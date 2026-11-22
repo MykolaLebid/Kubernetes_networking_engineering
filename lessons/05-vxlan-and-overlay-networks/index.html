@@ -1,0 +1,3612 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="34-lesson course on Kubernetes and Linux networking — from bare metal to AI GPU platforms">
+      
+      
+      
+        <link rel="canonical" href="https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/05-vxlan-and-overlay-networks/">
+      
+      
+        <link rel="prev" href="../04-network-namespaces-deep-dive/">
+      
+      
+        <link rel="next" href="../06-bgp-fundamentals/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
+    
+    
+      
+        <title>05 · VXLAN and Overlay Networks - Kubernetes Network Engineering</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#lesson-05-vxlan-and-overlay-networks" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Kubernetes Network Engineering" class="md-header__button md-logo" aria-label="Kubernetes Network Engineering" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Kubernetes Network Engineering
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              05 · VXLAN and Overlay Networks
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/MykolaLebid/Kubernetes_networking_engineering" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    MykolaLebid/Kubernetes_networking_engineering
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../course-map/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Course Map
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../version-matrix/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Version Matrix
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../RESOURCES/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Resources
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../01-linux-networking-fundamentals/" class="md-tabs__link">
+          
+  
+  
+  Track A — Linux Foundations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../08-cloud-provider-networking/" class="md-tabs__link">
+          
+  
+  
+  Track B — CNI Plugins and eBPF
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../13-kubernetes-services-kube-proxy/" class="md-tabs__link">
+          
+  
+  
+  Track C — Kubernetes Networking
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../17-ingress-controllers/" class="md-tabs__link">
+          
+  
+  
+  Track D — Ingress and Load Balancing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../21-service-mesh-istio/" class="md-tabs__link">
+          
+  
+  
+  Track E — Advanced Topics
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../25-openshift-networking-overview/" class="md-tabs__link">
+          
+  
+  
+  Track F — OpenShift Networking
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../29-aws-eks-networking/" class="md-tabs__link">
+          
+  
+  
+  Track G — AWS Networking
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../33-argocd-gitops/" class="md-tabs__link">
+          
+  
+  
+  Track H — GitOps
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../34-ai-platform-networking/" class="md-tabs__link">
+          
+  
+  
+  Track I — AI Platform
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Kubernetes Network Engineering" class="md-nav__button md-logo" aria-label="Kubernetes Network Engineering" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Kubernetes Network Engineering
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/MykolaLebid/Kubernetes_networking_engineering" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    MykolaLebid/Kubernetes_networking_engineering
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../course-map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Course Map
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../version-matrix/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Version Matrix
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../RESOURCES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Track A — Linux Foundations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Track A — Linux Foundations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01-linux-networking-fundamentals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01 · Linux Networking Fundamentals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../02-ip-routing-and-forwarding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    02 · IP Routing and Forwarding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03-iptables-and-netfilter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03 · iptables and Netfilter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04-network-namespaces-deep-dive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04 · Network Namespaces Deep Dive
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05 · VXLAN and Overlay Networks
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05 · VXLAN and Overlay Networks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#practice-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Practice Setup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-the-problem-overlay-networks-solve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. The Problem Overlay Networks Solve
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-vxlan-fundamentals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. VXLAN Fundamentals
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. VXLAN Fundamentals">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#packet-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Packet Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#architecture-two-node-vxlan-overlay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture: Two-Node VXLAN Overlay
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-creating-a-vxlan-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Creating a VXLAN Interface
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-vxlan-fdb-forwarding-database" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. VXLAN FDB (Forwarding Database)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-flannel-vxlan-mode-how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Flannel VXLAN Mode — How It Works
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Flannel VXLAN Mode — How It Works">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#packet-journey-pod-a-to-pod-b" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Packet Journey: Pod A to Pod B
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-mtu-the-most-common-vxlan-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. MTU — The Most Common VXLAN Problem
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. MTU — The Most Common VXLAN Problem">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mtu-reference-by-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MTU Reference by Environment
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-geneve-the-modern-alternative" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Geneve — The Modern Alternative
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Geneve — The Modern Alternative">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#vxlan-configuration-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VXLAN Configuration Reference
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-bare-metal-vs-cloud-overlay-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Bare Metal vs Cloud Overlay Considerations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Bare Metal vs Cloud Overlay Considerations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bare-metal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bare Metal
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cloud-awsgcpazure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cloud (AWS/GCP/Azure)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-performance-tuning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Performance Tuning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-hands-on-lab-manual-vxlan-tunnel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Hands-On Lab: Manual VXLAN Tunnel
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Hands-On Lab: Manual VXLAN Tunnel">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-by-step-observation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step-by-step Observation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#production-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Production Checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-anti-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Anti-Patterns
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#online-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Online Resources
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06-bgp-fundamentals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06 · BGP Fundamentals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07-bare-metal-network-infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07 · Bare Metal Network Infrastructure
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Track B — CNI Plugins and eBPF
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Track B — CNI Plugins and eBPF
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08-cloud-provider-networking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08 · Cloud Provider Networking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09-cni-specification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    09 · CNI Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../10-ebpf-xdp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10 · eBPF and XDP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../11-calico-cni-deep-dive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    11 · Calico CNI Deep Dive
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../12-cilium-cni-ebpf/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    12 · Cilium CNI and eBPF Dataplane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Track C — Kubernetes Networking
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Track C — Kubernetes Networking
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../13-kubernetes-services-kube-proxy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    13 · Kubernetes Services and kube-proxy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../14-coredns-service-discovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    14 · CoreDNS and Service Discovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../15-ipv6-dual-stack/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    15 · IPv6 and Dual-Stack
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../16-network-policies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    16 · Network Policies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Track D — Ingress and Load Balancing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Track D — Ingress and Load Balancing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../17-ingress-controllers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    17 · Ingress Controllers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../18-gateway-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    18 · Gateway API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../19-metallb-kube-vip/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    19 · MetalLB and kube-vip
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../20-cloud-load-balancers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    20 · Cloud Provider Load Balancers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Track E — Advanced Topics
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Track E — Advanced Topics
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../21-service-mesh-istio/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    21 · Service Mesh with Istio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../22-multi-cluster-networking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    22 · Multi-Cluster Networking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../23-network-security-hardening/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    23 · Network Security Hardening
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../24-network-observability-troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    24 · Network Observability and Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Track F — OpenShift Networking
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Track F — OpenShift Networking
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../25-openshift-networking-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    25 · OpenShift Networking Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../26-ovn-kubernetes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    26 · OVN-Kubernetes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../27-openshift-routes-haproxy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    27 · OpenShift Routes and HAProxy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../28-openshift-egress/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    28 · OpenShift EgressIP and EgressFirewall
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Track G — AWS Networking
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Track G — AWS Networking
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../29-aws-eks-networking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    29 · AWS EKS Networking Deep Dive
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../30-aws-vpc-design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    30 · AWS VPC Design for Kubernetes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../31-aws-load-balancer-controller/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    31 · AWS Load Balancer Controller
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../32-aws-hybrid-multicluster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    32 · AWS Hybrid and Multi-Cluster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Track H — GitOps
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Track H — GitOps
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../33-argocd-gitops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    33 · ArgoCD and GitOps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Track I — AI Platform
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Track I — AI Platform
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../34-ai-platform-networking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    34 · AI Platform Networking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#practice-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Practice Setup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-the-problem-overlay-networks-solve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. The Problem Overlay Networks Solve
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-vxlan-fundamentals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. VXLAN Fundamentals
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. VXLAN Fundamentals">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#packet-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Packet Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#architecture-two-node-vxlan-overlay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture: Two-Node VXLAN Overlay
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-creating-a-vxlan-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Creating a VXLAN Interface
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-vxlan-fdb-forwarding-database" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. VXLAN FDB (Forwarding Database)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-flannel-vxlan-mode-how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Flannel VXLAN Mode — How It Works
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Flannel VXLAN Mode — How It Works">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#packet-journey-pod-a-to-pod-b" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Packet Journey: Pod A to Pod B
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-mtu-the-most-common-vxlan-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. MTU — The Most Common VXLAN Problem
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. MTU — The Most Common VXLAN Problem">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mtu-reference-by-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MTU Reference by Environment
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-geneve-the-modern-alternative" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Geneve — The Modern Alternative
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Geneve — The Modern Alternative">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#vxlan-configuration-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VXLAN Configuration Reference
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-bare-metal-vs-cloud-overlay-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Bare Metal vs Cloud Overlay Considerations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Bare Metal vs Cloud Overlay Considerations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bare-metal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bare Metal
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cloud-awsgcpazure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cloud (AWS/GCP/Azure)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-performance-tuning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Performance Tuning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-hands-on-lab-manual-vxlan-tunnel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Hands-On Lab: Manual VXLAN Tunnel
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Hands-On Lab: Manual VXLAN Tunnel">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-by-step-observation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step-by-step Observation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#production-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Production Checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#common-anti-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Common Anti-Patterns
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#online-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Online Resources
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/MykolaLebid/Kubernetes_networking_engineering/edit/main/docs/lessons/05-vxlan-and-overlay-networks.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="lesson-05-vxlan-and-overlay-networks">Lesson 05 — VXLAN and Overlay Networks<a class="headerlink" href="#lesson-05-vxlan-and-overlay-networks" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>Track:</strong> Network Foundation — Bare Metal &amp; Cloud · <strong>Prereqs:</strong> <a href="../02-ip-routing-and-forwarding/">Lesson 02 — IP Routing and Forwarding</a> · <strong>Time:</strong> ~2 hours</p>
+<p><strong>Goal:</strong> Build a working VXLAN tunnel between two Linux hosts, explain how the FDB maps pod MACs to VTEP IPs, and calculate the correct pod MTU to prevent silent fragmentation.</p>
+</blockquote>
+<hr />
+<h2 id="practice-setup">Practice Setup<a class="headerlink" href="#practice-setup" title="Permanent link">&para;</a></h2>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Two terminals:</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># Terminal 1 — minikube Linux node</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>minikube<span class="w"> </span>ssh
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>ip<span class="w"> </span>link<span class="w"> </span>show<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-E<span class="w"> </span><span class="s2">"vxlan|tunl|cali"</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1"># Terminal 2 — Mac, kubectl</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>kubectl<span class="w"> </span>get<span class="w"> </span>pods<span class="w"> </span>-A<span class="w"> </span>-o<span class="w"> </span>wide<span class="w">   </span><span class="c1"># see pod IPs and nodes</span>
+</span></code></pre></div>
+<hr />
+<h2 id="1-the-problem-overlay-networks-solve">1. The Problem Overlay Networks Solve<a class="headerlink" href="#1-the-problem-overlay-networks-solve" title="Permanent link">&para;</a></h2>
+<p>Kubernetes assigns pods IPs from a private CIDR (e.g., <code>10.244.0.0/16</code>). These IPs are not routable on the underlying physical network. Without overlays, cross-node pod traffic would need:
+- Routes programmed on every physical switch/router (BGP), <strong>or</strong>
+- VPC-level route tables updated for every node (cloud), <strong>or</strong>
+- An overlay that wraps pod-IP packets inside routable packets.</p>
+<p>Overlay networks choose the third option: <strong>encapsulate first, route second</strong>.</p>
+<blockquote>
+<p><strong>See also:</strong> <a href="../02-ip-routing-and-forwarding/">Lesson 02 — IP Routing and Forwarding</a> for how CNI plugins using Flannel host-gw or Calico BGP avoid encapsulation entirely by programming the physical routing layer instead.</p>
+</blockquote>
+<hr />
+<h2 id="2-vxlan-fundamentals">2. VXLAN Fundamentals<a class="headerlink" href="#2-vxlan-fundamentals" title="Permanent link">&para;</a></h2>
+<p><strong>VXLAN (Virtual eXtensible LAN)</strong> encapsulates L2 Ethernet frames inside UDP packets.</p>
+<h3 id="packet-structure">Packet Structure<a class="headerlink" href="#packet-structure" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart TD
+    subgraph outer [Outer packet - routed on physical network]
+        OE[Outer Ethernet Header\nnode MAC to next-hop MAC]
+        OI[Outer IP Header\nsrc: node IP, dst: remote node IP]
+        OU[Outer UDP Header\nsrc: ephemeral, dst: 4789]
+        OV[VXLAN Header 8 bytes\nVNI 24-bit segment ID]
+    end
+    subgraph inner [Inner packet - original pod frame]
+        IE[Inner Ethernet\npod src MAC to dst pod MAC]
+        II[Inner IP Header\npod src IP to pod dst IP]
+        IP2[Inner TCP/UDP\napplication payload]
+    end
+    outer --&gt; inner
+
+    style outer fill:#1a3a5c,color:#fff
+    style inner fill:#2d5a27,color:#fff</code></pre>
+<p>Key facts:
+- VNI (VXLAN Network Identifier): 24-bit = up to 16 million segments (vs 4096 VLANs)
+- UDP destination port: <strong>4789</strong> (IANA standard); Flannel legacy uses <strong>8472</strong>
+- Each node runs a <strong>VTEP</strong> (VXLAN Tunnel Endpoint) — a virtual NIC that handles encapsulation and decapsulation
+- Overhead: <strong>50 bytes</strong> (outer Ethernet 14 + IP 20 + UDP 8 + VXLAN 8)</p>
+<h3 id="architecture-two-node-vxlan-overlay">Architecture: Two-Node VXLAN Overlay<a class="headerlink" href="#architecture-two-node-vxlan-overlay" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>flowchart LR
+    subgraph nodeA [Node A — 192.168.1.10]
+        PA[Pod A\n10.244.0.5]
+        BRA[cni0\nbridge]
+        VTEPA[flannel.1\nVTEP]
+        PA --- BRA --- VTEPA
+    end
+
+    subgraph net [Physical Network]
+        PHYS[UDP 4789\nencapsulated traffic]
+    end
+
+    subgraph nodeB [Node B — 192.168.1.20]
+        VTEPB[flannel.1\nVTEP]
+        BRB[cni0\nbridge]
+        PB[Pod B\n10.244.1.7]
+        VTEPB --- BRB --- PB
+    end
+
+    VTEPA &lt;--&gt;|outer src=192.168.1.10\nouter dst=192.168.1.20| PHYS
+    PHYS &lt;--&gt; VTEPB
+
+    style nodeA fill:#1a3a5c,color:#fff
+    style nodeB fill:#1a3a5c,color:#fff
+    style net fill:#4a4a4a,color:#fff</code></pre>
+<hr />
+<h2 id="3-creating-a-vxlan-interface">3. Creating a VXLAN Interface<a class="headerlink" href="#3-creating-a-vxlan-interface" title="Permanent link">&para;</a></h2>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Create a VXLAN interface (VTEP)</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>ip<span class="w"> </span>link<span class="w"> </span>add<span class="w"> </span>vxlan0<span class="w"> </span><span class="nb">type</span><span class="w"> </span>vxlan<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>id<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\ </span><span class="w">            </span><span class="c1"># VNI</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>dstport<span class="w"> </span><span class="m">4789</span><span class="w"> </span><span class="se">\ </span><span class="w">      </span><span class="c1"># UDP port</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nb">local</span><span class="w"> </span><span class="m">192</span>.168.1.10<span class="w"> </span><span class="se">\ </span><span class="c1"># local node IP (tunnel source)</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span>dev<span class="w"> </span>eth0<span class="w">             </span><span class="c1"># interface to use for outer IP</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>vxlan0<span class="w"> </span>up
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>ip<span class="w"> </span>addr<span class="w"> </span>add<span class="w"> </span><span class="m">10</span>.244.0.1/16<span class="w"> </span>dev<span class="w"> </span>vxlan0
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="c1"># Check interface details</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>ip<span class="w"> </span>-d<span class="w"> </span>link<span class="w"> </span>show<span class="w"> </span>vxlan0
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="c1"># → vxlan id 100 local 192.168.1.10 dev eth0 srcport 0 0 dstport 4789</span>
+</span></code></pre></div>
+<hr />
+<h2 id="4-vxlan-fdb-forwarding-database">4. VXLAN FDB (Forwarding Database)<a class="headerlink" href="#4-vxlan-fdb-forwarding-database" title="Permanent link">&para;</a></h2>
+<p>The VTEP needs to know which remote node has which pod MAC address.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># View the VXLAN FDB</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>bridge<span class="w"> </span>fdb<span class="w"> </span>show<span class="w"> </span>dev<span class="w"> </span>vxlan0
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Output example:</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1"># 00:00:00:00:00:00 dst 192.168.1.20 self permanent  ← flood to this VTEP</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="c1"># aa:bb:cc:dd:ee:01 dst 192.168.1.20 self            ← specific pod MAC</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="c1"># Add a unicast FDB entry (Flannel/Calico do this via their daemons)</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>bridge<span class="w"> </span>fdb<span class="w"> </span>add<span class="w"> </span>aa:bb:cc:dd:ee:01<span class="w"> </span>dev<span class="w"> </span>vxlan0<span class="w"> </span>dst<span class="w"> </span><span class="m">192</span>.168.1.20
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="c1"># Add an anycast entry (flood unknown MACs to all VTEPs)</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>bridge<span class="w"> </span>fdb<span class="w"> </span>add<span class="w"> </span><span class="m">00</span>:00:00:00:00:00<span class="w"> </span>dev<span class="w"> </span>vxlan0<span class="w"> </span>dst<span class="w"> </span><span class="m">192</span>.168.1.20
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>bridge<span class="w"> </span>fdb<span class="w"> </span>add<span class="w"> </span><span class="m">00</span>:00:00:00:00:00<span class="w"> </span>dev<span class="w"> </span>vxlan0<span class="w"> </span>dst<span class="w"> </span><span class="m">192</span>.168.1.30
+</span></code></pre></div>
+<p>Flannel uses the Kubernetes API (node annotations) to watch node CIDRs and program FDB entries. When a new node joins, flanneld adds its VTEP MAC and node IP to the FDB of every other node.</p>
+<hr />
+<h2 id="5-flannel-vxlan-mode-how-it-works">5. Flannel VXLAN Mode — How It Works<a class="headerlink" href="#5-flannel-vxlan-mode-how-it-works" title="Permanent link">&para;</a></h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Node A (192.168.1.10) podCIDR=10.244.0.0/24  flannel.1=10.244.0.0
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>Node B (192.168.1.20) podCIDR=10.244.1.0/24  flannel.1=10.244.1.0
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>Pod A (10.244.0.5) → Pod B (10.244.1.7)
+</span></code></pre></div>
+<h3 id="packet-journey-pod-a-to-pod-b">Packet Journey: Pod A to Pod B<a class="headerlink" href="#packet-journey-pod-a-to-pod-b" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>sequenceDiagram
+    participant PA as Pod A (10.244.0.5)
+    participant BRA as cni0 bridge (Node A)
+    participant VTEPA as flannel.1 VTEP (Node A)
+    participant NET as Physical Network
+    participant VTEPB as flannel.1 VTEP (Node B)
+    participant BRB as cni0 bridge (Node B)
+    participant PB as Pod B (10.244.1.7)
+
+    PA-&gt;&gt;BRA: Frame: src=10.244.0.5 dst=10.244.1.7
+    BRA-&gt;&gt;VTEPA: Routed to flannel.1 (ip route: 10.244.1.0/24 via flannel.1 onlink)
+    Note over VTEPA: FDB lookup: dst MAC for 10.244.1.0 → Node B VTEP at 192.168.1.20
+    VTEPA-&gt;&gt;NET: UDP encap: outer 192.168.1.10→192.168.1.20 port 8472 VNI=1
+    NET-&gt;&gt;VTEPB: Physical delivery
+    Note over VTEPB: Decap: strip outer headers, recover inner frame
+    VTEPB-&gt;&gt;BRB: Inner frame: 10.244.0.5→10.244.1.7
+    BRB-&gt;&gt;PB: Delivered via pod-side veth</code></pre>
+<hr />
+<h2 id="6-mtu-the-most-common-vxlan-problem">6. MTU — The Most Common VXLAN Problem<a class="headerlink" href="#6-mtu-the-most-common-vxlan-problem" title="Permanent link">&para;</a></h2>
+<p>VXLAN adds <strong>50 bytes</strong> of overhead (outer Ethernet + IP + UDP + VXLAN header).</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Physical NIC MTU: 1500 bytes
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>VXLAN overhead:    - 50 bytes
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>Pod/container MTU: 1450 bytes  ← must be configured explicitly
+</span></code></pre></div>
+<p>If pods use MTU 1500 (the default), large packets get fragmented or silently dropped (if the DF bit is set).</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Check MTU on VXLAN interface</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>ip<span class="w"> </span>link<span class="w"> </span>show<span class="w"> </span>flannel.1<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>mtu
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Check pod-side MTU (inside pod namespace)</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>kubectl<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-it<span class="w"> </span>&lt;pod&gt;<span class="w"> </span>--<span class="w"> </span>ip<span class="w"> </span>link<span class="w"> </span>show<span class="w"> </span>eth0<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>mtu
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># Test actual MTU with ping (don't fragment)</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>kubectl<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-it<span class="w"> </span>&lt;pod&gt;<span class="w"> </span>--<span class="w"> </span>ping<span class="w"> </span>-M<span class="w"> </span><span class="k">do</span><span class="w"> </span>-s<span class="w"> </span><span class="m">1422</span><span class="w"> </span>&lt;other-pod-ip&gt;
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="c1"># -M do = don't fragment, -s = payload size</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="c1"># 1422 + 28 (ICMP+IP headers) = 1450 → succeeds</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="c1"># 1423 + 28 = 1451 → fragmented or ICMP message too big received</span>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="c1"># Fix: set CNI MTU in ConfigMap (Flannel example)</span>
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>kubectl<span class="w"> </span>edit<span class="w"> </span>cm<span class="w"> </span>-n<span class="w"> </span>kube-system<span class="w"> </span>kube-flannel-cfg
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="c1"># NET_CONF_JSON: "MTU": 1450</span>
+</span></code></pre></div>
+<h3 id="mtu-reference-by-environment">MTU Reference by Environment<a class="headerlink" href="#mtu-reference-by-environment" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Environment</th>
+<th>Physical MTU</th>
+<th>VXLAN Overhead</th>
+<th>Correct Pod MTU</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Standard Ethernet</td>
+<td>1500</td>
+<td>50</td>
+<td><strong>1450</strong></td>
+</tr>
+<tr>
+<td>AWS (most instances)</td>
+<td>9001 (jumbo)</td>
+<td>50</td>
+<td><strong>8951</strong></td>
+</tr>
+<tr>
+<td>GCP VPC</td>
+<td>1460</td>
+<td>50</td>
+<td><strong>1410</strong></td>
+</tr>
+<tr>
+<td>Azure VNet</td>
+<td>1500</td>
+<td>50</td>
+<td><strong>1450</strong></td>
+</tr>
+<tr>
+<td>On-prem jumbo frames</td>
+<td>9000</td>
+<td>50</td>
+<td><strong>8950</strong></td>
+</tr>
+<tr>
+<td>Geneve (instead of VXLAN)</td>
+<td>1500</td>
+<td>54</td>
+<td><strong>1446</strong></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="7-geneve-the-modern-alternative">7. Geneve — The Modern Alternative<a class="headerlink" href="#7-geneve-the-modern-alternative" title="Permanent link">&para;</a></h2>
+<p>Geneve (Generic Network Virtualization Encapsulation) is similar to VXLAN but with extensible option headers. OVN, OpenShift, and Cilium support Geneve.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Create a Geneve interface</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>ip<span class="w"> </span>link<span class="w"> </span>add<span class="w"> </span>geneve0<span class="w"> </span><span class="nb">type</span><span class="w"> </span>geneve<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span>id<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span>remote<span class="w"> </span><span class="m">192</span>.168.1.20<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span>dstport<span class="w"> </span><span class="m">6081</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>geneve0<span class="w"> </span>up
+</span></code></pre></div>
+<p>Cilium uses Geneve or VXLAN depending on configuration:
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>cilium<span class="w"> </span>config<span class="w"> </span>view<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>tunnel
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="c1"># tunnel-protocol: vxlan  (or geneve)</span>
+</span></code></pre></div></p>
+<h3 id="vxlan-configuration-reference">VXLAN Configuration Reference<a class="headerlink" href="#vxlan-configuration-reference" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Effect</th>
+<th>When to change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>VNI (<code>id</code>)</td>
+<td>—</td>
+<td>24-bit segment identifier</td>
+<td>Use different VNIs to isolate tenant networks</td>
+</tr>
+<tr>
+<td>UDP port (<code>dstport</code>)</td>
+<td>4789 (IANA)</td>
+<td>Destination UDP port for encapsulated traffic</td>
+<td>Use 4789 unless hardware offload requires 8472 (Flannel legacy)</td>
+</tr>
+<tr>
+<td><code>local</code> IP</td>
+<td>—</td>
+<td>Source IP of outer UDP header</td>
+<td>Set to the node's primary IP; must be reachable from all other nodes</td>
+</tr>
+<tr>
+<td>MTU on vxlan device</td>
+<td>inherited</td>
+<td>Maximum frame size on the VTEP</td>
+<td>Set to <code>physical_MTU - 50</code>; CNI must propagate this to pods</td>
+</tr>
+<tr>
+<td><code>learning</code> flag</td>
+<td>on</td>
+<td>VTEP learns remote MAC→VTEP mappings via flood-and-learn</td>
+<td>Disable (<code>nolearning</code>) when CNI uses explicit FDB population</td>
+</tr>
+<tr>
+<td><code>proxy</code> flag</td>
+<td>off</td>
+<td>Respond to ARP on behalf of remote pods</td>
+<td>Enable (<code>proxy</code>) with <code>l2miss</code>/<code>l3miss</code> for ARP suppression</td>
+</tr>
+<tr>
+<td>UDP receive buffer</td>
+<td>system default</td>
+<td>Receive buffer for VTEP socket</td>
+<td>Increase <code>net.core.rmem_max</code> to <code>16777216</code> on high-throughput nodes</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="8-bare-metal-vs-cloud-overlay-considerations">8. Bare Metal vs Cloud Overlay Considerations<a class="headerlink" href="#8-bare-metal-vs-cloud-overlay-considerations" title="Permanent link">&para;</a></h2>
+<h3 id="bare-metal">Bare Metal<a class="headerlink" href="#bare-metal" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Full control of MTU (configure jumbo frames end-to-end for best performance)</li>
+<li>Overlay overhead matters more at 10/25/100 GbE</li>
+<li>Consider native routing (BGP, host-gw) for performance-sensitive workloads</li>
+<li>Ensure UDP 4789/8472 is allowed on host firewall rules</li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Allow VXLAN on firewall (if using ufw/iptables)</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>ufw<span class="w"> </span>allow<span class="w"> </span><span class="m">4789</span>/udp
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="c1"># or:</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>iptables<span class="w"> </span>-I<span class="w"> </span>INPUT<span class="w"> </span>-p<span class="w"> </span>udp<span class="w"> </span>--dport<span class="w"> </span><span class="m">4789</span><span class="w"> </span>-j<span class="w"> </span>ACCEPT
+</span></code></pre></div>
+<h3 id="cloud-awsgcpazure">Cloud (AWS/GCP/Azure)<a class="headerlink" href="#cloud-awsgcpazure" title="Permanent link">&para;</a></h3>
+<ul>
+<li>VPC Security Groups / Firewall Rules must allow UDP 4789 between nodes</li>
+<li>NACLs (AWS) must allow it in both directions</li>
+<li>Cloud load balancers don't forward raw UDP 4789 — VXLAN must be node-to-node</li>
+<li>Some cloud providers offer native overlay bypass (AWS VPC CNI, GKE Dataplane v2)</li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># AWS: check Security Group allows VXLAN</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>aws<span class="w"> </span>ec2<span class="w"> </span>describe-security-groups<span class="w"> </span>--group-ids<span class="w"> </span>sg-xxxxx<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span>--query<span class="w"> </span><span class="s1">'SecurityGroups[0].IpPermissions[?FromPort==`4789`]'</span>
+</span></code></pre></div>
+<hr />
+<h2 id="9-performance-tuning">9. Performance Tuning<a class="headerlink" href="#9-performance-tuning" title="Permanent link">&para;</a></h2>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Enable hardware offload for VXLAN (if NIC supports it)</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>ethtool<span class="w"> </span>-k<span class="w"> </span>eth0<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>tx-udp_tnl
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="c1"># tx-udp_tnl-segmentation: on</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="c1"># Enable checksum offload</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>ethtool<span class="w"> </span>-K<span class="w"> </span>eth0<span class="w"> </span>tx-checksum-ip-generic<span class="w"> </span>on
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="c1"># Increase UDP receive buffer for VTEP</span>
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>sysctl<span class="w"> </span>-w<span class="w"> </span>net.core.rmem_max<span class="o">=</span><span class="m">16777216</span>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>sysctl<span class="w"> </span>-w<span class="w"> </span>net.core.wmem_max<span class="o">=</span><span class="m">16777216</span>
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="c1"># Use RSS (Receive Side Scaling) so VXLAN decap is spread across CPUs</span>
+</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>ethtool<span class="w"> </span>-l<span class="w"> </span>eth0
+</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>ethtool<span class="w"> </span>-L<span class="w"> </span>eth0<span class="w"> </span>combined<span class="w"> </span><span class="m">8</span>
+</span></code></pre></div>
+<hr />
+<h2 id="10-hands-on-lab-manual-vxlan-tunnel">10. Hands-On Lab: Manual VXLAN Tunnel<a class="headerlink" href="#10-hands-on-lab-manual-vxlan-tunnel" title="Permanent link">&para;</a></h2>
+<p>Build a VXLAN overlay between two Linux hosts (or VMs).</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1">### On Host A (192.168.1.10)</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>ip<span class="w"> </span>link<span class="w"> </span>add<span class="w"> </span>vxlan10<span class="w"> </span><span class="nb">type</span><span class="w"> </span>vxlan<span class="w"> </span>id<span class="w"> </span><span class="m">10</span><span class="w"> </span>dstport<span class="w"> </span><span class="m">4789</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span><span class="nb">local</span><span class="w"> </span><span class="m">192</span>.168.1.10<span class="w"> </span>dev<span class="w"> </span>eth0
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>vxlan10<span class="w"> </span>up
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>ip<span class="w"> </span>addr<span class="w"> </span>add<span class="w"> </span><span class="m">10</span>.0.0.1/24<span class="w"> </span>dev<span class="w"> </span>vxlan10
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>bridge<span class="w"> </span>fdb<span class="w"> </span>add<span class="w"> </span><span class="m">00</span>:00:00:00:00:00<span class="w"> </span>dev<span class="w"> </span>vxlan10<span class="w"> </span>dst<span class="w"> </span><span class="m">192</span>.168.1.20
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>ip<span class="w"> </span>route<span class="w"> </span>add<span class="w"> </span><span class="m">10</span>.0.0.0/24<span class="w"> </span>dev<span class="w"> </span>vxlan10
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="c1">### On Host B (192.168.1.20)</span>
+</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>ip<span class="w"> </span>link<span class="w"> </span>add<span class="w"> </span>vxlan10<span class="w"> </span><span class="nb">type</span><span class="w"> </span>vxlan<span class="w"> </span>id<span class="w"> </span><span class="m">10</span><span class="w"> </span>dstport<span class="w"> </span><span class="m">4789</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="w">  </span><span class="nb">local</span><span class="w"> </span><span class="m">192</span>.168.1.20<span class="w"> </span>dev<span class="w"> </span>eth0
+</span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>vxlan10<span class="w"> </span>up
+</span><span id="__span-11-14"><a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a>ip<span class="w"> </span>addr<span class="w"> </span>add<span class="w"> </span><span class="m">10</span>.0.0.2/24<span class="w"> </span>dev<span class="w"> </span>vxlan10
+</span><span id="__span-11-15"><a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>
+</span><span id="__span-11-16"><a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a>bridge<span class="w"> </span>fdb<span class="w"> </span>add<span class="w"> </span><span class="m">00</span>:00:00:00:00:00<span class="w"> </span>dev<span class="w"> </span>vxlan10<span class="w"> </span>dst<span class="w"> </span><span class="m">192</span>.168.1.10
+</span><span id="__span-11-17"><a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a>ip<span class="w"> </span>route<span class="w"> </span>add<span class="w"> </span><span class="m">10</span>.0.0.0/24<span class="w"> </span>dev<span class="w"> </span>vxlan10
+</span></code></pre></div>
+<h3 id="step-by-step-observation">Step-by-step Observation<a class="headerlink" href="#step-by-step-observation" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1">### From Host A</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="c1"># Verify VTEP interface details</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>ip<span class="w"> </span>-d<span class="w"> </span>link<span class="w"> </span>show<span class="w"> </span>vxlan10
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="c1"># → vxlan id 10 local 192.168.1.10 dev eth0 srcport 0 0 dstport 4789 ...</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="c1"># Confirm FDB flood entry</span>
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>bridge<span class="w"> </span>fdb<span class="w"> </span>show<span class="w"> </span>dev<span class="w"> </span>vxlan10
+</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="c1"># → 00:00:00:00:00:00 dst 192.168.1.20 self permanent</span>
+</span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>
+</span><span id="__span-12-11"><a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="c1"># Test overlay reachability</span>
+</span><span id="__span-12-12"><a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>ping<span class="w"> </span>-c5<span class="w"> </span><span class="m">10</span>.0.0.2
+</span><span id="__span-12-13"><a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a><span class="c1"># → PING 10.0.0.2: 5 packets transmitted, 5 received, 0% packet loss</span>
+</span><span id="__span-12-14"><a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a>
+</span><span id="__span-12-15"><a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a><span class="c1"># Inspect encapsulated traffic on the physical interface</span>
+</span><span id="__span-12-16"><a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a>tcpdump<span class="w"> </span>-i<span class="w"> </span>eth0<span class="w"> </span>-n<span class="w"> </span>udp<span class="w"> </span>port<span class="w"> </span><span class="m">4789</span><span class="w"> </span>-X
+</span><span id="__span-12-17"><a id="__codelineno-12-17" name="__codelineno-12-17" href="#__codelineno-12-17"></a><span class="c1"># → UDP packets visible; inner IP addresses 10.0.0.1→10.0.0.2 visible in hex</span>
+</span><span id="__span-12-18"><a id="__codelineno-12-18" name="__codelineno-12-18" href="#__codelineno-12-18"></a>
+</span><span id="__span-12-19"><a id="__codelineno-12-19" name="__codelineno-12-19" href="#__codelineno-12-19"></a><span class="c1"># Verify MTU: largest payload that passes without fragmentation</span>
+</span><span id="__span-12-20"><a id="__codelineno-12-20" name="__codelineno-12-20" href="#__codelineno-12-20"></a>ping<span class="w"> </span>-M<span class="w"> </span><span class="k">do</span><span class="w"> </span>-s<span class="w"> </span><span class="m">1422</span><span class="w"> </span><span class="m">10</span>.0.0.2<span class="w">   </span><span class="c1"># → succeeds (1422+28 = 1450 ≤ 1500-50)</span>
+</span><span id="__span-12-21"><a id="__codelineno-12-21" name="__codelineno-12-21" href="#__codelineno-12-21"></a>ping<span class="w"> </span>-M<span class="w"> </span><span class="k">do</span><span class="w"> </span>-s<span class="w"> </span><span class="m">1452</span><span class="w"> </span><span class="m">10</span>.0.0.2<span class="w">   </span><span class="c1"># → fails: "Frag needed" or message too big</span>
+</span></code></pre></div>
+<h3 id="verification">Verification<a class="headerlink" href="#verification" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># After first ping, FDB should have learned remote MAC</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>bridge<span class="w"> </span>fdb<span class="w"> </span>show<span class="w"> </span>dev<span class="w"> </span>vxlan10
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="c1"># → 00:00:00:00:00:00 dst 192.168.1.20 self permanent  (flood entry)</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="c1"># → aa:bb:cc:11:22:33 dst 192.168.1.20 self            (learned entry for 10.0.0.2)</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="c1"># Confirm no fragmentation occurs at correct MTU</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>ip<span class="w"> </span>-s<span class="w"> </span>link<span class="w"> </span>show<span class="w"> </span>vxlan10
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="c1"># → RX: bytes/packets should match TX with 0 drops</span>
+</span></code></pre></div>
+<hr />
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Likely Cause</th>
+<th>Diagnostic Command</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cross-node pod traffic 100% loss</td>
+<td>UDP 4789 blocked by firewall/security group</td>
+<td><code>tcpdump -i eth0 -n udp port 4789</code> on both nodes</td>
+<td>Open UDP 4789 in firewall; check AWS SG / Azure NSG</td>
+</tr>
+<tr>
+<td>Large requests fail, small ones work</td>
+<td>MTU mismatch — pod MTU not set to <code>physical_MTU - 50</code></td>
+<td><code>kubectl exec -- ping -M do -s 1422 &lt;pod&gt;</code></td>
+<td>Set CNI MTU in flannel/calico ConfigMap; restart CNI daemonset</td>
+</tr>
+<tr>
+<td><code>bridge fdb show</code> shows no entries</td>
+<td>FDB not populated; flannel/calico daemon not running</td>
+<td><code>kubectl get pod -n kube-system | grep flannel</code></td>
+<td>Restart CNI daemon; check logs for API access errors</td>
+</tr>
+<tr>
+<td>VXLAN tunnel works but very high CPU</td>
+<td>Hardware offload disabled; all encap/decap in software</td>
+<td><code>ethtool -k eth0 | grep tx-udp_tnl</code></td>
+<td>Enable offload: <code>ethtool -K eth0 tx-udp_tnl-segmentation on</code></td>
+</tr>
+<tr>
+<td>Intermittent drops under load</td>
+<td>UDP receive buffer overflow on VTEP</td>
+<td><code>netstat -su | grep errors</code></td>
+<td>Increase <code>net.core.rmem_max</code> and <code>rmem_default</code></td>
+</tr>
+<tr>
+<td><code>ip -d link show vxlan0</code> shows wrong VNI</td>
+<td>Flannel used different VNI than expected</td>
+<td><code>ip -d link show flannel.1</code></td>
+<td>Confirm VNI in flannel ConfigMap; recreate interface if mismatched</td>
+</tr>
+<tr>
+<td>ARP not resolving across VTEPs</td>
+<td>Flood-and-learn disabled but explicit FDB not populated</td>
+<td><code>bridge fdb show dev flannel.1 | wc -l</code> vs node count</td>
+<td>Add zero-MAC flood entries or enable <code>l2miss</code>/<code>l3miss</code> with ARP proxy</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="production-checklist">Production Checklist<a class="headerlink" href="#production-checklist" title="Permanent link">&para;</a></h2>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Pod MTU set to <code>physical_MTU - 50</code> (VXLAN) or <code>physical_MTU - 54</code> (Geneve) in CNI ConfigMap before cluster goes live</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> UDP 4789 (or 8472 for Flannel legacy) explicitly allowed between all nodes in firewall rules, security groups, and NACLs</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Hardware VXLAN offload verified on the NIC model in use (<code>ethtool -k eth0 | grep tx-udp_tnl</code>) for performance-critical clusters</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>net.core.rmem_max</code> and <code>wmem_max</code> raised to <code>16777216</code> on nodes expected to handle &gt; 10 Gbps overlay throughput</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> FDB entry count monitored — unexpectedly low count means CNI daemon has lost sync with the cluster state</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Jumbo frame configuration confirmed end-to-end (NIC → switch → NIC) before using MTU &gt; 1500 to avoid hidden fragmentation</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Cloud-specific MTU verified: GCP VPC uses 1460 baseline requiring pod MTU 1410, not 1450</li>
+</ul>
+<hr />
+<h2 id="common-anti-patterns">Common Anti-Patterns<a class="headerlink" href="#common-anti-patterns" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>What people do</th>
+<th>Why it breaks</th>
+<th>Correct approach</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Leave pod MTU at default 1500 on a VXLAN overlay</td>
+<td>Large packets get fragmented or dropped; throughput collapses; hard to diagnose because small packets work fine</td>
+<td>Set CNI MTU to <code>physical_MTU - 50</code> in the CNI ConfigMap; verify with <code>ping -M do</code></td>
+</tr>
+<tr>
+<td>Use Flannel VXLAN on bare metal with jumbo frames but keep default CNI MTU</td>
+<td>Wastes jumbo frame benefit; pods limited to 1450 when they could use 8950</td>
+<td>Set <code>flannel.MTU: 8950</code> in kube-flannel-cfg when physical MTU is 9000</td>
+</tr>
+<tr>
+<td>Allow only TCP in firewall rules between nodes</td>
+<td>VXLAN runs over UDP 4789; all overlay traffic is blocked</td>
+<td>Allow UDP 4789 (and 8472 for legacy) in both directions between node security groups</td>
+</tr>
+<tr>
+<td>Mix VNIs across clusters sharing the same physical network</td>
+<td>Different clusters use the same VNI; MAC/ARP entries bleed across cluster boundaries</td>
+<td>Assign a unique VNI range per cluster; use <code>id</code> parameter in VXLAN link creation</td>
+</tr>
+<tr>
+<td>Rely on flood-and-learn in large clusters</td>
+<td>Each unknown MAC causes a flood to all VTEPs; broadcast storm at scale</td>
+<td>Configure CNI daemon to use unicast FDB population (Flannel directRouting, Calico VXLAN with explicit FDB)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="quick-reference">Quick Reference<a class="headerlink" href="#quick-reference" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Use Case</th>
+<th>Command</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Create VXLAN VTEP interface</td>
+<td><code>ip link add vxlan0 type vxlan id &lt;VNI&gt; dstport 4789 local &lt;node-ip&gt; dev eth0</code></td>
+</tr>
+<tr>
+<td>Show VTEP details</td>
+<td><code>ip -d link show vxlan0</code></td>
+</tr>
+<tr>
+<td>View VXLAN FDB</td>
+<td><code>bridge fdb show dev vxlan0</code></td>
+</tr>
+<tr>
+<td>Add unicast FDB entry</td>
+<td><code>bridge fdb add &lt;mac&gt; dev vxlan0 dst &lt;remote-node-ip&gt;</code></td>
+</tr>
+<tr>
+<td>Add flood FDB entry</td>
+<td><code>bridge fdb add 00:00:00:00:00:00 dev vxlan0 dst &lt;remote-node-ip&gt;</code></td>
+</tr>
+<tr>
+<td>Test overlay reachability</td>
+<td><code>ping -c5 &lt;overlay-ip&gt;</code></td>
+</tr>
+<tr>
+<td>Test MTU (no fragment)</td>
+<td><code>ping -M do -s 1422 &lt;dst-ip&gt;</code></td>
+</tr>
+<tr>
+<td>Inspect encapsulated traffic</td>
+<td><code>tcpdump -i eth0 -n udp port 4789 -X</code></td>
+</tr>
+<tr>
+<td>Check hardware VXLAN offload</td>
+<td><code>ethtool -k eth0 \| grep tx-udp_tnl</code></td>
+</tr>
+<tr>
+<td>Check MTU on flannel interface</td>
+<td><code>ip link show flannel.1 \| grep mtu</code></td>
+</tr>
+<tr>
+<td>Verify pod MTU</td>
+<td><code>kubectl exec &lt;pod&gt; -- ip link show eth0</code></td>
+</tr>
+<tr>
+<td>Check CNI MTU config (Flannel)</td>
+<td><code>kubectl get cm -n kube-system kube-flannel-cfg -o yaml \| grep MTU</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>VXLAN overhead</td>
+<td>50 bytes → subtract from physical MTU for pod MTU</td>
+</tr>
+<tr>
+<td>FDB</td>
+<td>Maps pod MAC → remote node VTEP IP</td>
+</tr>
+<tr>
+<td>VNI</td>
+<td>24-bit segment ID; use unique values per cluster</td>
+</tr>
+<tr>
+<td>Flannel VXLAN</td>
+<td>Flood+learn or unicast FDB via Kubernetes API</td>
+</tr>
+<tr>
+<td>Geneve</td>
+<td>Extensible alternative (54 bytes overhead), used by OVN/Cilium</td>
+</tr>
+<tr>
+<td>MTU mismatch</td>
+<td>Most common VXLAN-related packet drop cause</td>
+</tr>
+<tr>
+<td>Cloud firewall</td>
+<td>Must allow UDP 4789 between all nodes</td>
+</tr>
+<tr>
+<td>Hardware offload</td>
+<td><code>tx-udp_tnl-segmentation</code> reduces CPU for encap/decap</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Resource</th>
+<th>Type</th>
+<th>What you practice</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://killercoda.com/">Killercoda Playground</a></td>
+<td>Free playground</td>
+<td>Create VXLAN interfaces, inspect FDB, test encapsulation with <code>tcpdump</code> live</td>
+</tr>
+<tr>
+<td><a href="https://labs.iximiuz.com/tutorials/container-networking-from-scratch">iximiuz: Container Networking from Scratch</a></td>
+<td>Free interactive lab</td>
+<td>Covers overlay mechanics that explain why VXLAN is needed</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><strong>Next:</strong> <a href="../06-bgp-fundamentals/">Lesson 06 — BGP Fundamentals for Kubernetes</a></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../04-network-namespaces-deep-dive/" class="md-footer__link md-footer__link--prev" aria-label="Previous: 04 · Network Namespaces Deep Dive">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                04 · Network Namespaces Deep Dive
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../06-bgp-fundamentals/" class="md-footer__link md-footer__link--next" aria-label="Next: 06 · BGP Fundamentals">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                06 · BGP Fundamentals
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/MykolaLebid/Kubernetes_networking_engineering" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.code.annotate", "content.action.edit", "toc.follow"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.a5f9d56c.min.js"></script>
+      
+    
+  </body>
+</html>
