@@ -275,4 +275,13 @@ ip netns del cni-pod-sim
 
 ---
 
+## Online Resources
+
+| Resource | Type | What you practice |
+|----------|------|-------------------|
+| [iximiuz: Container Networking from Scratch](https://labs.iximiuz.com/tutorials/container-networking-from-scratch) | Free interactive lab | The best free resource for this lesson — builds and inspects namespaces from scratch with the exact `ip netns` commands covered here |
+| [Killercoda Playground](https://killercoda.com/) | Free playground | Real Linux environment to run `nsenter`, `lsns`, `crictl` commands |
+
+---
+
 **Next:** [Lesson 05 — VXLAN and Overlay Networks](05-vxlan-and-overlay-networks.md)

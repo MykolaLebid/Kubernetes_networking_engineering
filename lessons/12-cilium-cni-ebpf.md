@@ -402,4 +402,14 @@ az aks create \
 
 ---
 
+## Online Resources
+
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [Isovalent: Getting Started with Cilium](https://isovalent.com/labs/getting-started-with-cilium/) | Free | Install Cilium, use Hubble for traffic inspection, enable encryption — covers this entire lesson |
+| [Isovalent: Foundations — Kubernetes Networking and Cilium](https://isovalent.com/labs/getting-started-with-kubernetes-networking-and-cilium/) | Free | Pod networking, CNI, IPAM, services, ingress, and network policies all with Cilium |
+| [Killercoda Playground](https://killercoda.com/) | Free | Run `cilium status`, `hubble observe`, inspect BPF maps with `bpftool` on a real cluster |
+
+---
+
 **Next:** [Lesson 13 — Kubernetes Services and kube-proxy](13-kubernetes-services-kube-proxy.md)

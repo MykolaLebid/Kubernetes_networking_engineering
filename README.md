@@ -4,6 +4,8 @@
 
 Kubernetes Network Engineering covers the design, implementation, and operation of networking within and around Kubernetes clusters. It bridges traditional network engineering with cloud-native infrastructure, requiring knowledge of CNI plugins, service meshes, and the underlying Linux networking primitives that power them — from bare metal spine-leaf fabrics to AI GPU clusters.
 
+> **Free learning resources mapped to every lesson:** [RESOURCES.md](RESOURCES.md)
+
 ---
 
 ## Practice Environment

@@ -307,4 +307,13 @@ ip route show proto bird
 
 ---
 
+## Online Resources
+
+| Resource | Type | What you practice |
+|----------|------|-------------------|
+| [Killercoda Playground](https://killercoda.com/) | Free playground | Run Calico with BIRD; use `birdc show protocols` and `ip route show proto bird` on a real cluster |
+| [KodeKloud: Kubernetes Networking Deep Dive](https://www.kodekloud.com/learning-path/kubernetes) | Paid course (free trial) | Covers BGP in the context of Calico CNI configuration |
+
+---
+
 **Next:** [Lesson 07 — Bare Metal Network Infrastructure for Kubernetes](07-bare-metal-network-infrastructure.md)

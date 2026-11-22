@@ -280,4 +280,14 @@ modprobe bridge vxlan
 
 ---
 
+## Online Resources
+
+| Resource | Type | What you practice |
+|----------|------|-------------------|
+| [Isovalent: Foundations — Kubernetes Networking and Cilium](https://isovalent.com/labs/getting-started-with-kubernetes-networking-and-cilium/) | Free interactive lab | Walks through CNI concepts, IPAM, and pod networking end-to-end in a real browser-based cluster |
+| [KodeKloud: Kubernetes Networking Deep Dive](https://www.kodekloud.com/learning-path/kubernetes) | Paid course (free trial) | Structured labs covering CNI plugin installation, config files, and debugging |
+| [Killercoda Playground](https://killercoda.com/) | Free playground | Inspect `/etc/cni/net.d/` and `/opt/cni/bin/` on a real node; manually trigger CNI ADD |
+
+---
+
 **Next:** [Lesson 10 — eBPF and XDP](10-ebpf-xdp.md)

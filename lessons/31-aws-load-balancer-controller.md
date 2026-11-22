@@ -293,4 +293,14 @@ kubectl logs -n kube-system deploy/aws-load-balancer-controller | grep "subnet"
 
 ---
 
+## Online Resources
+
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [AWS EKS Workshop — Load Balancers](https://www.eksworkshop.com/) | Free workshop (~$3 AWS cost) | Deploy AWS Load Balancer Controller, create ALB via Ingress, NLB via Service — covers every annotation in this lesson |
+| [AWS Skill Builder — Amazon EKS](https://skillbuilder.aws/) | Free (AWS account required) | Simulated ALB and NLB configuration labs |
+| [AWS Load Balancer Controller Docs](https://kubernetes-sigs.github.io/aws-load-balancer-controller/) | Free | Official reference for every annotation, IngressGroup, and TargetGroupBinding — bookmark for the hands-on sections |
+
+---
+
 **Next:** [Lesson 32 — AWS Hybrid and Multi-Cluster Networking](32-aws-hybrid-multicluster.md)

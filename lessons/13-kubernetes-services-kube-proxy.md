@@ -371,4 +371,14 @@ annotations:
 
 ---
 
+## Online Resources
+
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [Killercoda Playground](https://killercoda.com/) | Free | Create ClusterIP/NodePort services, inspect `iptables -t nat -L KUBE-SERVICES`, verify EndpointSlices live |
+| [Isovalent: Foundations — Kubernetes Networking and Cilium](https://isovalent.com/labs/getting-started-with-kubernetes-networking-and-cilium/) | Free | Covers Kubernetes services section including ClusterIP internals and load balancing |
+| [Kubernetes Official Interactive Tutorial](https://kubernetes.io/docs/tutorials/kubernetes-basics/expose/expose-intro/) | Free | Official browser-based K8s lab exposing a service — good warm-up before the iptables deep dive |
+
+---
+
 **Next:** [Lesson 14 — CoreDNS and Service Discovery](14-coredns-service-discovery.md)

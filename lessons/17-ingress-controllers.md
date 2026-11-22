@@ -359,4 +359,14 @@ openssl s_client -connect web.example.com:443 -servername web.example.com \
 
 ---
 
+## Online Resources
+
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [Killercoda Playground](https://killercoda.com/) | Free | Deploy NGINX ingress controller, create Ingress resources, test path routing — full setup in a browser cluster |
+| [Play with Kubernetes](https://labs.play-with-k8s.com/) | Free (Docker account) | Multi-node cluster in browser; deploy an ingress controller and expose services |
+| [cert-manager: Getting Started](https://cert-manager.io/docs/getting-started/) | Free | Official tutorial deploying cert-manager on minikube with a self-signed issuer — matches the TLS section of this lesson |
+
+---
+
 **Next:** [Lesson 18 — Gateway API: Next-Generation Ingress](18-gateway-api.md)

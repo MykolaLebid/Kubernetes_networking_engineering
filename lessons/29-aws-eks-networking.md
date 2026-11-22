@@ -315,4 +315,14 @@ spec:
 
 ---
 
+## Online Resources
+
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [AWS EKS Workshop](https://www.eksworkshop.com/) | Free workshop (~$3 AWS cost, clean up after) | ENI secondary IPs, VPC CNI configuration, prefix delegation, Security Groups for Pods — mirrors this lesson end-to-end |
+| [AWS Skill Builder — Amazon EKS](https://skillbuilder.aws/) | Free (AWS account required) | Official AWS simulated labs for EKS networking with no live infrastructure cost |
+| [Amazon EKS Best Practices Guide — Networking](https://aws.github.io/aws-eks-best-practices/networking/index/) | Free | Deep reference on VPC CNI design, pod density, custom networking — read alongside this lesson |
+
+---
+
 **Next:** [Lesson 30 — AWS VPC Design for Kubernetes](30-aws-vpc-design.md)

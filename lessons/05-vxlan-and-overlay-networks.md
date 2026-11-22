@@ -281,4 +281,13 @@ tcpdump -i eth0 -n udp port 4789 -X
 
 ---
 
+## Online Resources
+
+| Resource | Type | What you practice |
+|----------|------|-------------------|
+| [Killercoda Playground](https://killercoda.com/) | Free playground | Create VXLAN interfaces, inspect FDB, test encapsulation with `tcpdump` live |
+| [iximiuz: Container Networking from Scratch](https://labs.iximiuz.com/tutorials/container-networking-from-scratch) | Free interactive lab | Covers overlay mechanics that explain why VXLAN is needed |
+
+---
+
 **Next:** [Lesson 06 — BGP Fundamentals for Kubernetes](06-bgp-fundamentals.md)

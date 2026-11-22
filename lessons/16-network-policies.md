@@ -388,4 +388,15 @@ az aks create --network-policy azure
 
 ---
 
+## Online Resources
+
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [Isovalent: Cilium Host Firewall](https://isovalent.com/labs/cilium-host-firewall/) | Free | Enforce network policies at the host level with Cilium — extends standard NetworkPolicy to node traffic |
+| [Killercoda Playground](https://killercoda.com/) | Free | Apply and test NetworkPolicy YAML, verify traffic is blocked with `kubectl exec` + `curl` |
+| [Kubernetes Network Policy Recipes](https://github.com/ahmetb/kubernetes-network-policy-recipes) | Free (GitHub) | 20+ ready-to-use NetworkPolicy examples covering default-deny, namespace isolation, CIDR rules — copy-paste into your cluster |
+| [NetworkPolicy Editor (Cilium)](https://editor.networkpolicy.io/) | Free browser tool | Visual drag-and-drop NetworkPolicy editor — build policies graphically, export YAML, see the selector logic |
+
+---
+
 **Next:** [Lesson 17 — Ingress Controllers and L7 Load Balancing](17-ingress-controllers.md)

@@ -248,4 +248,14 @@ ip link del br0
 
 ---
 
+## Online Resources
+
+| Resource | Type | What you practice |
+|----------|------|-------------------|
+| [iximiuz: Container Networking from Scratch](https://labs.iximiuz.com/tutorials/container-networking-from-scratch) | Free interactive lab | Build veth pairs, bridges, namespaces by hand in a real Linux environment — mirrors this lesson's lab exactly |
+| [Killercoda Playground](https://killercoda.com/) | Free playground | Instant browser-based Linux node; run every `ip` command from this lesson without minikube |
+| [iximiuz: Networking Challenges](https://labs.iximiuz.com/challenges) | Free challenges | Practical Linux networking problems with automated verification |
+
+---
+
 **Next:** [Lesson 02 — IP Routing and Forwarding in Linux](02-ip-routing-and-forwarding.md)

@@ -318,4 +318,15 @@ kubectl logs -f job.kube-bench | grep -A3 "5.3"
 
 ---
 
+## Online Resources
+
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [Isovalent: Zero Trust Visibility](https://isovalent.com/labs/zero-trust-visibility/) | Free | Use metrics and Hubble dashboards to identify all required application flows before enforcing zero-trust network policies |
+| [Kubernetes Network Policy Recipes](https://github.com/ahmetb/kubernetes-network-policy-recipes) | Free (GitHub) | 20+ policy templates covering default-deny, namespace isolation, metadata API block |
+| [NetworkPolicy Editor](https://editor.networkpolicy.io/) | Free browser tool | Visually build and validate NetworkPolicy YAML before applying it |
+| [Killercoda Playground](https://killercoda.com/) | Free | Apply hardening policies, verify blocks, test WireGuard encryption toggle in Cilium |
+
+---
+
 **Next:** [Lesson 24 — Network Observability and Troubleshooting](24-network-observability-troubleshooting.md)

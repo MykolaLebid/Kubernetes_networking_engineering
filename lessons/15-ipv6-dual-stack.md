@@ -313,6 +313,13 @@ ip6tables -t nat -L KUBE-SERVICES -n | grep CLUSTER-IP
 
 ---
 
-**Next:** [Lesson 16 — Network Policies: Microsegmentation](16-network-policies.md)
+## Online Resources
 
-<!-- old-next was multi-cluster --> Networking](22-multi-cluster-networking.md)
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [Killercoda Playground](https://killercoda.com/) | Free | Enable dual-stack on a kind/minikube cluster; inspect IPv6 addresses, test NDP with `ip -6 neigh` |
+| [Kubernetes Official Docs: IPv4/IPv6 dual-stack](https://kubernetes.io/docs/concepts/services-networking/dual-stack/) | Free | Official walkthrough with example configs — use alongside the lab commands in this lesson |
+
+---
+
+**Next:** [Lesson 16 — Network Policies: Microsegmentation](16-network-policies.md)

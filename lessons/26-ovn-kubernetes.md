@@ -294,4 +294,13 @@ oc get podnetworkconnectivitycheck -n openshift-network-diagnostics \
 
 ---
 
+## Online Resources
+
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [Red Hat Developer Sandbox](https://developers.redhat.com/developer-sandbox) | Free 30-day cluster | The only free way to run `ovs-vsctl show`, inspect OVN NB/SB databases, and view Geneve tunnels in a real OpenShift cluster |
+| [Red Hat Interactive Learning Portal](https://www.redhat.com/en/interactive-labs/openshift) | Free (Red Hat account) | Guided labs for OVN-Kubernetes network troubleshooting |
+
+---
+
 **Next:** [Lesson 27 — OpenShift Routes and HAProxy Router](27-openshift-routes-haproxy.md)

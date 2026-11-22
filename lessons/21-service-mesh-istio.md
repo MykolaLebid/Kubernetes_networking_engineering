@@ -426,4 +426,15 @@ istioctl experimental envoy-stats <pod>
 
 ---
 
+## Online Resources
+
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [Istio — Get Started](https://istio.io/latest/docs/setup/getting-started/) | Free | Official Istio tutorial on minikube: deploy Bookinfo app, enable mTLS, configure VirtualService traffic splitting — covers this entire lesson |
+| [Tetrate Academy: Istio Fundamentals](https://academy.tetrate.io/courses/istio-fundamentals) | Free (account required) | Official free Istio training with browser-based labs; covers PeerAuthentication, AuthorizationPolicy, DestinationRule |
+| [Isovalent: TLS Visibility](https://isovalent.com/labs/tls-visibility/) | Free | Inspect TLS traffic and cipher identification using Cilium + Hubble — complements mTLS concepts |
+| [Killercoda Playground](https://killercoda.com/) | Free | Run `istioctl proxy-status`, inspect sidecar config, test traffic routing |
+
+---
+
 **Next:** [Lesson 10 — eBPF and XDP in Kubernetes Networking](10-ebpf-xdp.md)

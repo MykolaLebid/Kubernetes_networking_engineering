@@ -256,4 +256,13 @@ oc exec -n openshift-ovn-kubernetes ovnkube-master-xxxxx -- \
 
 ---
 
+## Online Resources
+
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [Red Hat Developer Sandbox](https://developers.redhat.com/developer-sandbox) | Free 30-day cluster | Apply EgressIP and EgressFirewall resources; test DNS-based egress rules; observe HA failover behavior |
+| [Red Hat: EgressIP Documentation](https://docs.openshift.com/container-platform/latest/networking/ovn_kubernetes_network_provider/assigning-egress-ips-ovn.html) | Free | Official walkthrough with YAML examples — follow along in the Developer Sandbox |
+
+---
+
 **Next:** [Lesson 29 — AWS EKS Networking Deep Dive](29-aws-eks-networking.md)

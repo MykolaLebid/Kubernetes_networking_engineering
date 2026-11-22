@@ -353,6 +353,16 @@ aws ec2 describe-vpn-connections \
 
 ---
 
+## Online Resources
+
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [AWS EKS Workshop](https://www.eksworkshop.com/) | Free workshop (~$3 AWS cost) | Transit Gateway connectivity, VPC peering between EKS clusters, Direct Connect simulation |
+| [AWS Skill Builder — Networking](https://skillbuilder.aws/) | Free (AWS account required) | Transit Gateway, VPC peering, and hybrid networking simulated labs |
+| [Submariner Quickstart](https://submariner.io/getting-started/quickstart/) | Free | Connect two local kind clusters — a free stand-in for practicing cross-cluster pod routing concepts without AWS cost |
+
+---
+
 *End of AWS Networking Track*
 
 **See also:** [Lesson 22 — Multi-Cluster Networking](22-multi-cluster-networking.md) for Cilium Cluster Mesh and Submariner details.

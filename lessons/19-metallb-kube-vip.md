@@ -289,4 +289,13 @@ spec:
 
 ---
 
+## Online Resources
+
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [Killercoda Playground](https://killercoda.com/) | Free | Deploy MetalLB in L2 mode, create a LoadBalancer service, watch ARP announcements with `arping` |
+| [MetalLB Official Tutorial](https://metallb.universe.tf/installation/) | Free | Step-by-step MetalLB install on minikube with L2 and BGP mode examples |
+
+---
+
 **Next:** [Lesson 18 — Cloud Provider Load Balancers](20-cloud-load-balancers.md)

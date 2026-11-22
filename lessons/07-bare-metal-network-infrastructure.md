@@ -366,4 +366,13 @@ kubectl run -it --rm debug --image=nicolaka/netshoot -- nslookup kubernetes.defa
 
 ---
 
+## Online Resources
+
+| Resource | Type | What you practice |
+|----------|------|-------------------|
+| [Killercoda Playground](https://killercoda.com/) | Free playground | Inspect bonding, bridge VLAN tables, and MetalLB on a real Linux node |
+| [KodeKloud: Kubernetes Networking Deep Dive](https://www.kodekloud.com/learning-path/kubernetes) | Paid course (free trial) | Bare-metal load balancing and node network configuration labs |
+
+---
+
 **Next:** [Lesson 08 — Cloud Provider Networking Basics](08-cloud-provider-networking.md)

@@ -259,4 +259,13 @@ ip netns exec node1 ping -c3 -I 10.244.0.1 10.244.1.1
 
 ---
 
+## Online Resources
+
+| Resource | Type | What you practice |
+|----------|------|-------------------|
+| [iximiuz: Container Networking from Scratch](https://labs.iximiuz.com/tutorials/container-networking-from-scratch) | Free interactive lab | Routing table manipulation between namespaces — same commands as this lesson |
+| [Killercoda Playground](https://killercoda.com/) | Free playground | Run `ip route`, policy routing, and ECMP commands live |
+
+---
+
 **Next:** [Lesson 03 — iptables and Netfilter Architecture](03-iptables-and-netfilter.md)

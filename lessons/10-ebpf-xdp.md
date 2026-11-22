@@ -345,6 +345,16 @@ grep -E "CONFIG_BPF|CONFIG_XDP|CONFIG_NET_CLS_BPF" /boot/config-$(uname -r)
 
 ---
 
-**Next:** [Lesson 11 — Calico CNI Deep Dive](11-calico-cni-deep-dive.md)
+## Online Resources
 
-<!-- old-next was IPv6 (now 15) --> and Dual-Stack Kubernetes](15-ipv6-dual-stack.md)
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [ebpf.io Interactive Lab](https://ebpf.io/labs/) | Free | Write and load a real eBPF program in your browser — no kernel setup; based on the `opensnoop` example |
+| [xdp-project: XDP Tutorial](https://github.com/xdp-project/xdp-tutorial) | Free (runs locally) | Step-by-step labs writing XDP programs in C with automated test environments; covers every XDP return code from this lesson |
+| [iximiuz: eBPF Beginner Challenge](https://labs.iximiuz.com/challenges/ebpf-beginner-challenge-89ffd924) | Free | Debug eBPF programs, explore `bpftool`, test BPF maps — interactive with auto-verification |
+| [Isovalent: Build an eBPF Monitoring Tool for Kubernetes](https://isovalent.com/labs/ebpf-monitoring-tool-for-kubernetes/) | Free | Write a production-ready HTTP monitor using eBPF and Go inside a real Kubernetes cluster |
+| [Brendan Gregg — BPF & bpftrace Tutorials](https://www.brendangregg.com/BPF/bpftrace-cheatsheet.html) | Free | The original BPF one-liners reference; use with `bpftool` commands from this lesson |
+
+---
+
+**Next:** [Lesson 11 — Calico CNI Deep Dive](11-calico-cni-deep-dive.md)

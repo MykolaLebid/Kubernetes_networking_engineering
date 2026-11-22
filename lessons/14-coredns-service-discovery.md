@@ -350,4 +350,13 @@ kubectl get cm -n kube-system coredns -o yaml | grep forward
 
 ---
 
+## Online Resources
+
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [Killercoda Playground](https://killercoda.com/) | Free | Edit CoreDNS ConfigMap live, run `nslookup` from pods, test ndots behavior, inspect NodeLocal DNSCache |
+| [iximiuz: Container Networking from Scratch](https://labs.iximiuz.com/tutorials/container-networking-from-scratch) | Free | DNS resolution inside network namespaces — explains why CoreDNS sits at a ClusterIP address |
+
+---
+
 **Next:** [Lesson 15 — IPv6 and Dual-Stack Kubernetes](15-ipv6-dual-stack.md)

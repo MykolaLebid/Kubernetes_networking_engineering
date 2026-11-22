@@ -332,4 +332,14 @@ aws ec2 describe-network-interface-attribute \
 
 ---
 
+## Online Resources
+
+| Resource | Type | What you practice |
+|----------|------|-------------------|
+| [AWS EKS Workshop](https://www.eksworkshop.com/) | Free workshop (small AWS cost ~$3) | Hands-on VPC CNI, ENI secondary IPs, Security Groups for Pods — the AWS half of this lesson |
+| [AWS Skill Builder — Amazon EKS](https://skillbuilder.aws/) | Free (simulated labs) | Official AWS labs for EKS networking with no AWS account cost for simulations |
+| [Killercoda Playground](https://killercoda.com/) | Free playground | Inspect CNI configs and pod networking on a local cluster |
+
+---
+
 **Next:** [Lesson 09 — CNI Specification and Plugin Architecture](09-cni-specification.md)

@@ -351,4 +351,15 @@ You can now trace a packet from a pod's application socket all the way to its de
 
 ---
 
+## Online Resources
+
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [Isovalent: Getting Started with Cilium](https://isovalent.com/labs/getting-started-with-cilium/) | Free | Use Hubble CLI and UI to inspect live traffic flows, identify drops, build service dependency maps |
+| [Isovalent: Zero Trust Visibility](https://isovalent.com/labs/zero-trust-visibility/) | Free | Investigate connectivity issues and build service maps using Hubble Timescape |
+| [Killercoda Playground](https://killercoda.com/) | Free | Run `ss -s`, `conntrack -L`, `tcpdump`, deploy netshoot pod for live packet capture |
+| [iximiuz: Networking Challenges](https://labs.iximiuz.com/challenges) | Free | Real troubleshooting scenarios — broken network configs with automated pass/fail checking |
+
+---
+
 *End of Kubernetes Network Engineering — Network Foundations Course*

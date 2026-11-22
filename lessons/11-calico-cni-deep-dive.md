@@ -377,4 +377,14 @@ az aks create --network-policy calico --network-plugin azure ...
 
 ---
 
+## Online Resources
+
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [Killercoda Playground](https://killercoda.com/) | Free | Instant Kubernetes cluster with Calico; run `calicoctl node status`, `ip route show proto bird`, inspect `cali*` interfaces |
+| [Isovalent: Foundations — Kubernetes Networking and Cilium](https://isovalent.com/labs/getting-started-with-kubernetes-networking-and-cilium/) | Free | Covers IPAM, CNI concepts, and pod networking — directly applicable to understanding Calico IPAM blocks |
+| [Project Calico — Interactive Demos](https://www.tigera.io/learn/guides/kubernetes-networking/) | Free | Official Calico/Tigera learning resources including BGP and policy guides |
+
+---
+
 **Next:** [Lesson 12 — Cilium CNI and eBPF Dataplane](12-cilium-cni-ebpf.md)

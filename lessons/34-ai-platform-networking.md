@@ -647,4 +647,16 @@ cat /sys/class/net/ens4f0/ecn_enable   # 1 = ECN enabled
 
 ---
 
+## Online Resources
+
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [NVIDIA GPU Operator Quick Start](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/getting-started.html) | Free | Official tutorial: deploy GPU Operator on Kubernetes, verify GPU resources, run a test workload |
+| [NVIDIA Network Operator Quick Start](https://docs.nvidia.com/networking/display/kubernetes2410/getting-started-with-kubernetes-nvidia-network-operator) | Free | Deploy OFED drivers, SR-IOV device plugin, and RDMA resource manager on Kubernetes |
+| [NCCL Tests (GitHub)](https://github.com/NVIDIA/nccl-tests) | Free | AllReduce/AllGather bandwidth benchmarks — run inside GPU pods to validate network fabric performance |
+| [AWS EKS with EFA Workshop](https://www.eksworkshop.com/) | Free workshop | Configure EFA device plugin on P4d instances, run NCCL tests to verify 400 Gbps EFA throughput |
+| [Kubeflow — Getting Started](https://www.kubeflow.org/docs/started/getting-started/) | Free | Deploy distributed training with PyTorchJob on a local cluster; observe NCCL traffic patterns |
+
+---
+
 **Next:** This is the final lesson. Return to [README](../README.md) to review the full learning path.

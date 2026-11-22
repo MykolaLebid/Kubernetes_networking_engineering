@@ -268,4 +268,14 @@ oc get podnetworkconnectivitycheck -n openshift-network-diagnostics | head -20
 
 ---
 
+## Online Resources
+
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [Red Hat Interactive Learning Portal](https://www.redhat.com/en/interactive-labs/openshift) | Free (Red Hat account) | Browser-based OpenShift cluster with labs for CNO, network operator config, and namespace isolation |
+| [Red Hat Developer Sandbox](https://developers.redhat.com/developer-sandbox) | Free 30-day cluster | Real OpenShift cluster: run `oc get network.operator cluster`, inspect CNO config, test pod networking |
+| [OpenShift Interactive Learning Portal](https://learn.openshift.com/) | Free | Scenario-based OpenShift labs including networking basics |
+
+---
+
 **Next:** [Lesson 26 — OVN-Kubernetes: OpenShift's Default CNI](26-ovn-kubernetes.md)

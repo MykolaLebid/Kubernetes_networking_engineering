@@ -333,4 +333,15 @@ kubectl get ingress,httproute
 
 ---
 
+## Online Resources
+
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [Isovalent: Cilium Gateway API + cert-manager](https://isovalent.com/labs/cilium-gateway-api-cert-manager/) | Free | HTTPS configuration and certificate management with Gateway API — interactive browser lab |
+| [Isovalent: Advanced Gateway API Use Cases](https://isovalent.com/labs/advanced-gateway-api-use-cases/) | Free | Header rewriting, redirects, gRPC routing, and canary deployments with HTTPRoute |
+| [Isovalent: Cilium Gateway API — External Authentication](https://isovalent.com/labs/cilium-gateway-api-external-authentication/) | Free | Implement auth at the gateway layer without modifying apps |
+| [Gateway API — Getting Started](https://gateway-api.sigs.k8s.io/guides/) | Free | Official docs with hands-on examples — use with `kubectl apply` on minikube |
+
+---
+
 **Next:** [Lesson 17 — Load Balancing on Bare Metal: MetalLB and kube-vip](19-metallb-kube-vip.md)

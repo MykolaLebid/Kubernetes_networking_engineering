@@ -308,4 +308,15 @@ aws ec2 authorize-network-acl-entry \
 
 ---
 
+## Online Resources
+
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [AWS EKS Workshop — VPC and Subnets](https://www.eksworkshop.com/) | Free workshop (~$3 AWS cost) | Create VPC with correct subnet tags, configure ENIConfig for custom networking, deploy to multi-AZ |
+| [AWS Skill Builder — Amazon EKS](https://skillbuilder.aws/) | Free (AWS account required) | Subnet design labs for EKS without live infrastructure cost |
+| [Amazon EKS Best Practices Guide — Networking](https://aws.github.io/aws-eks-best-practices/networking/index/) | Free | VPC CIDR planning, subnet sizing formulas, VPC endpoint design for EKS |
+| [AWS VPC Subnet Calculator](https://network00.com/NetworkTools/IPv4SubnetCreator/) | Free browser tool | Plan your /22 subnets and pod CIDR ranges visually before applying |
+
+---
+
 **Next:** [Lesson 31 — AWS Load Balancer Controller Deep Dive](31-aws-load-balancer-controller.md)

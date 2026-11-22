@@ -308,4 +308,14 @@ az network lb list --resource-group <node-rg>
 
 ---
 
+## Online Resources
+
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [AWS EKS Workshop](https://www.eksworkshop.com/) | Free workshop (~$3 AWS cost) | Deploy NLB and ALB via AWS Load Balancer Controller, configure annotations, test instance vs ip target mode |
+| [AWS Skill Builder — Amazon EKS](https://skillbuilder.aws/) | Free (account required) | Official AWS simulated labs for EKS load balancing with no live AWS cost |
+| [GKE Quickstart](https://cloud.google.com/kubernetes-engine/docs/quickstart) | Free tier (GCP free credits) | Deploy a GKE cluster with a LoadBalancer service and inspect the cloud LB created |
+
+---
+
 **Next:** [Lesson 21 — Service Mesh with Istio](21-service-mesh-istio.md)

@@ -319,4 +319,13 @@ watch -n1 'iptables -t nat -L KUBE-SERVICES -v -n | head -30'
 
 ---
 
+## Online Resources
+
+| Resource | Type | What you practice |
+|----------|------|-------------------|
+| [Killercoda Playground](https://killercoda.com/) | Free playground | Full `iptables`/`nftables` access on a real Linux node; inspect kube-proxy chains |
+| [KodeKloud: Kubernetes Networking Deep Dive](https://www.kodekloud.com/learning-path/kubernetes) | Paid course (free trial) | 4h 31m structured labs covering iptables, conntrack, and kube-proxy rule generation |
+
+---
+
 **Next:** [Lesson 04 — Network Namespaces Deep Dive](04-network-namespaces-deep-dive.md)

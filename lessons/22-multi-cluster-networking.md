@@ -317,4 +317,14 @@ subctl diagnose all   # comprehensive health check
 
 ---
 
+## Online Resources
+
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [Isovalent: Cilium Cluster Mesh](https://isovalent.com/labs/cilium-cluster-mesh/) | Free | Connect two Kubernetes clusters with Cilium Cluster Mesh, enable shared services, test cross-cluster pod connectivity |
+| [Killercoda Playground](https://killercoda.com/) | Free | Multi-context kubectl setup; simulate multi-cluster with two separate namespaces |
+| [Submariner Quickstart](https://submariner.io/getting-started/quickstart/) | Free | Official Submariner tutorial connecting two kind clusters — works locally without cloud |
+
+---
+
 **Next:** [Lesson 23 — Network Security Hardening](23-network-security-hardening.md)

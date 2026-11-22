@@ -645,4 +645,15 @@ kubectl edit cm argocd-cm -n argocd
 
 ---
 
+## Online Resources
+
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [ArgoCD — Getting Started](https://argo-cd.readthedocs.io/en/stable/getting_started/) | Free | Official tutorial: install ArgoCD on minikube, create your first Application, watch GitOps sync — runs the full lesson flow |
+| [Killercoda: ArgoCD Scenarios](https://killercoda.com/) | Free | Browser-based ArgoCD labs with pre-installed clusters — search "ArgoCD" in the Killercoda explore page |
+| [ArgoCD Example Apps](https://github.com/argoproj/argocd-example-apps) | Free (GitHub) | Official sample applications including network-policy-heavy configurations; use as your Git repo target |
+| [Codefresh: GitOps Fundamentals](https://codefresh.io/learn/argo-cd/) | Free course | Free ArgoCD fundamentals course from Codefresh (Argo maintainers) with hands-on exercises |
+
+---
+
 **Next:** [Lesson 34 — AI Platform Networking](34-ai-platform-networking.md)

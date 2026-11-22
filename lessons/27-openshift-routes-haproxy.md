@@ -364,4 +364,13 @@ oc exec -n openshift-ingress router-default-xxxxx -- \
 
 ---
 
+## Online Resources
+
+| Resource | Cost | What you practice |
+|----------|------|-------------------|
+| [Red Hat Developer Sandbox](https://developers.redhat.com/developer-sandbox) | Free 30-day cluster | Create Routes with edge/passthrough/reencrypt TLS; inspect HAProxy config; test weighted alternateBackends |
+| [Red Hat Interactive Learning Portal](https://www.redhat.com/en/interactive-labs/openshift) | Free (Red Hat account) | Hands-on Route creation and IngressController configuration lab |
+
+---
+
 **Next:** [Lesson 28 — OpenShift EgressIP and EgressFirewall](28-openshift-egress.md)
