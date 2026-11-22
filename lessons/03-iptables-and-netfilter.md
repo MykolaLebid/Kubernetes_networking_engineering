@@ -55,6 +55,40 @@ The Linux kernel's **netfilter framework** intercepts packets at five hook point
            └─────────────┘
 ```
 
+### Full packet traversal with kube-proxy context
+
+```
+                    ┌─────────────────────────────────────────────────────┐
+                    │                   NETWORK INTERFACE                  │
+                    └─────────────────────┬───────────────────────────────┘
+                                          │
+                                 ┌────────▼────────┐
+                                 │   PREROUTING    │  ← DNAT (kube-proxy redirects
+                                 │   (nat/mangle)  │    to ClusterIP happens here)
+                                 └────────┬────────┘
+                                          │
+                         ┌────────────────┴────────────────┐
+                         │                                 │
+                 ┌───────▼───────┐                 ┌───────▼───────┐
+                 │   FORWARD     │                 │  LOCAL PROCESS│
+                 │ (mangle/filter│                 │  (INPUT chain)│
+                 │  — pod-to-pod)│                 └───────┬───────┘
+                 └───────┬───────┘                         │
+                         │                                 │
+                 ┌───────▼───────┐                 ┌───────▼───────┐
+                 │  POSTROUTING  │◄────────────────│    OUTPUT     │
+                 │  (nat/mangle) │                 │   (nat/mangle)│
+                 │ ← MASQUERADE  │                 └───────────────┘
+                 └───────┬───────┘
+                         │
+                    ┌────▼────────────────────────────────────────────────┐
+                    │                 NETWORK INTERFACE (out)              │
+                    └─────────────────────────────────────────────────────┘
+
+kube-proxy iptables rules (ClusterIP → pod DNAT):
+  PREROUTING → KUBE-SERVICES → KUBE-SVC-<hash> → KUBE-SEP-<hash> → DNAT to podIP:port
+```
+
 ---
 
 ## 2. Tables and Chains

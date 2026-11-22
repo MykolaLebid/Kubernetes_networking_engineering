@@ -1,8 +1,24 @@
 # Lesson 23 — Network Security Hardening
 
 > **Track:** Network Foundation — Bare Metal & Cloud  
-> **Prerequisites:** [Lesson 14 — Network Policies](14-network-policies.md), [Lesson 19 — Istio](19-service-mesh-istio.md)  
+> **Prerequisites:** [Lesson 16 — Network Policies](16-network-policies.md), [Lesson 19 — Istio](21-service-mesh-istio.md)  
 > **Duration:** ~2.5 hours
+
+---
+
+## Practice Setup
+
+```bash
+# Terminal 1 — Mac (kubectl — audit current posture)
+kubectl get netpol -A
+kubectl get peerauthentication -A 2>/dev/null || echo "Istio not installed"
+kubectl get pods -A -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.hostNetwork}{"\n"}{end}' | grep true
+
+# Terminal 2 — Mac
+# Check for pods with no NetworkPolicy coverage
+kubectl get pods -n default -o wide
+kubectl get netpol -n default
+```
 
 ---
 

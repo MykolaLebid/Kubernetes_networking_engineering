@@ -1,8 +1,24 @@
-# Lesson 14 — Network Policies: Microsegmentation
+# Lesson 16 — Network Policies: Microsegmentation
 
 > **Track:** Network Foundation — Bare Metal & Cloud  
-> **Prerequisites:** [Lesson 12 — Kubernetes Services](12-kubernetes-services-kube-proxy.md)  
+> **Prerequisites:** [Lesson 13 — Kubernetes Services](13-kubernetes-services-kube-proxy.md)  
 > **Duration:** ~2.5 hours
+
+---
+
+## Practice Setup
+
+```bash
+# Terminal 1 — Mac (kubectl)
+kubectl get netpol -A
+kubectl get pods -A -o wide | head -15
+
+# Terminal 2 — minikube Linux node
+minikube ssh
+# Inspect CNI-enforced iptables rules (Calico)
+sudo iptables -L | grep -i cali | head -20
+# Or for Cilium: sudo bpftool map dump name cilium_policy 2>/dev/null | head -20
+```
 
 ---
 
@@ -372,4 +388,4 @@ az aks create --network-policy azure
 
 ---
 
-**Next:** [Lesson 15 — Ingress Controllers and L7 Load Balancing](15-ingress-controllers.md)
+**Next:** [Lesson 17 — Ingress Controllers and L7 Load Balancing](17-ingress-controllers.md)

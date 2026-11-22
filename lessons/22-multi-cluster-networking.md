@@ -1,8 +1,24 @@
 # Lesson 22 — Multi-Cluster Networking
 
 > **Track:** Network Foundation — Bare Metal & Cloud  
-> **Prerequisites:** [Lesson 11 — Cilium](11-cilium-cni-ebpf.md), [Lesson 06 — BGP](06-bgp-fundamentals.md)  
+> **Prerequisites:** [Lesson 12 — Cilium](12-cilium-cni-ebpf.md), [Lesson 06 — BGP](06-bgp-fundamentals.md)  
 > **Duration:** ~2.5 hours
+
+---
+
+## Practice Setup
+
+```bash
+# Terminal 1 — Mac (kubectl with multiple contexts)
+kubectl config get-contexts
+kubectl config use-context <cluster-1>
+kubectl get pods -A | head -10
+
+# Terminal 2 — Mac (second cluster context)
+kubectl config use-context <cluster-2>
+cilium clustermesh status 2>/dev/null || echo "Cluster Mesh not enabled on this cluster"
+kubectl get serviceimports -A 2>/dev/null || echo "MCS API not installed"
+```
 
 ---
 

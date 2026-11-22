@@ -6,6 +6,20 @@
 
 ---
 
+## Practice Setup
+
+```bash
+# Terminal 1 — kubectl (Mac)
+kubectl get nodes -o wide
+kubectl get pods -A -o wide | head -20
+
+# Terminal 2 — cloud CLI (optional, Mac)
+kubectl get cm -n kube-system amazon-vpc-cni -o yaml 2>/dev/null || echo "Not on AWS EKS"
+kubectl get cm -n kube-system ip-masq-agent -o yaml 2>/dev/null || echo "Not on GKE"
+```
+
+---
+
 ## Why This Matters
 
 Cloud providers abstract physical networking behind software-defined networking (SDN). EKS, GKE, and AKS each integrate Kubernetes with their VPC/VNet in unique ways that affect pod IPs, load balancer behavior, security groups, and cross-cluster connectivity. Understanding these models is essential for designing reliable, secure, and cost-effective cloud-native Kubernetes deployments.

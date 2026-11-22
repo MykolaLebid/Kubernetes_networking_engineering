@@ -280,4 +280,4 @@ modprobe bridge vxlan
 
 ---
 
-**Next:** [Lesson 10 — Calico CNI Deep Dive](10-calico-cni-deep-dive.md)
+**Next:** [Lesson 10 — eBPF and XDP](10-ebpf-xdp.md)

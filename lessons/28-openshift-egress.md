@@ -1,8 +1,22 @@
 # Lesson 28 — OpenShift EgressIP and EgressFirewall
 
 > **Track:** OpenShift Networking  
-> **Prerequisites:** [Lesson 14 — Network Policies](14-network-policies.md), [Lesson 25 — OpenShift Overview](25-openshift-networking-overview.md)  
+> **Prerequisites:** [Lesson 16 — Network Policies](16-network-policies.md), [Lesson 25 — OpenShift Overview](25-openshift-networking-overview.md)  
 > **Duration:** ~2 hours
+
+---
+
+## Practice Setup
+
+```bash
+# Terminal 1 — oc CLI
+oc get egressip -o wide 2>/dev/null
+oc get egressfirewall -A 2>/dev/null
+
+# Terminal 2 — oc
+oc get nodes -o custom-columns='NAME:.metadata.name,EGRESS:.metadata.labels.k8s\.ovn\.org/egress-assignable'
+oc describe egressip default 2>/dev/null | head -20
+```
 
 ---
 

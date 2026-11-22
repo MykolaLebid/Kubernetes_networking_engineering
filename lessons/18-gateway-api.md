@@ -1,8 +1,22 @@
-# Lesson 16 — Gateway API: Next-Generation Ingress
+# Lesson 18 — Gateway API: Next-Generation Ingress
 
 > **Track:** Network Foundation — Bare Metal & Cloud  
-> **Prerequisites:** [Lesson 15 — Ingress Controllers](15-ingress-controllers.md)  
+> **Prerequisites:** [Lesson 17 — Ingress Controllers](17-ingress-controllers.md)  
 > **Duration:** ~2 hours
+
+---
+
+## Practice Setup
+
+```bash
+# Terminal 1 — Mac (kubectl)
+# Check if Gateway API CRDs are installed
+kubectl api-resources | grep -E "gateway|httproute|grpcroute|tcproute"
+kubectl get gatewayclass 2>/dev/null || echo "Gateway API not installed — run: kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/standard-install.yaml"
+
+# Terminal 2 — Mac
+kubectl get gateway,httproute -A 2>/dev/null
+```
 
 ---
 
@@ -319,4 +333,4 @@ kubectl get ingress,httproute
 
 ---
 
-**Next:** [Lesson 17 — Load Balancing on Bare Metal: MetalLB and kube-vip](17-metallb-kube-vip.md)
+**Next:** [Lesson 17 — Load Balancing on Bare Metal: MetalLB and kube-vip](19-metallb-kube-vip.md)

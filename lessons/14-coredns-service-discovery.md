@@ -1,8 +1,23 @@
-# Lesson 13 — CoreDNS and Service Discovery
+# Lesson 14 — CoreDNS and Service Discovery
 
 > **Track:** Network Foundation — Bare Metal & Cloud  
-> **Prerequisites:** [Lesson 12 — Kubernetes Services](12-kubernetes-services-kube-proxy.md)  
+> **Prerequisites:** [Lesson 13 — Kubernetes Services](13-kubernetes-services-kube-proxy.md)  
 > **Duration:** ~2 hours
+
+---
+
+## Practice Setup
+
+```bash
+# Terminal 1 — Mac (kubectl)
+kubectl get cm -n kube-system coredns -o yaml
+kubectl get pods -n kube-system -l k8s-app=kube-dns
+kubectl get svc -n kube-system kube-dns
+
+# Terminal 2 — debug pod for DNS testing
+kubectl run dns-test --image=nicolaka/netshoot --rm -it --restart=Never -- \
+  sh -c "nslookup kubernetes && nslookup kubernetes.default.svc.cluster.local"
+```
 
 ---
 
@@ -167,6 +182,33 @@ The default `ndots:5` causes each short name to be tried against all search doma
 
 For external names, this adds latency. Fix:
 
+```
+ndots:5 DNS Resolution — The 6-Query Problem
+
+Pod with default resolv.conf:
+  nameserver 10.96.0.10
+  search default.svc.cluster.local svc.cluster.local cluster.local
+  options ndots:5
+
+Query: curl http://my-service  (1 dot → less than 5 → try search domains first)
+
+Query 1: my-service.default.svc.cluster.local  → FOUND ✓ (stops here if exists)
+Query 2: my-service.svc.cluster.local          → NXDOMAIN
+Query 3: my-service.cluster.local              → NXDOMAIN
+Query 4: my-service.                           → NXDOMAIN
+
+Query: curl http://api.external.com  (3 dots → less than 5 → still tries search domains!)
+
+Query 1: api.external.com.default.svc.cluster.local  → NXDOMAIN (~30ms timeout)
+Query 2: api.external.com.svc.cluster.local          → NXDOMAIN (~30ms timeout)
+Query 3: api.external.com.cluster.local              → NXDOMAIN (~30ms timeout)
+Query 4: api.external.com.                           → FOUND ✓
+
+Total latency added: ~90–300ms for external hostnames with fewer than 5 dots
+```
+
+Fix options:
+
 ```yaml
 # Option 1: Use FQDNs in app config (add trailing dot)
 # http://external-api.example.com./path
@@ -308,4 +350,4 @@ kubectl get cm -n kube-system coredns -o yaml | grep forward
 
 ---
 
-**Next:** [Lesson 14 — Network Policies: Microsegmentation](14-network-policies.md)
+**Next:** [Lesson 15 — IPv6 and Dual-Stack Kubernetes](15-ipv6-dual-stack.md)

@@ -1,8 +1,24 @@
-# Lesson 21 — IPv6 and Dual-Stack Kubernetes
+# Lesson 15 — IPv6 and Dual-Stack Kubernetes
 
 > **Track:** Network Foundation — Bare Metal & Cloud  
 > **Prerequisites:** [Lesson 02 — IP Routing](02-ip-routing-and-forwarding.md), [Lesson 09 — CNI](09-cni-specification.md)  
 > **Duration:** ~2 hours
+
+---
+
+## Practice Setup
+
+```bash
+# Terminal 1 — Mac (kubectl)
+kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.addresses[*].address}{"\n"}{end}'
+kubectl get pods -A -o wide | head -15
+kubectl get svc -A | head -10
+
+# Terminal 2 — minikube Linux node
+minikube ssh
+ip -6 addr show
+ip -6 route show
+```
 
 ---
 
@@ -17,6 +33,34 @@ IPv4 exhaustion is real. Cloud providers now charge for public IPv4 addresses, a
 **Dual-stack:** Every pod and service has both an IPv4 and IPv6 address. Traffic uses IPv4 or IPv6 based on the caller's preference.
 
 **IPv6-only:** No IPv4 at all — full IPv6. Less common, but increasingly required in some regions and carriers.
+
+```
+Dual-Stack Address Assignment
+
+Single-stack (IPv4 only):               Dual-stack (IPv4 + IPv6):
+
+  Node: 192.168.1.10                    Node: 192.168.1.10 / fd00::10
+  Pod CIDR: 10.244.1.0/24              Pod CIDR: 10.244.1.0/24 + fd01::/96
+
+  ┌─────────────────────┐               ┌─────────────────────────────────────┐
+  │ Pod A               │               │ Pod A                               │
+  │ eth0: 10.244.1.5/24 │               │ eth0: 10.244.1.5/24                 │
+  │                     │               │       fd01::a:f405/96               │
+  └─────────────────────┘               └─────────────────────────────────────┘
+
+  Service (ClusterIP):                  Service (dual-stack ClusterIP):
+  10.96.0.10/32                         10.96.0.10/32  (IPv4 ClusterIP)
+                                        fd02::a/128    (IPv6 ClusterIP)
+
+ipFamilyPolicy options:
+  SingleStack      — one family only (default)
+  PreferDualStack  — dual if available, single if not
+  RequireDualStack — fail if both not available
+
+NDP (IPv6 Neighbor Discovery) replaces ARP:
+  IPv4: Pod → ARP broadcast → "who has 10.244.1.1?"
+  IPv6: Pod → ICMPv6 NS    → "who has fd01::1?" (multicast, not broadcast)
+```
 
 ---
 
@@ -269,4 +313,6 @@ ip6tables -t nat -L KUBE-SERVICES -n | grep CLUSTER-IP
 
 ---
 
-**Next:** [Lesson 22 — Multi-Cluster Networking](22-multi-cluster-networking.md)
+**Next:** [Lesson 16 — Network Policies: Microsegmentation](16-network-policies.md)
+
+<!-- old-next was multi-cluster --> Networking](22-multi-cluster-networking.md)

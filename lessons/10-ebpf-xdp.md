@@ -1,7 +1,7 @@
-# Lesson 20 — eBPF and XDP in Kubernetes Networking
+# Lesson 10 — eBPF and XDP in Kubernetes Networking
 
 > **Track:** Network Foundation — Bare Metal & Cloud  
-> **Prerequisites:** [Lesson 11 — Cilium](11-cilium-cni-ebpf.md), [Lesson 03 — iptables](03-iptables-and-netfilter.md)  
+> **Prerequisites:** [Lesson 09 — CNI Specification](09-cni-specification.md), [Lesson 03 — iptables](03-iptables-and-netfilter.md)  
 > **Duration:** ~2.5 hours
 
 ---
@@ -30,6 +30,39 @@ eBPF program   →    Verifier → JIT compiler → native code
 ---
 
 ## 2. eBPF Hook Points
+
+```
+eBPF Hook Positions on the Linux Network Stack
+
+                                        Application (userspace)
+                                               │  ▲
+                                        write()│  │read()
+                                               ▼  │
+┌──────────────────────────────────────────────────────────────────────┐
+│                            Linux Kernel                               │
+│                                                                       │
+│   Socket layer ──────────────────────────────── BPF_PROG_TYPE_SK     │
+│       │                                                               │
+│   TCP/UDP/ICMP                                                        │
+│       │                                                               │
+│   IP routing                                                          │
+│       │                                                               │
+│   ┌───▼────────────────────────────────────────────────────────────┐ │
+│   │  TC (Traffic Control) ingress  ←── BPF_PROG_TYPE_SCHED_CLS    │ │  ← Cilium policy/NAT
+│   │  TC egress             ──────► BPF_PROG_TYPE_SCHED_CLS        │ │  ← Cilium policy/NAT
+│   └───┬────────────────────────────────────────────────────────────┘ │
+│       │                                                               │
+│   ┌───▼────────────────────────────────────────────────────────────┐ │
+│   │  XDP (eXpress Data Path)       ←── BPF_PROG_TYPE_XDP          │ │  ← DDoS drop, LB
+│   │  Runs BEFORE sk_buff allocation — fastest possible hook        │ │
+│   └───┬────────────────────────────────────────────────────────────┘ │
+│       │                                                               │
+└───────┼──────────────────────────────────────────────────────────────┘
+        │
+  Network Driver / NIC
+        │
+   Physical Wire
+```
 
 | Hook | Location | Use in Kubernetes |
 |------|----------|-----------------|
@@ -312,4 +345,6 @@ grep -E "CONFIG_BPF|CONFIG_XDP|CONFIG_NET_CLS_BPF" /boot/config-$(uname -r)
 
 ---
 
-**Next:** [Lesson 21 — IPv6 and Dual-Stack Kubernetes](21-ipv6-dual-stack.md)
+**Next:** [Lesson 11 — Calico CNI Deep Dive](11-calico-cni-deep-dive.md)
+
+<!-- old-next was IPv6 (now 15) --> and Dual-Stack Kubernetes](15-ipv6-dual-stack.md)

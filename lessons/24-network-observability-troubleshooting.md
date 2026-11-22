@@ -6,6 +6,22 @@
 
 ---
 
+## Practice Setup
+
+```bash
+# Terminal 1 — minikube Linux node
+minikube ssh
+ss -s           # socket summary
+ss -tlnp        # listening TCP sockets
+conntrack -L 2>/dev/null | head -10  # conntrack table
+
+# Terminal 2 — Mac (kubectl + hubble)
+hubble observe --last 20 2>/dev/null || echo "hubble not running — try: cilium hubble enable"
+kubectl run netshoot --image=nicolaka/netshoot --rm -it --restart=Never -- bash
+```
+
+---
+
 ## Why This Matters
 
 The best-designed network still needs to be debugged. This final lesson is a practitioner's reference — a systematic methodology and toolkit for diagnosing any network problem in Kubernetes, from "pod can't reach a service" to "latency spiked by 100ms."

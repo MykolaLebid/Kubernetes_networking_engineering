@@ -1,8 +1,24 @@
 # Lesson 17 — Load Balancing on Bare Metal: MetalLB and kube-vip
 
 > **Track:** Network Foundation — Bare Metal  
-> **Prerequisites:** [Lesson 06 — BGP](06-bgp-fundamentals.md), [Lesson 12 — Services](12-kubernetes-services-kube-proxy.md)  
+> **Prerequisites:** [Lesson 06 — BGP](06-bgp-fundamentals.md), [Lesson 12 — Services](13-kubernetes-services-kube-proxy.md)  
 > **Duration:** ~2.5 hours
+
+---
+
+## Practice Setup
+
+```bash
+# Terminal 1 — Mac (kubectl)
+kubectl get pods -n metallb-system 2>/dev/null || echo "MetalLB not installed"
+kubectl get ipaddresspools,l2advertisements -n metallb-system 2>/dev/null
+kubectl get svc -A --field-selector spec.type=LoadBalancer
+
+# Terminal 2 — minikube Linux node (inspect ARP for L2 mode)
+minikube ssh
+arp -n | head -20
+ip neigh show
+```
 
 ---
 
@@ -273,4 +289,4 @@ spec:
 
 ---
 
-**Next:** [Lesson 18 — Cloud Provider Load Balancers](18-cloud-load-balancers.md)
+**Next:** [Lesson 18 — Cloud Provider Load Balancers](20-cloud-load-balancers.md)

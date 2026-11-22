@@ -1,14 +1,63 @@
-# Lesson 11 — Cilium CNI and eBPF Dataplane
+# Lesson 12 — Cilium CNI and eBPF Dataplane
 
 > **Track:** Network Foundation — Bare Metal & Cloud  
-> **Prerequisites:** [Lesson 09 — CNI Specification](09-cni-specification.md), [Lesson 03 — iptables](03-iptables-and-netfilter.md)  
+> **Prerequisites:** [Lesson 10 — eBPF and XDP](10-ebpf-xdp.md), [Lesson 09 — CNI Specification](09-cni-specification.md)  
 > **Duration:** ~3 hours
+
+---
+
+## Practice Setup
+
+```bash
+# Terminal 1 — minikube Linux node
+minikube ssh
+sudo bpftool prog list | grep -i cil | head -10
+ip link show | grep -E "cilium|lxc"
+
+# Terminal 2 — Mac (kubectl + cilium CLI)
+cilium status 2>/dev/null || echo "cilium CLI not installed: brew install cilium-cli"
+kubectl get pods -n kube-system | grep -E "cilium|hubble"
+hubble observe --last 10 2>/dev/null || echo "hubble not running"
+```
 
 ---
 
 ## Why This Matters
 
 Cilium is the most technically advanced Kubernetes CNI, using eBPF to replace iptables and kube-proxy. It powers GKE Dataplane v2, EKS Anywhere, and many performance-critical environments. Its observability tool (Hubble) provides flow-level visibility that is impossible with traditional tools.
+
+---
+
+## Cilium Identity-Based Policy (vs IP-based)
+
+```
+Traditional (iptables):               Cilium eBPF:
+  Pod A (10.0.0.5) → Pod B            Pod A (identity: app=frontend)
+  Rule: allow 10.0.0.5/32             Rule: allow app=frontend → app=backend
+  Problem: IP changes on reschedule   Works regardless of IP or node
+
+  ┌──────────────┐                    ┌──────────────┐
+  │   Pod A      │                    │   Pod A      │
+  │  app=frontend│                    │  app=frontend│
+  │  id: 1234    │                    │  id: 1234    │
+  └──────┬───────┘                    └──────┬───────┘
+         │ packet + IP-based rule            │ packet with identity 1234
+         │                                   │
+  ┌──────▼───────┐                    ┌──────▼───────┐
+  │  TC egress   │                    │  TC egress   │
+  │  BPF program │                    │  BPF prog    │
+  │  (Cilium)    │                    │  stamps id   │
+  └──────┬───────┘                    └──────┬───────┘
+         │                                   │ encapsulated (VXLAN/Geneve)
+  physical network                    physical network
+         │                                   │
+  ┌──────▼───────┐                    ┌──────▼───────┐
+  │  TC ingress  │                    │  TC ingress  │
+  │  BPF prog    │                    │  BPF prog    │
+  │  checks IP   │                    │  checks id   │
+  │  → fragile   │                    │  → stable ✓  │
+  └──────────────┘                    └──────────────┘
+```
 
 ---
 
@@ -353,4 +402,4 @@ az aks create \
 
 ---
 
-**Next:** [Lesson 12 — Kubernetes Services and kube-proxy](12-kubernetes-services-kube-proxy.md)
+**Next:** [Lesson 13 — Kubernetes Services and kube-proxy](13-kubernetes-services-kube-proxy.md)

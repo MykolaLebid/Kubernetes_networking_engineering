@@ -1,8 +1,22 @@
 # Lesson 27 — OpenShift Routes and HAProxy Router
 
 > **Track:** OpenShift Networking  
-> **Prerequisites:** [Lesson 15 — Ingress Controllers](15-ingress-controllers.md), [Lesson 25 — OpenShift Overview](25-openshift-networking-overview.md)  
+> **Prerequisites:** [Lesson 17 — Ingress Controllers](17-ingress-controllers.md), [Lesson 25 — OpenShift Overview](25-openshift-networking-overview.md)  
 > **Duration:** ~2.5 hours
+
+---
+
+## Practice Setup
+
+```bash
+# Terminal 1 — oc CLI
+oc get routes -A
+oc get ingresscontroller -n openshift-ingress-operator -o yaml | grep -A5 "domain\|replicas\|tlsSecurityProfile"
+
+# Terminal 2 — oc
+oc get pods -n openshift-ingress
+oc rsh -n openshift-ingress deploy/router-default -- cat /var/lib/haproxy/conf/haproxy.config | head -40
+```
 
 ---
 

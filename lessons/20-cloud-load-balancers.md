@@ -1,8 +1,22 @@
 # Lesson 18 — Cloud Provider Load Balancers
 
 > **Track:** Network Foundation — Cloud Provider  
-> **Prerequisites:** [Lesson 08 — Cloud Provider Networking](08-cloud-provider-networking.md), [Lesson 12 — Services](12-kubernetes-services-kube-proxy.md)  
+> **Prerequisites:** [Lesson 08 — Cloud Provider Networking](08-cloud-provider-networking.md), [Lesson 12 — Services](13-kubernetes-services-kube-proxy.md)  
 > **Duration:** ~2.5 hours
+
+---
+
+## Practice Setup
+
+```bash
+# Terminal 1 — Mac (kubectl)
+kubectl get svc -A --field-selector spec.type=LoadBalancer
+kubectl describe svc <your-lb-svc> | grep -E "LoadBalancer|Ingress|Annotations"
+
+# Terminal 2 — cloud CLI (optional)
+aws elb describe-load-balancers 2>/dev/null | jq '.LoadBalancerDescriptions[].LoadBalancerName' || \
+  echo "Configure AWS CLI or use GCP/Azure equivalent"
+```
 
 ---
 
@@ -294,4 +308,4 @@ az network lb list --resource-group <node-rg>
 
 ---
 
-**Next:** [Lesson 19 — Service Mesh with Istio](19-service-mesh-istio.md)
+**Next:** [Lesson 21 — Service Mesh with Istio](21-service-mesh-istio.md)

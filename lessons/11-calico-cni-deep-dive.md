@@ -1,8 +1,25 @@
-# Lesson 10 — Calico CNI Deep Dive
+# Lesson 11 — Calico CNI Deep Dive
 
 > **Track:** Network Foundation — Bare Metal & Cloud  
 > **Prerequisites:** [Lesson 06 — BGP](06-bgp-fundamentals.md), [Lesson 09 — CNI Specification](09-cni-specification.md)  
 > **Duration:** ~3 hours
+
+---
+
+## Practice Setup
+
+```bash
+# Terminal 1 — minikube Linux node
+minikube ssh
+sudo calicoctl node status 2>/dev/null || echo "calicoctl not in PATH, try: kubectl exec -n calico-system ..."
+ip route show | grep -E "cali|bird|blackhole"
+ip link show | grep cali
+
+# Terminal 2 — Mac (kubectl + calicoctl)
+kubectl get pods -n calico-system
+kubectl get felixconfiguration default -o yaml 2>/dev/null
+kubectl get ipamblocks 2>/dev/null | head -10
+```
 
 ---
 
@@ -360,4 +377,4 @@ az aks create --network-policy calico --network-plugin azure ...
 
 ---
 
-**Next:** [Lesson 11 — Cilium CNI and eBPF Dataplane](11-cilium-cni-ebpf.md)
+**Next:** [Lesson 12 — Cilium CNI and eBPF Dataplane](12-cilium-cni-ebpf.md)

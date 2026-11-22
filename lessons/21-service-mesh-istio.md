@@ -1,8 +1,24 @@
-# Lesson 19 — Service Mesh with Istio
+# Lesson 21 — Service Mesh with Istio
 
 > **Track:** Network Foundation — Bare Metal & Cloud  
-> **Prerequisites:** [Lesson 12 — Services](12-kubernetes-services-kube-proxy.md), [Lesson 14 — Network Policies](14-network-policies.md)  
+> **Prerequisites:** [Lesson 12 — Services](13-kubernetes-services-kube-proxy.md), [Lesson 16 — Network Policies](16-network-policies.md)  
 > **Duration:** ~3 hours
+
+---
+
+## Practice Setup
+
+```bash
+# Terminal 1 — Mac (istioctl + kubectl)
+istioctl version 2>/dev/null || echo "Install: curl -L https://istio.io/downloadIstio | sh -"
+kubectl get pods -n istio-system 2>/dev/null
+istioctl proxy-status 2>/dev/null | head -10
+
+# Terminal 2 — Mac
+kubectl get peerauthentication -A 2>/dev/null
+kubectl get authorizationpolicy -A 2>/dev/null
+kubectl get virtualservice,destinationrule -A 2>/dev/null
+```
 
 ---
 
@@ -38,6 +54,46 @@ Traffic flow:
 ```
 
 Ambient mode eliminates sidecar overhead; ztunnel handles mTLS transparently.
+
+```
+Sidecar Injection + mTLS Handshake Flow
+
+  kubectl apply pod.yaml
+        │
+        ▼
+  API Server → MutatingWebhookConfiguration (istiod)
+        │
+        ▼
+  Pod spec modified: inject envoy sidecar container
+  + init container (iptables: redirect all traffic → envoy :15001)
+        │
+        ▼
+  Pod running:
+  ┌─────────────────────────────────────────────┐
+  │  Pod A                                      │
+  │  ┌────────────┐    ┌────────────────────┐   │
+  │  │ App (8080) │◄──►│ Envoy sidecar      │   │
+  │  │            │    │ :15001 (outbound)  │   │
+  │  └────────────┘    │ :15006 (inbound)   │   │
+  │                    └─────────┬──────────┘   │
+  └──────────────────────────────┼──────────────┘
+                                 │ mTLS (SPIFFE/X.509)
+  ┌──────────────────────────────┼──────────────┐
+  │  Pod B                       │              │
+  │                    ┌─────────▼──────────┐   │
+  │                    │ Envoy sidecar      │   │
+  │                    │ :15006 (inbound)   │   │
+  │  ┌────────────┐    │ :15001 (outbound)  │   │
+  │  │ App (8080) │◄──►│                    │   │
+  │  └────────────┘    └────────────────────┘   │
+  └─────────────────────────────────────────────┘
+
+mTLS handshake (SPIFFE/X.509 certificates from istiod CA):
+  Envoy A presents: spiffe://cluster.local/ns/default/sa/frontend
+  Envoy B validates against istiod-issued CA cert → trusts it
+  Envoy B presents: spiffe://cluster.local/ns/default/sa/backend
+  Envoy A validates → mutual trust established → TLS session begins
+```
 
 ---
 
@@ -370,4 +426,4 @@ istioctl experimental envoy-stats <pod>
 
 ---
 
-**Next:** [Lesson 20 — eBPF and XDP in Kubernetes Networking](20-ebpf-xdp.md)
+**Next:** [Lesson 10 — eBPF and XDP in Kubernetes Networking](10-ebpf-xdp.md)

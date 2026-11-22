@@ -1,8 +1,25 @@
-# Lesson 12 — Kubernetes Services and kube-proxy
+# Lesson 13 — Kubernetes Services and kube-proxy
 
 > **Track:** Network Foundation — Bare Metal & Cloud  
 > **Prerequisites:** [Lesson 03 — iptables](03-iptables-and-netfilter.md), [Lesson 02 — IP Routing](02-ip-routing-and-forwarding.md)  
 > **Duration:** ~2.5 hours
+
+---
+
+## Practice Setup
+
+```bash
+# Terminal 1 — minikube Linux node
+minikube ssh
+sudo iptables -t nat -L KUBE-SERVICES | head -20
+sudo iptables -t nat -L KUBE-NODEPORTS 2>/dev/null | head -10
+ipvsadm -Ln 2>/dev/null | head -20  # if IPVS mode
+
+# Terminal 2 — Mac (kubectl)
+kubectl get svc -A
+kubectl get endpointslices -A | head -10
+kubectl get cm -n kube-system kube-proxy -o yaml | grep mode
+```
 
 ---
 
@@ -156,6 +173,33 @@ iptables -t nat -L KUBE-SVC-XXXX -n
 # Endpoint chain (DNAT)
 iptables -t nat -L KUBE-SEP-AAAA -n
 # DNAT  tcp  --  to:10.244.0.5:8080
+```
+
+### iptables DNAT Chain: ClusterIP to Pod
+
+```
+Client pod (10.244.1.5) → Service ClusterIP (10.96.0.10:80)
+
+PREROUTING / OUTPUT (nat table):
+  │
+  ▼
+KUBE-SERVICES
+  ├─ match dst=10.96.0.10, dport=80 ──► KUBE-SVC-XXXXHASH
+  │                                          │
+  │                              ┌───────────┴───────────────┐
+  │                              │  Probabilistic selection  │
+  │                              │  (1/N each SEP)           │
+  │                     ─33%──►  KUBE-SEP-AAA  → DNAT → 10.244.0.5:8080
+  │                     ─33%──►  KUBE-SEP-BBB  → DNAT → 10.244.0.6:8080
+  │                     ─33%──►  KUBE-SEP-CCC  → DNAT → 10.244.2.1:8080
+  │
+  ├─ match dst=10.96.0.1, dport=443 ──► KUBE-SVC-kubernetes
+  └─ default: KUBE-NODEPORTS (checks dport in NodePort range 30000-32767)
+
+After DNAT: packet has real pod IP, routed normally to destination node.
+POSTROUTING MASQUERADE ensures return traffic comes back through this node.
+
+IPVS mode replaces all this with kernel hash tables — O(1) vs O(N) lookup.
 ```
 
 ---
@@ -327,4 +371,4 @@ annotations:
 
 ---
 
-**Next:** [Lesson 13 — CoreDNS and Service Discovery](13-coredns-service-discovery.md)
+**Next:** [Lesson 14 — CoreDNS and Service Discovery](14-coredns-service-discovery.md)

@@ -6,12 +6,18 @@
 
 ---
 
-## Practice Environment
+## Practice Setup
 
 ```bash
-# AWS CLI required. Check access:
+# Terminal 1 — Mac (aws CLI)
 aws sts get-caller-identity
-aws ec2 describe-vpcs --query 'Vpcs[*].{ID:VpcId,CIDR:CidrBlock}'
+aws ec2 describe-vpcs --query 'Vpcs[*].{ID:VpcId,CIDR:CidrBlock}' --output table
+
+# Terminal 2 — Mac
+# Find EKS-tagged subnets
+aws ec2 describe-subnets \
+  --query 'Subnets[?Tags[?Key==`kubernetes.io/role/elb`]].[SubnetId,CidrBlock,AvailabilityZone]' \
+  --output table 2>/dev/null || echo "Configure AWS CLI first"
 ```
 
 ---

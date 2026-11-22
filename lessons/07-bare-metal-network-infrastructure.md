@@ -6,6 +6,22 @@
 
 ---
 
+## Practice Setup
+
+```bash
+# Terminal 1 — minikube Linux node
+minikube ssh
+ip link show bonding_masters 2>/dev/null || echo "No bonding on this node"
+bridge vlan show 2>/dev/null
+ip link show type vlan
+
+# Terminal 2 — Mac (kubectl)
+kubectl get nodes -o wide
+kubectl describe node minikube | grep -A5 "Addresses\|Capacity"
+```
+
+---
+
 ## Why This Matters
 
 Deploying Kubernetes on bare metal gives you full control — and full responsibility. Unlike cloud providers, you must design and operate the physical network, switch configuration, NIC bonding, and load-balancer integration. Getting this right is what separates a stable production cluster from one that has mysterious packet drops.

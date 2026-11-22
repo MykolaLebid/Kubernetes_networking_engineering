@@ -6,12 +6,17 @@
 
 ---
 
-## Practice Environment
+## Practice Setup
 
 ```bash
-# AWS CLI and kubectl configured for multiple clusters
+# Terminal 1 — Mac (kubectl multi-context)
 kubectl config get-contexts
-aws eks list-clusters
+aws eks list-clusters --output table 2>/dev/null || echo "Configure AWS CLI first"
+
+# Terminal 2 — Mac (aws CLI — inspect Transit Gateway if present)
+aws ec2 describe-transit-gateways \
+  --query 'TransitGateways[*].[TransitGatewayId,State,Description]' \
+  --output table 2>/dev/null || echo "No Transit Gateways or AWS CLI not configured"
 ```
 
 ---
@@ -76,6 +81,40 @@ aws ec2 create-route \
 ```
 
 TGW supports transitive routing: A↔B, B↔C, A↔C all work.
+
+```
+AWS Transit Gateway: Hub-and-Spoke vs VPC Peering
+
+VPC Peering (full mesh — does NOT scale):
+  VPC A ──────── VPC B
+    │  ╲        ╱  │
+    │    ╲    ╱    │
+    │      ╲╱      │   N VPCs = N×(N-1)/2 peering connections
+    │      ╱╲      │   4 VPCs = 6 connections
+    │    ╱    ╲    │   10 VPCs = 45 connections
+  VPC C ──────── VPC D   No transitive routing (A↔B, B↔C ≠ A↔C)
+
+Transit Gateway (hub-and-spoke — scales to 5000 attachments):
+
+                    ┌────────────────────────────┐
+                    │      Transit Gateway        │
+                    │   Route Table (default):    │
+                    │   10.0.0.0/8 → all VPCs    │
+                    └──┬──────┬──────┬──────┬────┘
+                       │      │      │      │
+                  ┌────┘  ┌───┘  ┌──┘  ┌───┘
+                  │       │      │     │
+             ┌────▼─┐ ┌───▼─┐ ┌──▼──┐ ┌▼────────────┐
+             │EKS-1 │ │EKS-2│ │EKS-3│ │On-Premises  │
+             │10.0. │ │10.1.│ │10.2.│ │Direct Connect│
+             │0/16  │ │0/16 │ │0/16 │ │192.168.0/16 │
+             └──────┘ └─────┘ └─────┘ └─────────────┘
+             N VPCs = N TGW attachments (not N² peering)
+
+EKS pod routing via TGW (VPC CNI — no overlay needed):
+  Pod in EKS-1 (10.0.1.5) → Pod in EKS-2 (10.1.2.8)
+  Route: 10.1.0.0/16 → tgw-attach-EKS-2 → ENI in EKS-2 node → pod
+```
 
 ---
 

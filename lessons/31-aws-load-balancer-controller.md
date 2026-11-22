@@ -1,23 +1,24 @@
 # Lesson 31 — AWS Load Balancer Controller Deep Dive
 
 > **Track:** AWS Networking  
-> **Prerequisites:** [Lesson 18 — Cloud Load Balancers](18-cloud-load-balancers.md), [Lesson 29 — EKS Networking](29-aws-eks-networking.md)  
+> **Prerequisites:** [Lesson 20 — Cloud Load Balancers](20-cloud-load-balancers.md), [Lesson 29 — EKS Networking](29-aws-eks-networking.md)  
 > **Duration:** ~2.5 hours
 
 ---
 
-## Practice Environment
+## Practice Setup
 
 ```bash
-# Requires EKS cluster + AWS Load Balancer Controller installed
-helm repo add eks https://aws.github.io/eks-charts
-helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
-  -n kube-system \
-  --set clusterName=my-cluster \
-  --set serviceAccount.create=true \
-  --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=arn:aws:iam::ACCOUNT:role/AmazonEKSLoadBalancerControllerRole
+# Terminal 1 — Mac (kubectl)
+kubectl get deployment -n kube-system aws-load-balancer-controller 2>/dev/null || \
+  echo "AWS LBC not installed — see section 2 for installation"
+kubectl get ingressclass
+kubectl get targetgroupbindings -A 2>/dev/null
 
-kubectl get deployment -n kube-system aws-load-balancer-controller
+# Terminal 2 — Mac (aws CLI)
+aws elbv2 describe-load-balancers \
+  --query 'LoadBalancers[*].[LoadBalancerName,Type,State.Code]' \
+  --output table 2>/dev/null || echo "Configure AWS CLI first"
 ```
 
 ---

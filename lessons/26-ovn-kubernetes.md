@@ -6,6 +6,20 @@
 
 ---
 
+## Practice Setup
+
+```bash
+# Terminal 1 — OpenShift node (via oc debug or oc rsh)
+oc rsh -n openshift-ovn-kubernetes ds/ovnkube-node -- ovs-vsctl show
+oc rsh -n openshift-ovn-kubernetes ds/ovnkube-node -- ovn-nbctl show 2>/dev/null | head -30
+
+# Terminal 2 — oc CLI
+oc get pods -n openshift-ovn-kubernetes
+oc logs -n openshift-ovn-kubernetes ds/ovnkube-node -c ovnkube-node --tail=20
+```
+
+---
+
 ## Why This Matters
 
 OVN-Kubernetes (Open Virtual Network for Kubernetes) is the default CNI for OpenShift 4.x and is increasingly used in vanilla Kubernetes. Unlike Calico or Cilium which bolt onto the kernel, OVN-Kubernetes builds a **virtual network using Open vSwitch (OVS)** — a software-defined networking stack that runs entirely in userspace and kernel, providing a full virtual topology with logical switches, routers, and load balancers.

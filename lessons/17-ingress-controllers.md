@@ -1,8 +1,25 @@
-# Lesson 15 — Ingress Controllers and L7 Load Balancing
+# Lesson 17 — Ingress Controllers and L7 Load Balancing
 
 > **Track:** Network Foundation — Bare Metal & Cloud  
-> **Prerequisites:** [Lesson 12 — Kubernetes Services](12-kubernetes-services-kube-proxy.md)  
+> **Prerequisites:** [Lesson 13 — Kubernetes Services](13-kubernetes-services-kube-proxy.md)  
 > **Duration:** ~2.5 hours
+
+---
+
+## Practice Setup
+
+```bash
+# Terminal 1 — Mac (kubectl + minikube tunnel)
+kubectl get ingress -A
+kubectl get pods -n ingress-nginx 2>/dev/null || kubectl get pods -n kube-system | grep ingress
+
+# To expose an Ingress locally (bare metal simulation):
+minikube tunnel   # run in a dedicated terminal, requires sudo
+
+# Terminal 2 — Mac
+kubectl get svc -n ingress-nginx -o wide 2>/dev/null
+curl -H "Host: myapp.local" http://$(minikube ip)/
+```
 
 ---
 
@@ -342,4 +359,4 @@ openssl s_client -connect web.example.com:443 -servername web.example.com \
 
 ---
 
-**Next:** [Lesson 16 — Gateway API: Next-Generation Ingress](16-gateway-api.md)
+**Next:** [Lesson 18 — Gateway API: Next-Generation Ingress](18-gateway-api.md)

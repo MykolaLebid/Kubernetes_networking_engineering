@@ -6,15 +6,19 @@
 
 ---
 
-## Practice Environment
+## Practice Setup
 
 ```bash
-# All kubectl commands run from your Mac terminal
-# Requires: aws CLI configured + EKS cluster access
+# Terminal 1 — Mac (kubectl + aws CLI)
+kubectl get nodes -o wide
+kubectl get ds -n kube-system aws-node   # VPC CNI daemonset
 
-# Verify access
-kubectl get nodes
+# Terminal 2 — Mac (aws CLI)
 aws sts get-caller-identity
+aws ec2 describe-network-interfaces \
+  --filters "Name=description,Values=aws-K8s-*" \
+  --query 'NetworkInterfaces[*].[NetworkInterfaceId,PrivateIpAddresses[*].PrivateIpAddress]' \
+  --output table 2>/dev/null || echo "Configure AWS CLI with EKS cluster credentials"
 ```
 
 ---
@@ -67,6 +71,34 @@ Pod scheduled → CNI plugin requests IP from IPAMD
 IPAMD assigns one secondary IP → becomes the pod IP
   ↓
 No NAT/overlay needed — pod IP is a real VPC IP
+```
+
+```
+AWS VPC CNI: ENI Secondary IP Assignment
+
+  EC2 Node (m5.large: 3 ENIs × 10 secondary IPs)
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  EC2 Worker Node (172.31.1.10)                                  │
+  │                                                                  │
+  │  Primary ENI (eth0)          Secondary ENI (eth1)               │
+  │  ┌───────────────────┐       ┌───────────────────┐              │
+  │  │ Primary IP:       │       │ Primary IP:       │              │
+  │  │ 172.31.1.10       │       │ 172.31.1.50       │              │
+  │  │                   │       │                   │              │
+  │  │ Secondary IPs:    │       │ Secondary IPs:    │              │
+  │  │ 172.31.1.11 ──► Pod A    │ 172.31.1.51 ──► Pod D           │
+  │  │ 172.31.1.12 ──► Pod B    │ 172.31.1.52 ──► Pod E           │
+  │  │ 172.31.1.13 ──► Pod C    │ 172.31.1.53 ──► Pod F           │
+  │  └───────────────────┘       └───────────────────┘              │
+  │                                                                  │
+  │  Pod IP = real VPC IP (no overlay, no NAT for pod-to-pod)       │
+  │  aws-node IPAMD maintains warm pool of pre-assigned IPs         │
+  └─────────────────────────────────────────────────────────────────┘
+
+  Prefix delegation (ENABLE_PREFIX_DELEGATION=true):
+  Instead of 10 secondary IPs per ENI → 1 /28 prefix = 16 IPs
+  m5.large with prefix delegation: 3 ENIs × 16 IPs = 48 pods (was 29)
 ```
 
 ---

@@ -1,14 +1,63 @@
 # Lesson 25 — OpenShift Networking Overview
 
 > **Track:** OpenShift Networking  
-> **Prerequisites:** [Lesson 09 — CNI Specification](09-cni-specification.md), [Lesson 12 — Services](12-kubernetes-services-kube-proxy.md)  
+> **Prerequisites:** [Lesson 09 — CNI Specification](09-cni-specification.md), [Lesson 12 — Services](13-kubernetes-services-kube-proxy.md)  
 > **Duration:** ~2.5 hours
+
+---
+
+## Practice Setup
+
+```bash
+# Terminal 1 — OpenShift CLI (oc)
+oc get network.operator cluster -o yaml | grep -A10 defaultNetwork
+oc get pods -n openshift-network-operator
+oc get clusternetwork 2>/dev/null
+
+# Terminal 2 — oc
+oc get pods -n openshift-ovn-kubernetes | head -10
+oc get hostsubnet 2>/dev/null || echo "OVN-Kubernetes mode (no hostsubnet)"
+```
 
 ---
 
 ## Why This Matters
 
 OpenShift is Red Hat's enterprise Kubernetes distribution. Its networking stack differs from vanilla Kubernetes in important ways: it ships OVN-Kubernetes as its default CNI, uses a `Route` CRD instead of Ingress by default, enforces its own security model (SCCs), and adds concepts like EgressIP, EgressFirewall, and NetworkPolicy isolation by default. Understanding these differences lets you operate OpenShift clusters confidently.
+
+```
+OpenShift Cluster Network Operator (CNO) Architecture
+
+  oc edit network.operator.openshift.io/cluster
+              │
+              ▼
+  ┌───────────────────────────────────────────────────────────────┐
+  │  Cluster Network Operator (CNO)                               │
+  │  namespace: openshift-network-operator                        │
+  │  Watches: network.operator.openshift.io/cluster              │
+  │  Manages: OVN-Kubernetes (default) or OpenShift SDN          │
+  └───────────────┬───────────────────────────────────────────────┘
+                  │ creates/manages DaemonSets and Deployments
+       ┌──────────┴───────────────────────────────────┐
+       │                                              │
+  ┌────▼────────────────────────────────┐  ┌──────────▼──────────────────┐
+  │  OVN-Kubernetes DaemonSet           │  │  ovnkube-master Deployment  │
+  │  ns: openshift-ovn-kubernetes       │  │  (control plane pods)       │
+  │  ┌──────────────────────────────┐   │  │  ┌──────────────────────┐   │
+  │  │ ovnkube-node (per node)      │   │  │  │ ovn-northd           │   │
+  │  │ ├── ovs-vswitchd (OVS)       │   │  │  │ (NB DB → SB DB sync) │   │
+  │  │ ├── ovsdb-server (br-int)    │   │  │  └──────────────────────┘   │
+  │  │ └── ovn-controller           │   │  │  ┌──────────────────────┐   │
+  │  └──────────────────────────────┘   │  │  │ NB DB (logical topo) │   │
+  └─────────────────────────────────────┘  │  │ SB DB (physical flow)│   │
+                                           │  └──────────────────────┘   │
+                                           └─────────────────────────────┘
+
+  Network.operator CR defaults:
+    clusterNetwork:  10.128.0.0/14  (hostPrefix: 23 → 512 pods/node max)
+    serviceNetwork:  172.30.0.0/16
+    defaultNetwork:  OVNKubernetes (Geneve port 6081, MTU 1400)
+```
 
 ---
 
