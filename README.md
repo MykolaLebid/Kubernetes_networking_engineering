@@ -26,7 +26,7 @@ Cluster commands (`kubectl`, `calicoctl`, `cilium`) run from your Mac terminal.
 
 ---
 
-## Course: 35 Lessons
+## Course: 34 Lessons
 
 ### Track A — Linux & Bare Metal Foundations
 

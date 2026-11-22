@@ -1,6 +1,6 @@
 # Lesson 21 — Service Mesh with Istio
 
-> **Track:** Network Foundation — Bare Metal & Cloud | **Prerequisites:** [Lesson 12 — Services](13-kubernetes-services-kube-proxy.md), [Lesson 16 — Network Policies](16-network-policies.md) | **Duration:** ~3 hours
+> **Track:** Service Mesh | **Prerequisites:** [Lesson 13 — Services](13-kubernetes-services-kube-proxy.md), [Lesson 16 — Network Policies](16-network-policies.md) | **Duration:** ~3 hours
 
 > **Goal:** Configure Istio sidecar injection, enforce mTLS between services, and control traffic with VirtualService and DestinationRule policies.
 

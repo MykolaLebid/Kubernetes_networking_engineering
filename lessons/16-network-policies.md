@@ -43,7 +43,7 @@ echo "Enforcement confirmed if attacker timed out"
 kubectl get events --watch --field-selector reason=NetworkPolicyUpdated 2>/dev/null &
 ```
 
-> **See also:** [Lesson 05 — iptables and packet filtering](05-iptables-nftables.md) for CNI enforcement mechanics.
+> **See also:** [Lesson 03 — iptables and Netfilter](03-iptables-and-netfilter.md) for CNI enforcement mechanics.
 
 ---
 
