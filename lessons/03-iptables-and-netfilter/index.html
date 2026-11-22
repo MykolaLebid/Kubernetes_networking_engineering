@@ -1066,6 +1066,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2724,6 +2735,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3294,6 +3316,37 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>[Concept question]</strong> At which Netfilter hook does kube-proxy install its DNAT rules for ClusterIP services, and why must DNAT happen at that specific hook rather than at the FORWARD hook?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   kube-proxy installs DNAT rules in the `nat` table at both the `PREROUTING` hook (for traffic arriving from outside the node) and the `OUTPUT` hook (for traffic originating from local pods). DNAT must happen before the routing decision — if the kernel looked up a route for the original ClusterIP (e.g., `10.96.42.10`), it would find no route for a virtual IP. By rewriting the destination to a real pod IP at PREROUTING, the subsequent routing lookup correctly finds a path to `10.244.x.x`.
+
+   </details>
+
+<ol>
+<li><strong>[Scenario question]</strong> A pod can reach the internet but cannot communicate with a ClusterIP service at <code>10.96.42.10</code>. The service has two healthy endpoints and <code>kubectl get endpoints</code> shows their IPs. <code>iptables -t nat -L KUBE-SERVICES</code> shows no entry for <code>10.96.42.10</code>. What is the most likely cause?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   The kube-proxy rules are missing, most likely because kube-proxy is not running on that node or its iptables sync period has not fired since the service was created. Check `kubectl get pods -n kube-system -l k8s-app=kube-proxy` to verify the pod is running. If kube-proxy is running but rules are absent, check for `bridge-nf-call-iptables=0` or the `br_netfilter` module not being loaded — without these, kube-proxy rules cannot intercept bridged pod traffic.
+
+   </details>
+
+<ol>
+<li><strong>[Practical question]</strong> What command would you run to inspect the per-service iptables load-balancing chain for a ClusterIP service and see the DNAT rules for each backend endpoint?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>iptables<span class="w"> </span>-t<span class="w"> </span>nat<span class="w"> </span>-L<span class="w"> </span>KUBE-SERVICES<span class="w"> </span>-n<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="m">10</span>.96.42.10
+</span></code></pre></div>
+   This shows the `KUBE-SVC-XXXX` chain name for the service. Then run `iptables -t nat -L KUBE-SVC-XXXX -n` to see the probabilistic load-balancing rules, and `iptables -t nat -L KUBE-SEP-YYYY -n` to see the DNAT rule for each individual endpoint.
+
+   </details>
+
 <hr />
 <h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
 <table>

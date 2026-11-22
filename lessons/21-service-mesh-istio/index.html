@@ -1859,6 +1859,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2814,6 +2825,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3555,6 +3577,37 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>[Concept question]</strong> What is the difference between <code>PeerAuthentication</code> modes <code>PERMISSIVE</code> and <code>STRICT</code>, and when should each be used?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   `PERMISSIVE` mode accepts both mTLS-encrypted connections and plain-text connections, which allows non-injected clients (such as external services or pods without sidecars) to still communicate during a migration. `STRICT` mode rejects all plain-text — only connections with valid SPIFFE X.509 certificates are accepted. Use `PERMISSIVE` during the rollout period while injecting sidecars into all workloads, then switch to `STRICT` once every pod in the namespace has an injected Envoy sidecar to guarantee end-to-end mTLS.
+
+   </details>
+
+<ol>
+<li><strong>[Scenario question]</strong> After applying <code>PeerAuthentication</code> with <code>mode: STRICT</code> to a namespace, several services start returning 503 errors. What is the most likely cause?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   Some caller pods are missing the Istio sidecar — either their namespace does not have the `istio-injection=enabled` label or they were created before the label was applied. Without a sidecar, those pods send plain-text requests that STRICT mode rejects. Run `istioctl authn tls-check <pod>.default` to identify CONFLICT rows and `kubectl describe pod <pod> | grep istio-proxy` to confirm whether the sidecar was injected. The fix is to label the namespace and restart affected pods to trigger injection.
+
+   </details>
+
+<ol>
+<li><strong>[Practical question]</strong> What command would you run to verify that mTLS is active and in STRICT mode between a specific pod and the <code>web</code> service?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>istioctl<span class="w"> </span>authn<span class="w"> </span>tls-check<span class="w"> </span>&lt;pod-name&gt;.default
+</span></code></pre></div>
+   Look for the row `web.default.svc.cluster.local:80` and confirm the `STATUS` column shows `OK` with both `SERVER` and `CLIENT` columns showing `STRICT`; a `CONFLICT` status means one side is not enforcing mTLS.
+
+   </details>
+
 <hr />
 <h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
 <table>

@@ -2042,6 +2042,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2715,6 +2726,17 @@
     <span class="md-ellipsis">
       
         Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
       
     </span>
   </a>
@@ -3421,6 +3443,37 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>[Concept question]</strong> What are the three TLS termination modes for OpenShift Routes, and in which mode is path-based routing impossible?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   The three modes are: **edge** (TLS terminates at the HAProxy router; plain HTTP is forwarded to the backend pod), **reencrypt** (TLS terminates at the router, and HAProxy opens a new TLS connection to the pod using a destination CA certificate), and **passthrough** (the encrypted stream is forwarded unchanged to the pod based solely on SNI hostname). Path-based routing is impossible in **passthrough** mode because HAProxy never decrypts the connection and therefore cannot inspect the HTTP path — it can only route by the hostname in the TLS SNI field.
+
+   </details>
+
+<ol>
+<li><strong>[Scenario question]</strong> A Route shows <code>Admitted: True</code> but users receive 503 Service Unavailable. How would you check whether the backend pods are healthy from the HAProxy router's perspective?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   Connect to the HAProxy stats socket inside the router pod using `echo "show stat" | socat - /var/lib/haproxy/run/haproxy.sock | cut -d, -f1,2,18,19` — the output shows each backend server entry with `UP` or `DOWN` status. A `DOWN` entry means HAProxy cannot reach the pod (readiness probe failing, wrong targetPort, or pod not yet ready). Also check `oc get endpoints <service>` to verify that at least one pod IP is in the `Addresses` list rather than `NotReadyAddresses`.
+
+   </details>
+
+<ol>
+<li><strong>[Practical question]</strong> What command would you run to check whether a specific Route was admitted by the HAProxy router?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>oc<span class="w"> </span>describe<span class="w"> </span>route<span class="w"> </span>web-edge<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-A<span class="w"> </span><span class="m">15</span><span class="w"> </span><span class="s2">"Status:"</span>
+</span></code></pre></div>
+   Look for the `Admitted: True` condition under the `Ingress` section and confirm the `RouterName` field shows which IngressController accepted it; `Admitted: False` means the router rejected the route due to a hostname conflict or admission policy violation, and the `Message` field will explain why.
+
+   </details>
+
 <hr />
 <h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
 <table>

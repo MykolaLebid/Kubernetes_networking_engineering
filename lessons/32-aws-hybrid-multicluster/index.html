@@ -2288,6 +2288,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2805,6 +2816,17 @@
     <span class="md-ellipsis">
       
         Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
       
     </span>
   </a>
@@ -3516,6 +3538,37 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>[Concept question]</strong> Why does VPC Peering become unmanageable for 10 or more VPCs, and what AWS service solves this at scale?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   VPC Peering is non-transitive: each pair of VPCs requires a separate peering connection and route table entry in both VPCs. For N VPCs the number of connections grows as N×(N-1)/2 — a full mesh of 10 VPCs requires 45 peering connections, and 20 VPCs requires 190. Transit Gateway replaces this with a hub-and-spoke model: each VPC attaches to the Transit Gateway once, and the TGW routes between all attachments. Route tables on the TGW can also isolate environments (dev/prod) without separate peering connections.
+
+   </details>
+
+<ol>
+<li><strong>[Scenario question]</strong> Cross-cluster pod-to-pod traffic fails even though VPC routes and security groups are correctly configured. Pods on the same node can communicate, but traffic destined for another node's pod is dropped. What AWS EC2-level setting is likely missing?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   Source/destination checking is enabled on the EC2 instance's ENI by default. This check causes the hypervisor to drop any packet where the source or destination IP is not one of the ENI's own IPs — but pod IPs are secondary IPs or prefix-delegated CIDRs, not the primary ENI IP. For nodes that act as routers (self-managed Kubernetes without VPC CNI), you must disable source/destination checking on each node's primary ENI: `aws ec2 modify-instance-attribute --instance-id <id> --no-source-dest-check`. EKS with VPC CNI handles this automatically.
+
+   </details>
+
+<ol>
+<li><strong>[Practical question]</strong> What AWS CLI command would you run to list all Transit Gateway VPC attachments and their current states to verify that all expected VPCs are attached and active?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>aws<span class="w"> </span>ec2<span class="w"> </span>describe-transit-gateway-vpc-attachments<span class="w"> </span>--output<span class="w"> </span>table
+</span></code></pre></div>
+   Look for `State: available` on each attachment. A state of `pending` means the attachment was just created and the TGW route table may not yet have a route to that VPC; a state of `failed` indicates a permissions or subnet issue.
+
+   </details>
+
 <hr />
 <h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
 <table>

@@ -1981,6 +1981,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2656,6 +2667,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3261,6 +3283,39 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>[Concept question]</strong> How does OVN-Kubernetes enforce NetworkPolicy without using iptables, and what is the control-plane path from a NetworkPolicy object to an enforced flow rule?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   OVN-Kubernetes compiles NetworkPolicy objects into OVN ACLs stored in the Northbound database. `ovn-northd` reads those ACLs and translates them into logical flows in the Southbound database. Each node's `ovn-controller` reads the Southbound DB and programs OpenFlow rules into the OVS `br-int` bridge. The result is that packet filtering happens in the OVS kernel dataplane flow tables — `iptables -L` shows no NetworkPolicy rules because they are enforced entirely within OVS, not netfilter.
+
+   </details>
+
+<ol>
+<li><strong>[Scenario question]</strong> Cross-node pod-to-pod traffic fails but pods on the same node can communicate. What port and protocol must be open between all nodes, and how would you verify it is the issue?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   OVN-Kubernetes uses Geneve tunnels on **UDP port 6081** for cross-node encapsulation. If a firewall or security group blocks UDP 6081 between nodes, intra-node traffic (which stays on the OVS bridge without tunneling) works fine while cross-node traffic silently drops. Verify by running `ss -ulnp | grep 6081` on a node to confirm the port is listening, and use `tcpdump -i eth0 -n udp port 6081` on both nodes to check whether tunnel packets are arriving. The fix is to open UDP 6081 bidirectionally between all node IPs.
+
+   </details>
+
+<ol>
+<li><strong>[Practical question]</strong> What command would you run to simulate a packet from pod-a to pod-b on port 8080 without sending real traffic, to see whether OVN ACLs would allow or drop it?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>oc<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-n<span class="w"> </span>openshift-ovn-kubernetes<span class="w"> </span><span class="nv">$MASTER</span><span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span>ovn-trace<span class="w"> </span>&lt;ls-name&gt;<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="s1">'inport=="pod-a-port"; ip4; ip4.src=10.128.0.5; ip4.dst=10.128.1.5; tcp; tcp.dst=8080'</span>
+</span></code></pre></div>
+   The output shows each logical flow table that the simulated packet passes through; look for `output to pod-b-port` for an allow result or `Policy drop` / `drop` for a deny result, which tells you which ACL matched.
+
+   </details>
+
 <hr />
 <h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
 <table>

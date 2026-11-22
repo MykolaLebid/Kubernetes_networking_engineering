@@ -1372,6 +1372,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2934,6 +2945,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3640,6 +3662,39 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>[Concept question]</strong> How does the AWS VPC CNI plugin assign IP addresses to pods differently from an overlay-based CNI like Flannel, and what hardware resource on the EC2 instance limits the maximum number of pods per node?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   The AWS VPC CNI plugin assigns pods real VPC IP addresses by using secondary private IPs on Elastic Network Interfaces (ENIs) attached to the EC2 instance. Each secondary IP becomes a pod IP, and routes inside the VPC fabric deliver traffic directly — no VXLAN or overlay tunnel is needed. The limiting factor is the number of ENIs the instance type supports and the number of secondary IPs per ENI. For example, an `m5.xlarge` supports 4 ENIs × 15 IPs/ENI = 60 total IPs, minus 1 per ENI for the primary node IP = 44 maximum pod IPs.
+
+   </details>
+
+<ol>
+<li><strong>[Scenario question]</strong> Pods on an EKS node are stuck in <code>ContainerCreating</code> with no IP assigned. <code>kubectl describe node</code> shows the node is Ready. The VPC CNI DaemonSet pods are running. What is the most likely cause?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   The most likely cause is that the ENI warm IP pool is exhausted — the node has used all secondary IPs available on its attached ENIs and cannot allocate a new IP for the new pod. Check with `kubectl describe node <node> | grep -i eni` or inspect the VPC CNI logs (`kubectl logs -n kube-system -l k8s-app=aws-node`). The fix is either to scale to a larger instance type with more ENIs, or to enable prefix delegation (`ENABLE_PREFIX_DELEGATION=true`) which allocates `/28` blocks of 16 IPs at a time instead of single IPs, increasing pod density.
+
+   </details>
+
+<ol>
+<li><strong>[Practical question]</strong> What command would you run to find which ENI on an EC2 instance owns a specific pod IP address (e.g., <code>10.0.1.21</code>)?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>aws<span class="w"> </span>ec2<span class="w"> </span>describe-network-interfaces<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="w">  </span>--filters<span class="w"> </span><span class="s2">"Name=private-ip-address,Values=10.0.1.21"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="w">  </span>--query<span class="w"> </span><span class="s1">'NetworkInterfaces[0].{ENI:NetworkInterfaceId,Node:PrivateIpAddress}'</span>
+</span></code></pre></div>
+   The output shows the ENI ID that holds this secondary IP. This is useful for correlating pod IPs to ENI security group rules when debugging connectivity issues at the VPC level.
+
+   </details>
+
 <hr />
 <h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
 <table>

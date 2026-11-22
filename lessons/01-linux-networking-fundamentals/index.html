@@ -988,6 +988,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2680,6 +2691,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3218,6 +3240,37 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>[Concept question]</strong> A veth pair is described as a "bidirectional virtual wire." What happens to a veth pair's peer interface when the namespace it lives in is deleted, and why does this matter for CNI cleanup?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   When a network namespace is deleted, all interfaces inside it are destroyed. Because a veth pair's two ends are linked, destroying the pod-side end (`eth0` inside the namespace) automatically removes the host-side end (e.g., `cali<hash>`) as well. This means CNI plugins do not need a separate step to delete the host-side veth — running `ip netns del <ns>` or `ip link del <host-side-veth>` cleans up both ends atomically.
+
+   </details>
+
+<ol>
+<li><strong>[Scenario question]</strong> You manually wire up a pod namespace with a veth pair and bridge, but pings from the pod to the bridge gateway IP (<code>10.244.0.1</code>) fail with 100% packet loss. The bridge is up, the veth pair is up, and the IP addresses are correct inside the namespace. What is the most likely remaining cause, and what command confirms it?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   The most likely cause is that IP forwarding is disabled on the host (`net.ipv4.ip_forward = 0`), so the kernel silently drops packets that need to be forwarded between the pod namespace and the rest of the network. Run `sysctl net.ipv4.ip_forward` to confirm — if it returns `0`, enable it with `sysctl -w net.ipv4.ip_forward=1`. A secondary cause could be that `net.bridge.bridge-nf-call-iptables=0` or the `br_netfilter` module is not loaded, preventing iptables FORWARD rules from seeing bridged traffic.
+
+   </details>
+
+<ol>
+<li><strong>[Practical question]</strong> What command would you run to verify that IP forwarding is currently enabled on a Kubernetes node?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>sysctl<span class="w"> </span>net.ipv4.ip_forward
+</span></code></pre></div>
+   The output should show `net.ipv4.ip_forward = 1`. A value of `0` means the node cannot forward packets between pod namespaces and external destinations, breaking cross-node pod communication.
+
+   </details>
+
 <hr />
 <h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
 <table>

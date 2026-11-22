@@ -1111,6 +1111,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2758,6 +2769,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3381,6 +3403,37 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>[Concept question]</strong> Why does the pause (infra) container serve as the holder of a pod's network namespace, rather than the first application container that starts?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   The pause container is started first and holds the network namespace open for the entire lifetime of the pod. If the application container held the namespace and then crashed and restarted, the namespace (along with its IP address, routes, and sockets) would be destroyed and recreated, breaking network state. The pause container does nothing except hold the namespace file descriptor open via a bind-mount at `/var/run/netns/cni-<UUID>`, ensuring the namespace survives application container restarts.
+
+   </details>
+
+<ol>
+<li><strong>[Scenario question]</strong> You run <code>ip netns list</code> on a node running containerd and it shows no namespaces, but <code>kubectl get pods</code> shows many running pods. Where are the pod network namespaces, and how do you access one to inspect its routing table?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   On containerd-based nodes, pod namespaces are not registered in `/var/run/netns/` — they are referenced by the pause container's PID via `/proc/<pause_pid>/ns/net`. Find the pause container ID with `crictl ps | grep pause`, get its PID with `crictl inspect <id> | jq '.info.pid'`, then run `nsenter -t <pause_pid> -n ip route` to enter the namespace and inspect its routing table. The command `lsns -t net` lists all kernel-known network namespaces with their PIDs.
+
+   </details>
+
+<ol>
+<li><strong>[Practical question]</strong> What command would you run to inspect the IP addresses and routes of a running pod from the host node, given the pause container's PID?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>nsenter<span class="w"> </span>-t<span class="w"> </span>&lt;pause_pid&gt;<span class="w"> </span>-n<span class="w"> </span>ip<span class="w"> </span>addr
+</span></code></pre></div>
+   This enters the pod's network namespace and runs `ip addr` within it, showing the pod's `eth0` interface with its assigned IP. Follow with `nsenter -t <pause_pid> -n ip route` to see the pod's routing table, which should show a default route via the bridge gateway (e.g., `10.244.0.1`).
+
+   </details>
+
 <hr />
 <h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
 <table>

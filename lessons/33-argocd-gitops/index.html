@@ -2372,6 +2372,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2795,6 +2806,17 @@
     <span class="md-ellipsis">
       
         Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
       
     </span>
   </a>
@@ -3701,6 +3723,37 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>[Concept question]</strong> Why must network CRDs (such as <code>Gateway</code> or <code>NetworkPolicy</code> CRDs) be deployed in an earlier sync wave than the resources that use them, and what wave number is typically assigned to CRDs?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   ArgoCD applies resources in wave order and waits for each wave's resources to become healthy before proceeding to the next wave. If a `Gateway` CRD is deployed in wave 0 at the same time as a `Gateway` object, Kubernetes will reject the `Gateway` object with "no matches for kind" because the CRD hasn't been registered yet. CRDs are typically assigned wave `-1` using the annotation `argocd.argoproj.io/sync-wave: "-1"` so they are created and established first. CNI plugins go in wave 0, and higher-level network resources (NetworkPolicy, Gateways, Routes) go in wave 1 or higher.
+
+   </details>
+
+<ol>
+<li><strong>[Scenario question]</strong> An ArgoCD Application syncs a default-deny NetworkPolicy into the <code>argocd</code> namespace in wave 0. Mid-sync, the ArgoCD application controller pod can no longer reach the managed cluster's API server and the sync stalls permanently. What went wrong and how do you prevent it?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   The default-deny NetworkPolicy was applied before the ArgoCD allow-ingress policy that permits the application controller to reach the cluster API. As a result, ArgoCD blocked its own control-plane connectivity mid-sync. The fix is to place the ArgoCD allow-ingress NetworkPolicy in wave `-1` or the same wave as the default-deny, so both are applied atomically before ArgoCD's connectivity window closes. Alternatively, place any NetworkPolicy that affects the `argocd` namespace in a separate Application that runs before the main security-hardening Application.
+
+   </details>
+
+<ol>
+<li><strong>[Practical question]</strong> What ArgoCD CLI command would you run to preview the diff between what ArgoCD has cached as the live state and what the Git repository currently contains for a specific Application, without triggering a sync?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>argocd<span class="w"> </span>app<span class="w"> </span>diff<span class="w"> </span>network-policies
+</span></code></pre></div>
+   The output shows a standard diff (minus for live, plus for desired) for every resource in the Application. Use this before syncing to confirm that only intended changes will be applied, and to catch accidental drift between what Git says and what is currently running in the cluster.
+
+   </details>
+
 <hr />
 <h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
 <table>

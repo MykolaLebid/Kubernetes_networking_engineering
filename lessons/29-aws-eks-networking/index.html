@@ -2098,6 +2098,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2593,6 +2604,17 @@
     <span class="md-ellipsis">
       
         Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
       
     </span>
   </a>
@@ -3270,6 +3292,39 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>[Concept question]</strong> Why does the AWS VPC CNI assign real VPC IP addresses to pods instead of using an overlay network, and what is the main pod density constraint this introduces?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   Real VPC IPs eliminate NAT and tunneling overhead: pod-to-pod traffic stays native L3 routing within the VPC, reducing latency and simplifying security group rules (SGs apply directly to pod IPs). The main constraint is that each IP must come from an ENI secondary IP slot, and each EC2 instance type has hard limits on the number of ENIs and IPs per ENI. For example, an `m5.large` supports 3 ENIs × 10 IPs − 3 (one per ENI for the node) = 27 pods maximum, far less than the default Kubernetes limit of 110. Prefix delegation (`ENABLE_PREFIX_DELEGATION=true`) assigns /28 blocks instead of individual IPs, raising the `m5.large` limit to 48.
+
+   </details>
+
+<ol>
+<li><strong>[Scenario question]</strong> Pods are stuck in Pending with the reason "0/3 nodes are available: 3 Too many pods." The cluster uses <code>m5.large</code> nodes without prefix delegation. What is the current maximum pod count per node, and what is the simplest way to raise it?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   An `m5.large` supports 3 ENIs × 10 secondary IPs per ENI, minus 3 (one primary IP per ENI reserved for the node) = 27 pods. Enable prefix delegation by setting `ENABLE_PREFIX_DELEGATION=true` and `WARM_PREFIX_TARGET=1` on the `aws-node` DaemonSet with `kubectl set env ds aws-node -n kube-system ENABLE_PREFIX_DELEGATION=true`; this assigns /28 CIDR blocks (16 IPs each) per ENI slot, raising the `m5.large` limit to 48 pods without changing instance type.
+
+   </details>
+
+<ol>
+<li><strong>[Practical question]</strong> What command would you run to check the current IP warm pool status — how many IPs are assigned versus available — on a specific node?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>kubectl<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-n<span class="w"> </span>kube-system<span class="w"> </span><span class="k">$(</span>kubectl<span class="w"> </span>get<span class="w"> </span>pod<span class="w"> </span>-n<span class="w"> </span>kube-system<span class="w"> </span>-l<span class="w"> </span>k8s-app<span class="o">=</span>aws-node<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">'{.items[0].metadata.name}'</span><span class="k">)</span><span class="w"> </span>-c<span class="w"> </span>aws-node<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span>curl<span class="w"> </span>-s<span class="w"> </span>http://localhost:61678/v1/nodeIPStats<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>.
+</span></code></pre></div>
+   Look for `totalIPAddresses`, `assignedIPAddresses`, and `coolDownIPs` fields; if `totalIPAddresses` minus `assignedIPAddresses` is at or near zero, the warm pool is exhausted and new pods will stall while IPAMD attaches more IPs from the EC2 API.
+
+   </details>
+
 <hr />
 <h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
 <table>

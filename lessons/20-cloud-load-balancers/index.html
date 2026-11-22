@@ -1769,6 +1769,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2812,6 +2823,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3428,6 +3450,37 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>[Concept question]</strong> Why does <code>externalTrafficPolicy: Local</code> preserve the real client IP while <code>externalTrafficPolicy: Cluster</code> does not?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   With `Cluster` policy, any node can receive the traffic and kube-proxy SNATs the source IP to the node's own IP before forwarding to a pod on a different node — the original client IP is lost at that SNAT step. With `Local` policy, the cloud LB's health check only marks nodes with ready pods as healthy, so traffic is only sent to nodes that already have a pod; kube-proxy does not SNAT because no cross-node hop is needed. The trade-off is that `Local` can cause uneven distribution if pods are not spread across all nodes.
+
+   </details>
+
+<ol>
+<li><strong>[Scenario question]</strong> An AWS NLB is working but pod logs show the source IP as the EC2 node IP, not the original client IP. Which annotation is most likely misconfigured?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   The NLB is using `target-type: instance` mode, which routes through NodePort and kube-proxy, causing SNAT. Switch to `service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"` so the NLB routes directly to pod IPs (bypassing NodePort). You may also need `service.beta.kubernetes.io/aws-load-balancer-target-group-attributes: "preserve_client_ip.enabled=true"` to ensure the NLB passes the client IP through to the pod.
+
+   </details>
+
+<ol>
+<li><strong>[Practical question]</strong> What command would you run to watch the progression of an EXTERNAL-IP being assigned to a LoadBalancer service?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>kubectl<span class="w"> </span>get<span class="w"> </span>svc<span class="w"> </span>web<span class="w"> </span>-w
+</span></code></pre></div>
+   Watch for the `EXTERNAL-IP` column to change from `<pending>` to an actual IP or DNS hostname; this transition typically takes 30–120 seconds and is driven by the Cloud Controller Manager calling the cloud provider API to provision the load balancer.
+
+   </details>
+
 <hr />
 <h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
 <table>

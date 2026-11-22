@@ -1301,6 +1301,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2680,6 +2691,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3468,6 +3490,37 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>[Concept question]</strong> What is the difference between XDP and TC hook eBPF programs in terms of where they execute in the network stack, and why does Cilium use TC hooks rather than XDP for per-pod network policy enforcement?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   XDP runs at the NIC driver level before the kernel allocates an `sk_buff` structure — it is the earliest and fastest hook but only has access to raw packet bytes. TC (Traffic Control) hooks run after `sk_buff` allocation, giving full access to packet metadata, socket information, and the ability to redirect packets to other interfaces. Cilium uses TC hooks on each pod's `lxc` veth interface because policy enforcement requires matching packets by identity labels stored in BPF maps and redirecting accepted traffic — operations that need the richer context available at the TC layer. XDP is used by Cilium for DDoS mitigation and node-level L4 load balancing on the physical NIC.
+
+   </details>
+
+<ol>
+<li><strong>[Scenario question]</strong> After deploying Cilium with <code>kubeProxyReplacement=strict</code>, running <code>cilium bpf lb list</code> shows no service entries even though <code>kubectl get svc</code> shows many services. What is the most likely cause?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   The most likely cause is that the BPF filesystem is not mounted at `/sys/fs/bpf`. Cilium stores its BPF maps (including the service LB map `cilium_lb4_services`) on the BPF filesystem — if it is not mounted, maps cannot be pinned and service entries are lost. Verify with `mount | grep bpf`. A secondary cause is that kube-proxy is still running alongside Cilium, conflicting with the eBPF service maps. Check with `cilium status | grep KubeProxyReplacement` to confirm it shows `Strict`.
+
+   </details>
+
+<ol>
+<li><strong>[Practical question]</strong> What command would you run to list all eBPF programs currently loaded on a node and identify which ones belong to Cilium?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>bpftool<span class="w"> </span>prog<span class="w"> </span>list<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>cilium
+</span></code></pre></div>
+   Each entry shows the program ID, type (e.g., `sched_cls` for TC, `xdp`), and name. On a node with many pods, Cilium loads hundreds of programs — roughly two TC programs per pod interface (ingress and egress). You can also run `bpftool net list` to see programs attached to specific network interfaces.
+
+   </details>
+
 <hr />
 <h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
 <table>

@@ -2199,6 +2199,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2683,6 +2694,17 @@
     <span class="md-ellipsis">
       
         Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
       
     </span>
   </a>
@@ -3384,6 +3406,38 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>[Concept question]</strong> What is the difference between <code>target-type: instance</code> and <code>target-type: ip</code> for the AWS Load Balancer Controller, and when would you choose each?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   With `target-type: instance`, the ALB or NLB sends traffic to each node's NodePort; kube-proxy on that node then performs a second hop (DNAT) to route the packet to the actual pod, which may be on a different node. With `target-type: ip`, the load balancer registers pod ENI IPs directly as targets and routes traffic in a single hop to the pod without going through kube-proxy. Choose `instance` when pods are using host-network or when you have strict compatibility requirements with older kube-proxy; choose `ip` for lower latency, correct client IP preservation, and direct pod health checks.
+
+   </details>
+
+<ol>
+<li><strong>[Scenario question]</strong> Two teams each defined an <code>Ingress</code> with <code>ingressClassName: alb</code> for different paths on the same domain. The controller provisioned two separate ALBs, doubling cost. What annotation would consolidate them into one ALB?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   Add the `alb.ingress.kubernetes.io/group.name` annotation with the same value on both Ingress resources, for example `alb.ingress.kubernetes.io/group.name: "shared-prod"`. The AWS Load Balancer Controller merges all Ingress resources that share a group name into a single ALB, combining their listener rules. Each Ingress still manages its own rules independently — deleting one Ingress removes only its rules, not the shared ALB.
+
+   </details>
+
+<ol>
+<li><strong>[Practical question]</strong> What AWS CLI command would you run to check the health of targets registered behind a specific ALB target group, to see which pods are healthy vs. draining vs. unhealthy?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>aws<span class="w"> </span>elbv2<span class="w"> </span>describe-target-health<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span>--target-group-arn<span class="w"> </span>arn:aws:elasticloadbalancing:&lt;region&gt;:&lt;account&gt;:targetgroup/&lt;name&gt;/&lt;id&gt;
+</span></code></pre></div>
+   The output lists each target (IP or instance ID) with its `TargetHealth.State` (`healthy`, `unhealthy`, `draining`, `unused`) and a `TargetHealth.Reason` explaining any failure. Unhealthy targets are typically caused by security group rules blocking the health-check port or the pod not yet passing its readiness probe.
+
+   </details>
+
 <hr />
 <h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
 <table>

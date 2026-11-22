@@ -1312,6 +1312,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2758,6 +2769,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3465,6 +3487,37 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>[Concept question]</strong> What three environment variables does kubelet set when invoking a CNI plugin binary for the ADD operation, and what does each one convey to the plugin?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   The three most critical variables are: `CNI_COMMAND=ADD` (which operation to perform — ADD, DEL, or CHECK); `CNI_NETNS=/var/run/netns/cni-<UUID>` (the path to the pre-created network namespace where the pod's interface should be configured); and `CNI_IFNAME=eth0` (the name to give the interface inside the namespace, always `eth0` for the primary pod interface). The plugin reads JSON configuration from stdin and writes the result JSON (including the assigned IP) to stdout.
+
+   </details>
+
+<ol>
+<li><strong>[Scenario question]</strong> A pod is stuck in <code>ContainerCreating</code>. The CNI plugin binary (<code>/opt/cni/bin/calico</code>) exists and is executable. <code>journalctl -u kubelet</code> shows a CNI error. What are the two most likely remaining causes, and how do you investigate each one?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   The two most likely causes are: (1) The IPAM pool is exhausted — no IP addresses remain to allocate. Check with `calicoctl ipam show --show-blocks` to see block utilization, or inspect `/var/lib/cni/networks/<name>/` for host-local IPAM. (2) There is a stale `eth0` interface already present in the target namespace from a failed previous attempt, causing the CNI to fail with "interface already exists." Inspect the namespace with `nsenter -t <pause_pid> -n ip link` to see if `eth0` exists and manually delete it.
+
+   </details>
+
+<ol>
+<li><strong>[Practical question]</strong> What command would you run to check which CNI configuration file will be used by kubelet on a Kubernetes node?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>ls<span class="w"> </span>-1<span class="w"> </span>/etc/cni/net.d/
+</span></code></pre></div>
+   kubelet uses the first file alphabetically in `/etc/cni/net.d/`. The file with the lowest sort order (e.g., `10-calico.conflist`) wins. If multiple files exist from old CNI installations, the unexpected one may be active. Use `cat /etc/cni/net.d/<first-file>` to confirm the plugin type and IPAM configuration.
+
+   </details>
+
 <hr />
 <h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
 <table>

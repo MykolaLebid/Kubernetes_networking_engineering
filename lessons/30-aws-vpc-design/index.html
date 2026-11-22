@@ -2137,6 +2137,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2615,6 +2626,17 @@
     <span class="md-ellipsis">
       
         Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
       
     </span>
   </a>
@@ -3380,6 +3402,38 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>[Concept question]</strong> Why does the EKS documentation recommend at least /22 subnets per AZ for production clusters, and how does the IP planning formula account for pod IPs?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   The VPC CNI assigns one real VPC IP per pod (not just per node), so a typical medium cluster with 10 nodes × 29 pods each in one AZ already needs 290 pod IPs plus 10 node IPs plus buffer. A /24 subnet provides only 251 usable IPs (259 minus 5 AWS-reserved), which is exhausted quickly. A /22 provides 1,019 usable IPs. The planning formula is: (nodes_per_AZ × 1) + (pods_per_node × nodes_per_AZ) + (LBs × 1) + 20% buffer — always round up to the next power-of-two subnet that accommodates the result.
+
+   </details>
+
+<ol>
+<li><strong>[Scenario question]</strong> A new LoadBalancer Service is stuck in <code>&lt;pending&gt;</code> on EKS even though the VPC and subnets exist. The AWS Load Balancer Controller logs show "No subnets found." What subnet tag is most likely missing?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   The subnet is missing the EKS discovery tag. For internal NLBs the required tag is `kubernetes.io/role/internal-elb=1`; for internet-facing NLBs the tag is `kubernetes.io/role/elb=1`. Both internal and external subnets also need `kubernetes.io/cluster/<cluster-name>=shared` (or `owned`). Without these tags the AWS Load Balancer Controller cannot discover which subnets to place the load balancer in. Add the tags with `aws ec2 create-tags --resources <subnet-id> --tags Key=kubernetes.io/role/internal-elb,Value=1`.
+
+   </details>
+
+<ol>
+<li><strong>[Practical question]</strong> What command would you run to check how many IP addresses are still available in a specific EKS subnet?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>aws<span class="w"> </span>ec2<span class="w"> </span>describe-subnets<span class="w"> </span>--subnet-ids<span class="w"> </span>&lt;subnet-id&gt;<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span>--query<span class="w"> </span><span class="s1">'Subnets[0].AvailableIpAddressCount'</span>
+</span></code></pre></div>
+   If this number is below 20% of the subnet's total capacity (for example, below 200 for a /22), plan to expand the subnet or add a secondary CIDR (such as `100.64.0.0/16`) before the cluster runs out of IPs and node groups fail to launch.
+
+   </details>
+
 <hr />
 <h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
 <table>

@@ -1178,6 +1178,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2780,6 +2791,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3451,6 +3473,37 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>[Concept question]</strong> What is a BGP Route Reflector, and at what cluster size does Calico's documentation recommend switching from a full BGP mesh to a Route Reflector topology?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   In a full BGP mesh every node peers with every other node, resulting in n*(n-1)/2 sessions — 4,950 sessions in a 100-node cluster. A Route Reflector (RR) is a dedicated node that receives BGP routes from all peers and re-advertises (reflects) them back out to all other peers. This reduces each non-RR node to only 2–4 sessions (one per RR). Calico recommends switching to RR topology at approximately 50 nodes, where the mesh overhead begins causing BIRD CPU spikes on route churn.
+
+   </details>
+
+<ol>
+<li><strong>[Scenario question]</strong> A Calico node's BGP session is stuck in the <code>Active</code> state and never transitions to <code>Established</code>. The peer IP is reachable via <code>ping</code>. What is the most likely cause, and what command confirms it?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   The most likely cause is TCP port 179 being blocked by a firewall or security group between the nodes. BGP uses TCP port 179 for session establishment — ICMP (ping) may work while TCP 179 is blocked. Confirm with `telnet <peer-ip> 179`; if it hangs or refuses, the port is blocked. A secondary cause is an ASN mismatch in the BGP peer configuration, which would cause the OPEN message to be rejected immediately after TCP connects.
+
+   </details>
+
+<ol>
+<li><strong>[Practical question]</strong> What command would you run on a Calico node to verify that all BGP sessions are in the <code>Established</code> state?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>calicoctl<span class="w"> </span>node<span class="w"> </span>status
+</span></code></pre></div>
+   The output shows each BGP peer, their IP address, ASN, and session state. All peers should show `Established` in the `INFO` column. Any peer showing `Active`, `Connect`, or `Idle` indicates a problem. You can also run `kubectl exec -n calico-system calico-node-xxxxx -- birdcl show protocols` to see the raw BIRD BGP protocol states.
+
+   </details>
+
 <hr />
 <h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
 <table>

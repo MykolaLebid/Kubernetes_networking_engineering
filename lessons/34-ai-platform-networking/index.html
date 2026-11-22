@@ -2519,6 +2519,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2913,6 +2924,17 @@
     <span class="md-ellipsis">
       
         Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
       
     </span>
   </a>
@@ -3955,6 +3977,37 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>[Concept question]</strong> How does RDMA eliminate CPU overhead for GPU-to-GPU communication, and why does this matter for distributed training workloads?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   RDMA (Remote Direct Memory Access) allows the NIC to read from and write directly into application memory (registered GPU or host buffers) using DMA, completely bypassing the CPU and OS kernel. In contrast, conventional TCP communication requires the CPU to copy data into a kernel socket buffer, process TCP/IP headers, and copy again into the application buffer — multiple CPU cycles and memory copies per message. For AllReduce operations in NCCL during distributed training, each rank exchanges gigabytes of gradient data per step; RDMA reduces that exchange latency from microseconds (TCP) to sub-microsecond, and frees GPU-local CPUs to stay focused on the training computation rather than network I/O.
+
+   </details>
+
+<ol>
+<li><strong>[Scenario question]</strong> An NCCL AllReduce operation falls back to TCP/IP instead of RDMA, dramatically slowing a multi-node GPU training job. What two things would you check first to diagnose whether RDMA is unavailable in the pod?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   First, check the `NCCL_IB_DISABLE` environment variable inside the pod: if it is set to `1`, NCCL explicitly skips InfiniBand/RDMA. Set it to `0` or remove it. Second, check whether the InfiniBand device is present in the pod by running `ls /dev/infiniband/` — if no devices appear (such as `uverbs0` or `rdma_cm`), the SR-IOV virtual function or RDMA device was not passed through to the pod. Verify that the pod's resource request includes the RDMA resource (e.g. `rdma/hca_shared_devices_a: 1`) and that the RDMA device plugin DaemonSet is running.
+
+   </details>
+
+<ol>
+<li><strong>[Practical question]</strong> What command would you run inside a GPU training pod to verify that InfiniBand RDMA devices are available and accessible to the workload?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>kubectl<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-it<span class="w"> </span>gpu-training-0<span class="w"> </span>--<span class="w"> </span>ls<span class="w"> </span>/dev/infiniband/
+</span></code></pre></div>
+   You should see character devices such as `uverbs0`, `rdma_cm`, and `issm0`. If the directory is empty or does not exist, the RDMA device was not allocated to the pod. Also run `kubectl exec -it gpu-training-0 -- ibv_devinfo` (if `libibverbs` is installed) to list all RDMA devices with their ports and GIDs — a device in `PORT_ACTIVE` state with a valid GID confirms end-to-end RDMA capability.
+
+   </details>
+
 <hr />
 <h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
 <table>

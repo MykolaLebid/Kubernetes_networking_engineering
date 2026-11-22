@@ -1619,6 +1619,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2568,6 +2579,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3135,6 +3157,37 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>[Concept question]</strong> Why does MetalLB L2 mode result in a single ingress node rather than true load balancing, and how does BGP mode solve this?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   In L2 mode, MetalLB uses leader election so that exactly one node's speaker answers ARP requests for the VIP. All external traffic therefore enters through that one node, which then uses kube-proxy to forward to pods — the LB layer itself is a single point of ingress. BGP mode solves this by having each speaker on multiple nodes advertise the same /32 host route via BGP; the upstream router installs ECMP routes for the VIP and distributes flows across all announcing nodes, giving true per-node load balancing.
+
+   </details>
+
+<ol>
+<li><strong>[Scenario question]</strong> A LoadBalancer service stays in <code>EXTERNAL-IP: &lt;pending&gt;</code> even after MetalLB pods are running. What two CRDs should you check first?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   Check that an `IPAddressPool` exists with a valid address range and that an `L2Advertisement` (or `BGPAdvertisement` for BGP mode) references that pool. Without both CRDs, MetalLB's controller will not allocate an IP or advertise it. Run `kubectl get ipaddresspools,l2advertisements -n metallb-system` to confirm both are present. A missing advertisement CRD is the most common oversight after install.
+
+   </details>
+
+<ol>
+<li><strong>[Practical question]</strong> What command would you run to find which node is currently announcing a specific VIP in L2 mode?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>kubectl<span class="w"> </span>get<span class="w"> </span>events<span class="w"> </span>-n<span class="w"> </span>metallb-system<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>announcing
+</span></code></pre></div>
+   Look for event messages of the form `announcing from node worker-X` — the node named in that event is the current elected speaker for the VIP. You can also watch speaker logs with `kubectl logs -n metallb-system -l app.kubernetes.io/component=speaker -f` for real-time announcement events.
+
+   </details>
+
 <hr />
 <h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
 <table>

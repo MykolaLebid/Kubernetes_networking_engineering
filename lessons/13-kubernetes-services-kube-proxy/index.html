@@ -1534,6 +1534,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2856,6 +2867,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3457,6 +3479,37 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>[Concept question]</strong> How does kube-proxy implement probabilistic load balancing across multiple endpoints for a ClusterIP service using iptables, and what chain structure does it use?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   kube-proxy creates a three-level chain structure: `KUBE-SERVICES` matches the destination ClusterIP and port, jumping to a per-service `KUBE-SVC-<hash>` chain. Inside that chain, each endpoint gets a `KUBE-SEP-<hash>` rule with a probabilistic `statistic mode random probability` match — the first endpoint gets `0.33`, the second gets `0.5` (of remaining), and the last gets `1.0` (all remaining traffic). Each `KUBE-SEP-<hash>` chain contains the actual `DNAT` rule rewriting the destination to the pod's IP and port (e.g., `DNAT tcp to 10.244.0.5:8080`).
+
+   </details>
+
+<ol>
+<li><strong>[Scenario question]</strong> A ClusterIP service with two healthy endpoints is unreachable from pods on one specific node, but works fine from pods on all other nodes. <code>kubectl get endpoints</code> shows both pod IPs. What is the first thing you should check on the failing node?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   Check whether the kube-proxy iptables rules exist on that specific node with `iptables -t nat -L KUBE-SERVICES -n | grep <cluster-ip>`. If the KUBE-SERVICES chain is missing entries for the service, kube-proxy on that node may have failed to sync. Check `kubectl get pods -n kube-system -l k8s-app=kube-proxy` for the node's kube-proxy pod status, and inspect its logs with `kubectl logs -n kube-system <kube-proxy-pod>` for sync errors. Also verify that `net.bridge.bridge-nf-call-iptables=1` is set on the failing node.
+
+   </details>
+
+<ol>
+<li><strong>[Practical question]</strong> What command would you run to find all iptables rules associated with a specific ClusterIP service (e.g., <code>10.96.42.10</code>) and see the DNAT targets for its endpoints?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>iptables<span class="w"> </span>-t<span class="w"> </span>nat<span class="w"> </span>-S<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="m">10</span>.96.42.10
+</span></code></pre></div>
+   This shows the `KUBE-SVC-<hash>` chain name. Then run `iptables -t nat -L KUBE-SVC-<hash> -n` to see the per-endpoint probabilistic rules, and `iptables -t nat -L KUBE-SEP-<hash> -n` for each endpoint chain to confirm the DNAT target IP and port.
+
+   </details>
+
 <hr />
 <h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
 <table>

@@ -1870,6 +1870,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2724,6 +2735,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3416,6 +3438,37 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>[Concept question]</strong> Why must you explicitly add a DNS egress policy (allowing port 53 UDP and TCP) when deploying a default-deny NetworkPolicy, and what breaks if you omit it?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   A default-deny policy with `policyTypes: [Ingress, Egress]` and an empty `podSelector: {}` blocks all outbound traffic including DNS queries to CoreDNS. Without an explicit allow for UDP port 53 (and TCP port 53 for large responses), pods cannot resolve any service names — `nslookup kubernetes.default.svc.cluster.local` will hang or return SERVFAIL. The allow-dns-egress policy must target `0.0.0.0/0` (or specifically the CoreDNS ClusterIP) on ports 53 UDP and TCP, and must be applied in the same namespace simultaneously with or before the deny-all policy.
+
+   </details>
+
+<ol>
+<li><strong>[Scenario question]</strong> A penetration tester demonstrates that a pod in the <code>production</code> namespace can query the cloud metadata API at 169.254.169.254 and retrieve an IAM role credential. What NetworkPolicy construct blocks this while still allowing all other internet egress?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   Use an `ipBlock` with an `except` clause in an egress NetworkPolicy: allow `cidr: 0.0.0.0/0` with `except: [169.254.169.254/32]` (and also `169.254.170.2/32` for AWS ECS metadata). This allows egress to all destinations except the metadata API addresses. Apply this policy with `podSelector: {}` to cover all pods in the namespace, and include it in every application namespace — not just the default namespace.
+
+   </details>
+
+<ol>
+<li><strong>[Practical question]</strong> What command would you run to see all currently dropped network flows across all namespaces in real time?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>hubble<span class="w"> </span>observe<span class="w"> </span>--verdict<span class="w"> </span>DROPPED<span class="w"> </span>--all-namespaces
+</span></code></pre></div>
+   Each output line shows the source pod, destination pod, destination port, and the drop reason (such as `POLICY_DENIED`); use this to identify which flows are being blocked so you can build the precise allow rules needed before enforcing a default-deny posture.
+
+   </details>
+
 <hr />
 <h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
 <table>

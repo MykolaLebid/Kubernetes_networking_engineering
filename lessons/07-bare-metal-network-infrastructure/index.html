@@ -1245,6 +1245,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2858,6 +2869,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3577,6 +3599,37 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>[Concept question]</strong> What is the purpose of LACP (802.3ad) bonding on a bare-metal Kubernetes node, and what does the <code>xmit-hash-policy: layer3+4</code> setting control?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   LACP bonding aggregates two or more physical NICs into a single logical interface (`bond0`), providing both link redundancy (if one NIC or switch port fails, the bond continues on the remaining link) and increased bandwidth. The `xmit-hash-policy: layer3+4` setting determines how outbound packets are distributed across the active slave links — using a hash of source IP, destination IP, source port, and destination port. This ensures that multiple concurrent flows are spread across both links rather than all going to the same NIC, maximizing bandwidth utilization.
+
+   </details>
+
+<ol>
+<li><strong>[Scenario question]</strong> Two nodes in a spine-leaf cluster cannot reach each other. The bond interface on both nodes shows only one active slave instead of two. LACP is configured on the bond. What is the most likely cause, and what command on the node confirms it?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   The most likely cause is that the switch ports are not configured for LACP (port-channel with `channel-group N mode active`). When the switch does not send LACP PDUs, the bond falls back to only one active slave. Confirm on the node with `cat /proc/net/bonding/bond0` — look at the "MII Status" of each slave and the "Partner Key" field; if the Partner Key is `0`, the switch is not negotiating LACP. Run `tcpdump -i eth0 ether proto 0x8809` to verify LACP PDUs are (or are not) being exchanged.
+
+   </details>
+
+<ol>
+<li><strong>[Practical question]</strong> What command would you run to verify that jumbo frames (MTU 9000) are working end-to-end between two bare-metal Kubernetes nodes?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>ping<span class="w"> </span>-M<span class="w"> </span><span class="k">do</span><span class="w"> </span>-s<span class="w"> </span><span class="m">8972</span><span class="w"> </span>&lt;remote-node-ip&gt;
+</span></code></pre></div>
+   The `-M do` flag sets the Don't Fragment bit and `-s 8972` sends a payload of 8972 bytes. Adding the 28-byte ICMP and IP header overhead gives 9000 bytes total — the maximum for a jumbo frame MTU of 9000. A successful reply confirms end-to-end jumbo frame support. If you receive "Frag needed" or the ping times out, an intermediate interface (switch port, NIC, or bond) has not been configured for MTU 9000.
+
+   </details>
+
 <hr />
 <h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
 <table>

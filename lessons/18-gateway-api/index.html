@@ -1669,6 +1669,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2724,6 +2735,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3377,6 +3399,37 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>[Concept question]</strong> Why does the Gateway API use three separate resource types (GatewayClass, Gateway, HTTPRoute) instead of a single Ingress-like object?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   The three-layer hierarchy maps to real organizational boundaries: infrastructure teams own GatewayClass (which controller handles traffic) and Gateway (listener ports, TLS, allowed namespaces), while application teams own HTTPRoute (routing rules to their backends). This separation means an app team cannot change TLS settings or open new ports on shared infrastructure. The old Ingress API collapsed all roles into one object, forcing teams to use annotation hacks for features like traffic splitting.
+
+   </details>
+
+<ol>
+<li><strong>[Scenario question]</strong> An HTTPRoute you just applied shows <code>ResolvedRefs: False</code> in its status conditions and traffic is not flowing. What is the most likely cause, and how do you fix it?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   The most common cause is a missing ReferenceGrant when the HTTPRoute references a backend Service in a different namespace. Without a ReferenceGrant in the target namespace explicitly allowing the route's namespace to reference its Services, the controller rejects the cross-namespace backendRef. Create a `ReferenceGrant` in the Service's namespace with `from.namespace` set to the HTTPRoute's namespace. Verify with `kubectl get referencegrant -n <target-ns>` and re-check `kubectl describe httproute <name>`.
+
+   </details>
+
+<ol>
+<li><strong>[Practical question]</strong> What command would you run to verify that a weighted 90/10 traffic split between <code>frontend-v1</code> and <code>frontend-v2</code> is actually working as configured?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">for</span><span class="w"> </span>i<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="k">$(</span>seq<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">20</span><span class="k">)</span><span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span>curl<span class="w"> </span>-s<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Host: web.example.com"</span><span class="w"> </span>http://&lt;gateway-ip&gt;/<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-o<span class="w"> </span><span class="s1">'v[12]'</span><span class="p">;</span><span class="w"> </span><span class="k">done</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span><span class="p">|</span><span class="w"> </span>uniq<span class="w"> </span>-c
+</span></code></pre></div>
+   Look for approximately 18 responses tagged `v1` and 2 responses tagged `v2`; if all 20 return `v1`, the HTTPRoute weights are not being applied by the controller (check `kubectl describe httproute` for status conditions).
+
+   </details>
+
 <hr />
 <h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
 <table>

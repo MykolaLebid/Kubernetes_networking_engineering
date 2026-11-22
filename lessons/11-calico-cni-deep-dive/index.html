@@ -1434,6 +1434,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2890,6 +2901,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#online-resources" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3527,6 +3549,37 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>[Concept question]</strong> What is Calico's default IPAM block size, and why does setting an overly large block size (e.g., <code>/24</code>) cause IP address starvation across a cluster with many small nodes?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   The default Calico IPAM block size is `/26`, which allocates 64 IP addresses per node. When a block is assigned to a node, all IPs in that block are reserved for that node — even if most are unused. With a `/24` block (256 IPs), a cluster where nodes run only 10–20 pods would waste 230+ IPs per node. A 100-node cluster with `/24` blocks needs a `/8` IP pool (16 million IPs) to avoid exhaustion. Using `/26` or `/27` blocks matched to the actual pods-per-node limit prevents IP starvation and allows more efficient pool utilization.
+
+   </details>
+
+<ol>
+<li><strong>[Scenario question]</strong> New pods cannot get IP addresses even though <code>calicoctl ipam show --show-blocks</code> shows blocks with available IPs. After investigation, you find that some IPs are allocated but have no corresponding running pods. How do you identify and release these leaked IPs?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   Run `calicoctl ipam show --ip <ip>` for a suspected leaked IP — if it shows an allocation but the pod name no longer exists in Kubernetes, the IP has leaked. This happens when CNI DEL fails during pod deletion. Release the leaked IP with `calicoctl ipam release --ip=<ip>`. For bulk investigation, compare the allocated IPs in IPAM blocks against running pod IPs from `kubectl get pods -A -o wide`, or use `calicoctl ipam check` to automatically detect and optionally clean orphaned allocations.
+
+   </details>
+
+<ol>
+<li><strong>[Practical question]</strong> What command would you run to check the IPAM block allocation across all nodes in a Calico cluster and see how many IPs are used versus free per block?</li>
+</ol>
+<details><summary>Answer</summary>
+
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>calicoctl<span class="w"> </span>ipam<span class="w"> </span>show<span class="w"> </span>--show-blocks
+</span></code></pre></div>
+   The output table shows each CIDR block, which node it is assigned to, the number of IPs used, and the number free. A block showing `IPS USED: 64, IPS FREE: 0` on a node is fully exhausted — new pods on that node will fail to get an IP until a new block is allocated or existing IPs are released.
+
+   </details>
+
 <hr />
 <h2 id="online-resources">Online Resources<a class="headerlink" href="#online-resources" title="Permanent link">&para;</a></h2>
 <table>
