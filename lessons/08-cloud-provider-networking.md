@@ -1,8 +1,10 @@
 # Lesson 08 — Cloud Provider Networking Basics
 
-> **Track:** Network Foundation — Cloud Provider  
-> **Prerequisites:** [Lesson 02 — IP Routing and Forwarding](02-ip-routing-and-forwarding.md)  
-> **Duration:** ~3 hours
+> **Track:** Network Foundation — Cloud Provider
+> **Prereqs:** [Lesson 02 — IP Routing and Forwarding](02-ip-routing-and-forwarding.md)
+> **Time:** ~3 hours
+
+> **Goal:** Explain how AWS VPC CNI, GKE Alias IPs, and Azure CNI assign pod IPs from cloud network resources, and configure security group and load balancer integrations for each provider.
 
 ---
 
@@ -18,18 +20,34 @@ kubectl get cm -n kube-system amazon-vpc-cni -o yaml 2>/dev/null || echo "Not on
 kubectl get cm -n kube-system ip-masq-agent -o yaml 2>/dev/null || echo "Not on GKE"
 ```
 
----
-
-## Why This Matters
-
-Cloud providers abstract physical networking behind software-defined networking (SDN). EKS, GKE, and AKS each integrate Kubernetes with their VPC/VNet in unique ways that affect pod IPs, load balancer behavior, security groups, and cross-cluster connectivity. Understanding these models is essential for designing reliable, secure, and cost-effective cloud-native Kubernetes deployments.
+> **See also:** [Lesson 09 — CNI Specification](09-cni-specification.md) for how the cloud-specific CNI binaries plug into the kubelet ADD/DEL lifecycle.
 
 ---
 
 ## 1. The SDN Abstraction
 
-Cloud VPCs implement routing in software, not on physical switches. This means:
-- Routes are enforced by the hypervisor/network fabric — you don't configure ToR switches
+Cloud VPCs implement routing in software, not on physical switches.
+
+```mermaid
+flowchart LR
+    subgraph cloud["Cloud Provider SDN"]
+        HV1[Hypervisor Node 1]
+        HV2[Hypervisor Node 2]
+        FABRIC[Virtual Network Fabric<br/>Software-defined routes]
+    end
+    subgraph k8s["Kubernetes Cluster"]
+        N1[EKS/GKE/AKS Node]
+        N2[EKS/GKE/AKS Node]
+        P1[Pod 10.0.1.5]
+        P2[Pod 10.0.2.7]
+    end
+
+    P1 --> N1 --> HV1 --> FABRIC
+    FABRIC --> HV2 --> N2 --> P2
+```
+
+This means:
+- Routes are enforced by the hypervisor/network fabric — you do not configure ToR switches
 - IP-in-IP or VXLAN tunnels may already be used underneath (invisible to you)
 - Routing changes propagate in seconds (API calls), not minutes (BGP convergence)
 - Security is enforced at the VM NIC level (Security Groups, NACLs)
@@ -39,13 +57,28 @@ Cloud VPCs implement routing in software, not on physical switches. This means:
 ## 2. AWS Networking for Kubernetes
 
 ### VPC Architecture
-```
-VPC: 10.0.0.0/16
-  ├── Subnet (us-east-1a): 10.0.1.0/24
-  │     ├── EC2 node: 10.0.1.10  (eth0 = primary ENI)
-  │     └── EC2 node: 10.0.1.11
-  ├── Subnet (us-east-1b): 10.0.2.0/24
-  └── Internet Gateway + NAT Gateway
+
+```mermaid
+flowchart TD
+    subgraph vpc["VPC 10.0.0.0/16"]
+        subgraph az1["us-east-1a"]
+            SUB1[Subnet 10.0.1.0/24]
+            N1[EC2 Node<br/>eth0=10.0.1.10<br/>Primary ENI]
+            N1E2[eth1=10.0.1.20<br/>Secondary ENI]
+            P1[Pod 10.0.1.21]
+            P2[Pod 10.0.1.22]
+        end
+        subgraph az2["us-east-1b"]
+            SUB2[Subnet 10.0.2.0/24]
+            N2[EC2 Node<br/>eth0=10.0.2.10]
+        end
+        IGW[Internet Gateway]
+        NAT[NAT Gateway]
+    end
+
+    N1E2 --> P1
+    N1E2 --> P2
+    SUB1 --> NAT --> IGW
 ```
 
 ### AWS VPC CNI (amazon-vpc-cni-k8s)
@@ -65,10 +98,19 @@ aws ec2 describe-instances --instance-ids <id> \
 kubectl get pods -o wide -A | head -20
 
 # Check AWS VPC CNI version
-kubectl get ds -n kube-system aws-node -o jsonpath='{.spec.template.spec.containers[0].image}'
+kubectl get ds -n kube-system aws-node \
+  -o jsonpath='{.spec.template.spec.containers[0].image}'
 
 # VPC CNI configuration
 kubectl get cm -n kube-system amazon-vpc-cni -o yaml
+
+# Step-by-step: trace a pod IP back to its ENI
+POD_IP=$(kubectl get pod <pod> -o jsonpath='{.status.podIP}')
+echo "Pod IP: $POD_IP"                            # → 10.0.1.21
+aws ec2 describe-network-interfaces \
+  --filters "Name=private-ip-address,Values=${POD_IP}" \
+  --query 'NetworkInterfaces[0].{ENI:NetworkInterfaceId,Node:PrivateIpAddress}'
+# → shows which ENI owns this pod IP
 ```
 
 **Source/Destination Check** must be disabled (EKS does this automatically):
@@ -78,7 +120,34 @@ aws ec2 modify-instance-attribute \
   --no-source-dest-check
 ```
 
+### ENI Limits per Instance Type
+
+| Instance | ENIs | IPs/ENI | Max Pods | With Prefix Delegation |
+|----------|------|---------|----------|----------------------|
+| t3.medium | 3 | 6 | 15 | 54 |
+| m5.large | 3 | 10 | 27 | 90 |
+| m5.xlarge | 4 | 15 | 44 | 120 |
+| m5.4xlarge | 8 | 30 | 232 | 480 |
+| c5.18xlarge | 15 | 50 | 737 | 750 |
+
+### AWS VPC CNI Configuration Reference
+
+| Parameter | Default | Effect | When to change |
+|-----------|---------|--------|----------------|
+| `WARM_IP_TARGET` | 1 | IPs pre-warmed per node | Increase for faster pod startup |
+| `MINIMUM_IP_TARGET` | 0 | Min IPs always allocated | Set to expected pod count per node |
+| `ENABLE_PREFIX_DELEGATION` | false | Allocate /28 blocks instead of single IPs | Enable for high pod density nodes |
+| `WARM_PREFIX_TARGET` | 1 | /28 blocks pre-warmed | Tune for burst workloads |
+| `AWS_VPC_K8S_CNI_EXTERNALSNAT` | false | Use VPC NAT for pod egress | Set true when using NAT Gateway for pod egress |
+
+```bash
+# Enable prefix delegation for higher pod density
+kubectl set env ds -n kube-system aws-node ENABLE_PREFIX_DELEGATION=true
+kubectl set env ds -n kube-system aws-node WARM_PREFIX_TARGET=1
+```
+
 ### AWS Security Groups
+
 Security Groups are stateful firewalls at the ENI level.
 
 ```bash
@@ -134,33 +203,53 @@ metadata:
 ## 3. GCP Networking for Kubernetes
 
 ### VPC Architecture
+
 GCP VPC is **global** (no regional boundary) and uses custom-mode subnets.
 
-```
-VPC: k8s-vpc
-  ├── Subnet (us-central1): 10.0.0.0/20  — node IPs
-  │     └── Secondary IP range (pods):   10.100.0.0/14
-  │     └── Secondary IP range (svcs):   10.200.0.0/20
-  └── Cloud Router + Cloud NAT
+```mermaid
+flowchart LR
+    subgraph vpc["GCP VPC: k8s-vpc (global)"]
+        subgraph region["us-central1"]
+            SUB[Subnet 10.0.0.0/20<br/>node IPs]
+            POD_RANGE[Secondary range<br/>pods: 10.100.0.0/14]
+            SVC_RANGE[Secondary range<br/>svcs: 10.200.0.0/20]
+            N1[GKE Node<br/>10.0.0.10/20]
+            N2[GKE Node<br/>10.0.0.11/20]
+            P1[Pod 10.100.1.5<br/>alias IP]
+        end
+        CR[Cloud Router]
+        NAT[Cloud NAT]
+    end
+
+    N1 --> P1
+    N1 --> CR --> NAT
 ```
 
 ### GKE Networking
+
 GKE uses **Alias IP ranges** — each node gets a /24 from the pod range, and pod IPs are real VPC addresses.
 
 ```bash
 # View node pod CIDR allocations
 kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.podCIDR}{"\n"}{end}'
+# → gke-node-1    10.100.0.0/24
+# → gke-node-2    10.100.1.0/24
 
 # GKE Dataplane v2 (uses Cilium eBPF under the hood)
 kubectl get cm -n kube-system cilium-config -o yaml 2>/dev/null
 
 # Check Dataplane version
-gcloud container clusters describe <cluster> --format='value(networkConfig.datapathProvider)'
-# ADVANCED_DATAPATH = Dataplane v2
+gcloud container clusters describe <cluster> \
+  --format='value(networkConfig.datapathProvider)'
+# ADVANCED_DATAPATH = Dataplane v2 (eBPF/Cilium)
 # LEGACY_DATAPATH = iptables kube-proxy
+
+# Observe ip-masq-agent config
+kubectl get configmap -n kube-system ip-masq-agent -o yaml
 ```
 
 ### GCP Firewall Rules
+
 GCP firewall rules are **global**, applied at the VPC level, not per-instance.
 
 ```bash
@@ -198,13 +287,28 @@ metadata:
 ## 4. Azure Networking for Kubernetes
 
 ### VNet Architecture
-```
-VNet: 10.0.0.0/8
-  ├── Subnet (nodeSubnet):  10.240.0.0/16  — nodes + pods (Azure CNI)
-  └── Subnet (svcSubnet):   10.0.0.0/16    — services
+
+```mermaid
+flowchart TD
+    subgraph vnet["VNet 10.0.0.0/8"]
+        subgraph node_sub["nodeSubnet 10.240.0.0/16"]
+            N1[AKS Node<br/>10.240.0.4]
+            P1[Pod 10.240.0.10<br/>Azure CNI classic]
+        end
+        subgraph svc_sub["svcSubnet"]
+            SVC[Services 10.0.0.0/16]
+        end
+        NSG[NSG rules]
+        LB[Azure Standard LB]
+    end
+
+    N1 --> P1
+    NSG --> N1
+    LB --> N1
 ```
 
 ### Azure CNI
+
 Two modes:
 
 **Azure CNI (classic):** Pods get IPs from the VNet subnet.
@@ -219,9 +323,13 @@ az aks show --resource-group rg --name aks \
 az aks show --resource-group rg --name aks \
   --query networkProfile.networkMode
 # overlay
+
+# View node's pod CIDR in overlay mode
+kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.podCIDR}{"\n"}{end}'
 ```
 
 ### NSG (Network Security Group)
+
 NSGs filter traffic at the subnet or NIC level.
 
 ```bash
@@ -229,6 +337,8 @@ NSGs filter traffic at the subnet or NIC level.
 az network nsg rule list \
   --resource-group <node-resource-group> \
   --nsg-name <nsg-name>
+
+# IMPORTANT: AKS manages these NSG rules — manual edits will be overwritten
 ```
 
 ### Azure Load Balancer Integration
@@ -258,6 +368,7 @@ service:
 | L7 LB | ALB (Controller) | Cloud LB (GCE Ingress) | App Gateway Ingress |
 | Security model | Security Groups (ENI) | VPC Firewall Rules | NSG |
 | Node-to-node | VPC routing | VPC routing | VNet routing |
+| IP exhaustion risk | ENI limit per instance | Pre-sized secondary range | Azure CNI classic uses VNet IPs |
 
 ---
 
@@ -273,6 +384,7 @@ service:
 kubectl set env ds -n kube-system aws-node ENABLE_PREFIX_DELEGATION=true
 
 # Gotcha 3: externalTrafficPolicy=Local required for client IP preservation with NLB
+kubectl patch svc <svc> -p '{"spec":{"externalTrafficPolicy":"Local"}}'
 ```
 
 ### GCP
@@ -290,6 +402,7 @@ kubectl get configmap -n kube-system ip-masq-agent -o yaml
 
 # Gotcha 2: AKS requires pre-planned subnet for Azure CNI
 # Use Overlay mode for large clusters
+az aks create --network-plugin azure --network-plugin-mode overlay ...
 
 # Gotcha 3: NSG rules are managed by AKS — manual edits get overwritten
 ```
@@ -302,33 +415,98 @@ kubectl get configmap -n kube-system ip-masq-agent -o yaml
 # Any cloud cluster — trace a pod's IP back to the cloud resource
 
 # Step 1: Get pod IP
-kubectl get pod <pod> -o jsonpath='{.status.podIP}'
+POD_IP=$(kubectl get pod <pod> -o jsonpath='{.status.podIP}')
+echo "Pod IP: $POD_IP"                                      # → 10.0.1.21
 
 # Step 2: Find which node
-kubectl get pod <pod> -o jsonpath='{.spec.nodeName}'
+NODE=$(kubectl get pod <pod> -o jsonpath='{.spec.nodeName}')
+echo "Node: $NODE"                                          # → ip-10-0-1-10.ec2.internal
 
 # Step 3: AWS — find the ENI that owns this secondary IP
-NODE_IP=$(kubectl get node <node> -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
+NODE_IP=$(kubectl get node $NODE \
+  -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
 aws ec2 describe-network-interfaces \
-  --filters "Name=private-ip-address,Values=<pod-ip>" \
+  --filters "Name=private-ip-address,Values=${POD_IP}" \
   --query 'NetworkInterfaces[0].{ENI:NetworkInterfaceId,Node:PrivateIpAddress}'
+# → {"ENI": "eni-0abc123", "Node": "10.0.1.10"}
 
 # Step 4: Verify security groups allow the traffic
 aws ec2 describe-network-interface-attribute \
   --network-interface-id <eni-id> \
   --attribute groupSet
+
+# GKE: verify alias IP assignment on the node
+gcloud compute instances describe $NODE --format='value(networkInterfaces[0].aliasIpRanges)'
+# → [{cidrRange: 10.100.1.0/24, subnetworkRangeName: pods}]
 ```
 
 ---
 
-## 8. Summary
+## Troubleshooting
+
+| Symptom | Likely Cause | Diagnostic Command | Fix |
+|---------|-------------|-------------------|-----|
+| Pods stuck in `ContainerCreating` on EKS | ENI limit reached (no IPs available) | `kubectl describe node <node> \| grep -i eni` | Scale to larger instance type or enable prefix delegation |
+| AWS pod can't reach external internet | Source/destination check enabled on ENI | `aws ec2 describe-instances --instance-ids <id> --query '...SourceDestCheck'` | Disable source/dest check or use NAT Gateway |
+| GKE pods can't communicate across nodes | Firewall rule blocking node-to-node traffic | `gcloud compute firewall-rules list --filter="name~gke-"` | Verify `gke-<cluster>-vms` rule exists and targets node tag |
+| AKS pod IPs exhausted | Azure CNI classic used too many VNet IPs | `az aks show --query networkProfile.networkMode` | Migrate to Azure CNI Overlay mode |
+| NLB not reaching pods on AWS | `externalTrafficPolicy: Cluster` masquerades source IP | `kubectl get svc <svc> -o yaml \| grep externalTrafficPolicy` | Set `externalTrafficPolicy: Local` for NLB IP target mode |
+| GKE pod can't egress to internet | Cloud NAT not configured for the subnet | `gcloud compute routers nats list --router=...` | Add Cloud NAT to Cloud Router for the node subnet |
+| AKS NSG rule disappears | AKS CCM overwrites manual NSG rules | Check AKS nodeResourceGroup NSG | Use Kubernetes NetworkPolicy instead of direct NSG edits |
+
+---
+
+## Production Checklist
+
+- [ ] Instance type selected with sufficient ENI/IP capacity for target pod density (AWS)
+- [ ] Prefix delegation enabled on EKS for clusters with >30 pods/node
+- [ ] Secondary IP range pre-sized for maximum cluster growth before cluster creation (GKE)
+- [ ] Azure CNI Overlay mode enabled for clusters with more than 50 nodes (AKS)
+- [ ] NetworkPolicy or Security Groups for Pods configured for pod-level isolation
+- [ ] Cloud NAT / NAT Gateway provisioned for private node subnets requiring egress
+- [ ] Load balancer health check ports opened in node security groups / firewall rules
+
+---
+
+## Common Anti-Patterns
+
+| What people do | Why it breaks | Correct approach |
+|----------------|--------------|-----------------|
+| Use default ENI limits on large EKS nodes | Pod scheduling fails when ENI is full; no visible error until pods are stuck | Plan instance type based on max pods needed; enable prefix delegation |
+| Size GKE secondary range too small at cluster creation | Pod CIDR exhaustion as cluster grows; cannot resize | Allocate a /14 secondary range (262k addresses) even for small clusters |
+| Edit NSG/firewall rules manually on AKS/GKE | Cloud controller manager overwrites changes at next reconcile | Use Kubernetes NetworkPolicy; only add non-managed rules outside the node resource group |
+| Use `externalTrafficPolicy: Cluster` with NLB on AWS | Client source IP is masqueraded; hops add latency | Use `externalTrafficPolicy: Local` with NLB and `ip` target type |
+| Rely on Security Groups alone for pod-to-pod isolation on EKS | SGs apply at ENI (node) level, not pod level, without trunk ENI mode | Enable Security Groups for Pods with trunk ENI mode, or use Calico NetworkPolicy |
+
+---
+
+## Quick Reference
+
+| Use Case | Command |
+|----------|---------|
+| Get pod IP | `kubectl get pod <pod> -o jsonpath='{.status.podIP}'` |
+| List ENIs on EC2 instance (AWS) | `aws ec2 describe-instances --instance-ids <id> --query '...NetworkInterfaces'` |
+| Enable prefix delegation (EKS) | `kubectl set env ds -n kube-system aws-node ENABLE_PREFIX_DELEGATION=true` |
+| Check VPC CNI config (EKS) | `kubectl get cm -n kube-system amazon-vpc-cni -o yaml` |
+| Check GKE dataplane version | `gcloud container clusters describe <c> --format='value(networkConfig.datapathProvider)'` |
+| List GKE firewall rules | `gcloud compute firewall-rules list --filter="name~gke-"` |
+| Check AKS network mode | `az aks show --query networkProfile.networkMode` |
+| View node pod CIDRs | `kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.podCIDR}{"\n"}{end}'` |
+| Check ip-masq-agent config (GKE) | `kubectl get cm -n kube-system ip-masq-agent -o yaml` |
+| Find which ENI owns a pod IP (AWS) | `aws ec2 describe-network-interfaces --filters Name=private-ip-address,Values=<ip>` |
+| Disable src/dst check on EC2 | `aws ec2 modify-instance-attribute --instance-id <id> --no-source-dest-check` |
+| List Cloud NAT configs (GCP) | `gcloud compute routers nats list --router=<router>` |
+
+---
+
+## Summary
 
 | Provider | Key Concept |
 |----------|------------|
-| AWS EKS | VPC CNI gives pods real ENI IPs; Security Groups at ENI level |
-| GCP GKE | Alias IP ranges; Dataplane v2 uses Cilium eBPF |
-| Azure AKS | Azure CNI Overlay recommended for large clusters; NSG at subnet |
-| All | Cloud LBs integrate via CCM (Cloud Controller Manager) annotations |
+| AWS EKS | VPC CNI gives pods real ENI IPs; ENI limit caps pod density per node |
+| GCP GKE | Alias IP ranges; Dataplane v2 uses Cilium eBPF; secondary ranges pre-sized at creation |
+| Azure AKS | Azure CNI Overlay recommended for large clusters; NSG at subnet managed by AKS |
+| All providers | Cloud LBs integrate via CCM (Cloud Controller Manager) annotations on Service objects |
 
 ---
 

@@ -1,8 +1,8 @@
 # Lesson 11 — Calico CNI Deep Dive
 
-> **Track:** Network Foundation — Bare Metal & Cloud  
-> **Prerequisites:** [Lesson 06 — BGP](06-bgp-fundamentals.md), [Lesson 09 — CNI Specification](09-cni-specification.md)  
-> **Duration:** ~3 hours
+> **Track:** Network Foundation — Bare Metal & Cloud · **Prereqs:** [Lesson 06 — BGP](06-bgp-fundamentals.md), [Lesson 09 — CNI Specification](09-cni-specification.md) · **Time:** ~3 hours
+
+> **Goal:** Configure Calico IP pools and BGP peering, enforce GlobalNetworkPolicy, and diagnose Felix/BIRD failures on a production node.
 
 ---
 
@@ -11,49 +11,125 @@
 ```bash
 # Terminal 1 — minikube Linux node
 minikube ssh
-sudo calicoctl node status 2>/dev/null || echo "calicoctl not in PATH, try: kubectl exec -n calico-system ..."
+sudo calicoctl node status 2>/dev/null || echo "calicoctl not in PATH"
 ip route show | grep -E "cali|bird|blackhole"
 ip link show | grep cali
 
 # Terminal 2 — Mac (kubectl + calicoctl)
-kubectl get pods -n calico-system
+kubectl get pods -n calico-system -o wide
 kubectl get felixconfiguration default -o yaml 2>/dev/null
 kubectl get ipamblocks 2>/dev/null | head -10
+kubectl get ippool -o yaml
 ```
 
 ---
 
-## Why This Matters
+## 1. Architecture
 
-Calico is the most widely deployed CNI plugin for production Kubernetes. It supports both overlay and native routing modes, implements the full Kubernetes NetworkPolicy API, and offers an eBPF dataplane as an alternative to kube-proxy. Understanding Calico deeply pays dividends in almost any production environment.
+```mermaid
+flowchart LR
+    subgraph Control["Kubernetes Control Plane"]
+        API[API Server]
+        etcd[(etcd)]
+    end
+    subgraph KCC["calico-kube-controllers"]
+        KCC1[watches K8s objects\nupdates Calico CRDs]
+    end
+    subgraph Node["calico-node DaemonSet (every node)"]
+        Felix[Felix\niptables / eBPF / routes]
+        BIRD[BIRD\nBGP daemon]
+        confd[confd\nrenders BIRD config]
+    end
+    subgraph Typha["Typha (optional, 50+ nodes)"]
+        T1[shared watch cache\nreduces API load]
+    end
+    API --> KCC1
+    KCC1 --> Felix
+    KCC1 --> BIRD
+    API --> T1
+    T1 --> Felix
+    Felix -- programs --> iptables[iptables / nftables\nor eBPF maps]
+    BIRD -- advertises --> BGPPeer[BGP Peer\nor Route Reflector]
+    confd -- renders --> BIRD
+```
+
+> **See also:** [Lesson 06 — BGP Fundamentals](06-bgp-fundamentals.md) for BGP peer configuration concepts used by BIRD.
 
 ---
 
-## 1. Calico Architecture
+## 2. Packet Flow: Pod-to-Pod Cross-Node
 
-```
-┌──────────────────────────────────────────┐
-│  Kubernetes Control Plane                │
-│  (APIServer, etcd)                       │
-└────────────────┬─────────────────────────┘
-                 │  CRDs (IPPool, NetworkPolicy, BGPPeer...)
-┌────────────────▼─────────────────────────┐
-│  calico-kube-controllers                 │
-│  (watches K8s objects → updates Calico)  │
-└────────────────┬─────────────────────────┘
-                 │
-┌────────────────▼─────────────────────────┐
-│  calico-node (DaemonSet on every node)   │
-│  ├── Felix (enforces policy, programs    │
-│  │          iptables/eBPF/routes)        │
-│  ├── BIRD (BGP agent, advertises routes) │
-│  └── confd (renders BIRD config)         │
-└──────────────────────────────────────────┘
+```mermaid
+sequenceDiagram
+    participant PA as Pod A (node1\n10.244.0.5)
+    participant VethA as cali<hash> veth\n(node1 host)
+    participant Felix1 as Felix / iptables\n(node1)
+    participant Net as Physical Network\n(BGP routes)
+    participant Felix2 as Felix / iptables\n(node2)
+    participant VethB as cali<hash> veth\n(node2 host)
+    participant PB as Pod B (node2\n10.244.1.6)
+
+    PA->>VethA: packet dst=10.244.1.6
+    VethA->>Felix1: check cali-FORWARD policy
+    Felix1->>Felix1: proxy_arp on veth → reply on behalf of gateway
+    Felix1->>Net: route lookup → via node2 IP (BGP learned)
+    Note over Net: IPIP/VXLAN encap if needed
+    Net->>Felix2: decap + route to cali<hash>
+    Felix2->>Felix2: check cali-FROM-ENDPOINT policy
+    Felix2->>VethB: forward to pod veth
+    VethB->>PB: packet delivered
 ```
 
 ---
 
-## 2. Installation
+## 3. Data Plane Modes
+
+### Native Routing (BGP, no overlay)
+Best performance. Requires L2 adjacency or BGP-capable switches.
+```yaml
+spec:
+  calicoNetwork:
+    ipPools:
+      - encapsulation: None
+        bgp: Enabled
+```
+
+### IPIP (IP-in-IP)
+20-byte overhead. Lower than VXLAN.
+```yaml
+encapsulation: IPIP               # all traffic
+encapsulation: IPIPCrossSubnet    # only cross-subnet traffic
+```
+
+### VXLAN
+50-byte overhead. UDP encapsulation; works where IPIP is blocked.
+```yaml
+encapsulation: VXLAN
+encapsulation: VXLANCrossSubnet
+```
+
+### eBPF Dataplane
+Replaces kube-proxy and iptables entirely with eBPF programs.
+```yaml
+apiVersion: operator.tigera.io/v1
+kind: Installation
+spec:
+  calicoNetwork:
+    linuxDataplane: BPF
+```
+
+### Dataplane Mode Comparison
+
+| Mode | Overhead | kube-proxy needed | Requires BGP switch | Best for |
+|------|----------|-------------------|---------------------|----------|
+| Native BGP | None | Yes | Yes | Bare metal, AWS with VPC BGP |
+| IPIP | 20 bytes | Yes | No | On-prem, same-subnet nodes |
+| VXLANCrossSubnet | 50 bytes cross-subnet | Yes | No | Mixed cloud/on-prem |
+| eBPF | None | No (replaced) | No | Performance-critical |
+
+---
+
+## 4. Installation
 
 ```bash
 # Install Calico via Tigera Operator (recommended)
@@ -69,104 +145,84 @@ spec:
     ipPools:
       - blockSize: 26
         cidr: 10.244.0.0/16
-        encapsulation: VXLANCrossSubnet  # or None, IPIP, VXLAN
+        encapsulation: VXLANCrossSubnet
         natOutgoing: Enabled
         nodeSelector: all()
 EOF
+
+# Verify operator is healthy
+kubectl get tigerastatus
 ```
 
 ---
 
-## 3. Data Plane Modes
-
-### Native Routing (BGP, no overlay)
-Best performance. Requires L2 adjacency or BGP-capable switches.
-```yaml
-spec:
-  calicoNetwork:
-    ipPools:
-      - encapsulation: None      # no overlay
-        bgp: Enabled
-```
-
-### IPIP (IP-in-IP)
-Encapsulates IP packets inside IP packets. Lower overhead than VXLAN (20 bytes vs 50).
-```yaml
-encapsulation: IPIP               # all traffic
-# or:
-encapsulation: IPIPCrossSubnet    # only cross-subnet traffic (native within subnet)
-```
-
-### VXLAN
-UDP encapsulation. Works where IPIP is blocked (some cloud environments).
-```yaml
-encapsulation: VXLAN
-encapsulation: VXLANCrossSubnet
-```
-
-### eBPF Dataplane
-Replaces kube-proxy and iptables with eBPF programs.
-```yaml
-apiVersion: operator.tigera.io/v1
-kind: Installation
-spec:
-  calicoNetwork:
-    linuxDataplane: BPF
-```
-
----
-
-## 4. Felix — The Policy Engine
+## 5. Felix — The Policy Engine
 
 Felix is the per-node agent that programs the dataplane.
 
 ```bash
-# Check Felix status
+# Check Felix liveness probe (port 9099)
 kubectl exec -n calico-system calico-node-xxxxx -- calico-node -felix-live
 kubectl logs -n calico-system calico-node-xxxxx -c calico-node | grep felix
 
-# Felix diagnostic snapshot
+# Felix diagnostic snapshot (saves to /tmp)
 kubectl exec -n calico-system calico-node-xxxxx -- calico-node -diags
 
-# Felix configuration
+# View Felix configuration
 kubectl get felixconfigurations default -o yaml
+
+# See iptables chains Felix has programmed
+iptables -t filter -L cali-FORWARD -n -v        # forwarding policy
+iptables -t nat -L cali-nat-outgoing -n -v      # masquerade rules
+iptables -t filter -L cali-to-wl-dispatch -n    # workload dispatch chain
 ```
 
-Key Felix responsibilities:
-- Programs iptables/nftables/eBPF rules for NetworkPolicy
-- Sets up routing for each local pod
-- Manages `cali*` veth interfaces
-- Programs iptables rules for NAT (masquerade)
+### Felix Key Configuration Parameters
+
+| Parameter | Default | Effect | When to change |
+|-----------|---------|--------|----------------|
+| `logSeverityScreen` | `Info` | Log verbosity | Set `Debug` for troubleshooting; revert after |
+| `iptablesRefreshInterval` | `90s` | How often Felix checks/repairs iptables | Lower if external tools modify iptables |
+| `bpfEnabled` | `false` | Enable eBPF dataplane | Requires Linux 5.3+; set via Installation CRD |
+| `wireguardEnabled` | `false` | Node-to-node WireGuard encryption | Enable for encrypted native routing |
+| `healthPort` | `9099` | Felix HTTP health probe port | Change if port conflicts |
+| `endpointReportingEnabled` | `true` | Felix reports workload endpoint status | Disable only if Typha is overloaded |
 
 ---
 
-## 5. Pod Interface Naming
+## 6. Pod Interface Naming
 
 ```bash
 # Each pod gets a veth pair:
-# Host side: cali<hash>  (e.g., cali9abc1234)
-# Pod side:  eth0
+#   Host side: cali<hash>  (e.g., cali9abc1234)
+#   Pod side:  eth0
 
 # View all Calico interfaces on a node
 ip link show | grep cali
 
-# Calico uses proxy ARP on the host veth so pods can use a /32 address
+# Calico uses proxy ARP on the host veth — pods use a /32 address
 cat /proc/sys/net/ipv4/conf/cali9abc1234/proxy_arp
 # 1
 
 # Each pod gets a /32 host route on the node
 ip route show | grep cali
 # 10.244.0.6 dev cali9abc1234 scope link
+
+# Map interface back to pod
+ip link show cali9abc1234     # note index
+# then: cat /sys/class/net/cali9abc1234/iflink
 ```
 
 ---
 
-## 6. IP Pools and IPAM
+## 7. IP Pools and IPAM
+
+Calico divides each IPPool into /26 blocks (default) assigned per node.
 
 ```bash
 # View IP pools
 calicoctl get ippool -o wide
-kubectl get ippool -o yaml   # via CRD
+kubectl get ippool -o yaml
 
 # View IPAM blocks (how the pool is divided per node)
 calicoctl ipam show --show-blocks
@@ -176,16 +232,19 @@ calicoctl ipam show --show-blocks
 # | IP Pool  | 10.244.0.0/16    |       48 |    65488 |
 # | Block    | 10.244.0.0/26    |       16 |       48 |
 
-# Which pod owns which IP
+# Which pod owns which IP?
 calicoctl ipam show --ip 10.244.0.6
 
-# Release a leaked IP (after pod deletion)
+# Release a leaked IP (after pod deletion without cleanup)
 calicoctl ipam release --ip=10.244.0.6
+
+# View all allocations per node
+calicoctl ipam show --show-borrowed
 ```
 
 ---
 
-## 7. NetworkPolicy with Calico
+## 8. NetworkPolicy with Calico
 
 Calico implements Kubernetes NetworkPolicy and also provides its own richer CRDs.
 
@@ -218,7 +277,7 @@ spec:
               kubernetes.io/metadata.name: kube-system
       ports:
         - protocol: UDP
-          port: 53   # allow DNS
+          port: 53
 ```
 
 ### Calico GlobalNetworkPolicy (cluster-wide)
@@ -266,7 +325,7 @@ spec:
 
 ---
 
-## 8. BGP Configuration
+## 9. BGP Configuration
 
 ```bash
 # View BGP status
@@ -275,10 +334,7 @@ calicoctl node status
 # BGP peers
 kubectl get bgppeers -o yaml
 
-# BGP configuration
-kubectl get bgpconfigurations default -o yaml
-
-# Configure full mesh (default)
+# Configure full mesh (default for small clusters)
 kubectl apply -f - <<EOF
 apiVersion: projectcalico.org/v3
 kind: BGPConfiguration
@@ -290,7 +346,7 @@ spec:
   asNumber: 64512
 EOF
 
-# Configure Route Reflector
+# Configure Route Reflector (recommended for 50+ nodes)
 kubectl annotate node rr-node-01 \
   projectcalico.org/RouteReflectorClusterID=244.0.0.1
 
@@ -303,41 +359,10 @@ spec:
   nodeSelector: "!has(projectcalico.org/RouteReflectorClusterID)"
   peerSelector: "has(projectcalico.org/RouteReflectorClusterID)"
 EOF
-```
 
----
-
-## 9. Troubleshooting Calico
-
-```bash
-# Overall health
-calicoctl node status
-kubectl get tigerastatus
-
-# Is Felix in sync?
-kubectl logs -n calico-system calico-node-xxxxx -c calico-node | grep -E "Sync|ERROR|WARN"
-
-# Check iptables rules programmed by Felix
-iptables -t filter -L cali-FORWARD -n -v
-iptables -t nat -L cali-nat-outgoing -n -v
-
-# Check routing table for pod routes
-ip route show | grep cali
-
-# Test policy enforcement
-# (run this from a pod and check if connection is allowed/denied)
-kubectl exec -it test-pod -- curl -v http://10.244.0.6:80
-
-# View Calico's understanding of a pod's policy
-calicoctl get workloadendpoint -n default <pod-name> -o yaml
-
-# Check BIRD routing tables
+# Check BIRD routing tables (BGP learned routes)
 kubectl exec -n calico-system calico-node-xxxxx -- birdcl show protocols
 kubectl exec -n calico-system calico-node-xxxxx -- birdcl show route
-
-# Felix log level (temporarily increase)
-kubectl patch felixconfiguration default --type merge \
-  -p '{"spec":{"logSeverityScreen":"Debug"}}'
 ```
 
 ---
@@ -364,16 +389,74 @@ az aks create --network-policy calico --network-plugin azure ...
 
 ---
 
-## 11. Summary
+## Troubleshooting
+
+| Symptom | Likely Cause | Diagnostic Command | Fix |
+|---------|-------------|-------------------|-----|
+| Pods can't reach each other cross-node | BIRD not advertising routes | `calicoctl node status` | Check BGP peer state; verify AS numbers match |
+| `BIRD: Neighbor down` in logs | MTU mismatch or firewall blocking BGP (TCP 179) | `kubectl exec calico-node-xxx -- birdcl show protocols` | Open TCP 179 between nodes; fix MTU |
+| NetworkPolicy not enforced | Felix not synced (`felixsyncState != InSync`) | `kubectl logs calico-node-xxx \| grep Sync` | Restart calico-node pod; check API connectivity |
+| Pod IP address leaked after pod deletion | IPAM release failed | `calicoctl ipam show --show-blocks` | `calicoctl ipam release --ip=<ip>` |
+| `iptables: No chain/target/match by that name` | Felix iptables modules not loaded | `iptables -t filter -L cali-FORWARD` | Load `xt_set`, `xt_mark`, `xt_rpfilter` modules |
+| Felix health check failing (port 9099) | Felix crash loop | `kubectl describe pod calico-node-xxx` | Check kernel version (need 3.10+); check Typha connectivity |
+| Calico eBPF mode: service IP not reachable | kube-proxy still running in parallel | `kubectl get cm -n kube-system kube-proxy -o yaml \| grep mode` | Remove kube-proxy DaemonSet when using eBPF mode |
+
+---
+
+## Production Checklist
+
+- [ ] Use Typha when cluster has 50+ nodes (`spec.typhaDeployment.replicas >= 2`)
+- [ ] Switch from node-to-node BGP mesh to route reflectors at 10+ nodes
+- [ ] Set IPAM block size (`blockSize: 26`) to match expected pod density per node
+- [ ] Enable WireGuard node-to-node encryption if the network is untrusted (`felixconfiguration: wireguardEnabled=true`)
+- [ ] Configure GlobalNetworkPolicy default-deny before enabling Calico in production
+- [ ] Set Felix log level back to `Info` after debugging (default); `Debug` generates GB/day
+- [ ] Monitor IPAM block utilization; alert when a pool is >80% allocated
+
+---
+
+## Common Anti-Patterns
+
+| What people do | Why it breaks | Correct approach |
+|---------------|--------------|-----------------|
+| Leave `nodeToNodeMeshEnabled: true` on 100-node cluster | O(N²) BGP sessions; each node peers with every other — unstable at scale | Deploy route reflectors, disable mesh |
+| Set `blockSize: 24` (256 IPs/block) on small nodes | Reserves too many IPs per node; starves other nodes | Use `/26` (64 IPs) or `/27` (32 IPs) matched to max pods per node |
+| Deploy GlobalNetworkPolicy `default-deny` without testing DNS egress | All pods lose DNS; app appears broken | Always add an egress rule allowing UDP 53 to kube-system namespace before applying default-deny |
+| Run Felix in `Debug` log level permanently | Disk exhaustion and performance degradation | Use `Info` in production; switch to `Debug` briefly during incident |
+| Skip `calicoctl ipam release` after pod disruption | IPAM blocks fill up; new pods cannot get IPs | Automate periodic `calicoctl ipam show` and alert on leaked IPs |
+
+---
+
+## Quick Reference
+
+| Use Case | Command |
+|---------|---------|
+| Check overall Calico health | `kubectl get tigerastatus` |
+| Felix sync state | `calicoctl node status` |
+| BGP peer status | `kubectl exec calico-node-xxx -- birdcl show protocols` |
+| List IPAM blocks per node | `calicoctl ipam show --show-blocks` |
+| Find which pod owns an IP | `calicoctl ipam show --ip 10.244.0.6` |
+| Release a leaked IP | `calicoctl ipam release --ip=10.244.0.6` |
+| View all workload endpoints | `calicoctl get workloadendpoint -A` |
+| View Felix iptables chains | `iptables -t filter -L cali-FORWARD -n -v` |
+| Increase Felix log level | `kubectl patch felixconfiguration default --type merge -p '{"spec":{"logSeverityScreen":"Debug"}}'` |
+| View BGP-learned routes | `kubectl exec calico-node-xxx -- birdcl show route` |
+| Inspect pod's policy | `calicoctl get workloadendpoint -n default <pod> -o yaml` |
+| Check wireguard encryption | `wg show` (inside calico-node pod with hostPID) |
+
+---
+
+## Summary
 
 | Component | Role |
 |-----------|------|
 | Felix | Per-node agent: programs routes, iptables/eBPF, NetworkPolicy |
 | BIRD | BGP daemon: advertises pod routes to peers |
-| calico-ipam | IP address management with per-node IPAM blocks |
+| Typha | Scales Felix by providing a shared watch cache (needed at 50+ nodes) |
+| calico-ipam | IP address management with per-node IPAM blocks (/26 default) |
 | Tigera Operator | Installs and manages Calico components |
 | GlobalNetworkPolicy | Cluster-wide policy (richer than K8s NetworkPolicy) |
-| eBPF dataplane | Replaces kube-proxy; better performance |
+| eBPF dataplane | Replaces kube-proxy; better performance, no iptables |
 
 ---
 

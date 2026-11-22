@@ -1,8 +1,8 @@
 # Lesson 04 — Network Namespaces Deep Dive
 
-> **Track:** Network Foundation — Bare Metal & Cloud  
-> **Prerequisites:** [Lesson 01 — Linux Networking Fundamentals](01-linux-networking-fundamentals.md)  
-> **Duration:** ~2 hours
+> **Track:** Network Foundation — Bare Metal & Cloud · **Prereqs:** [Lesson 01 — Linux Networking Fundamentals](01-linux-networking-fundamentals.md) · **Time:** ~2 hours
+
+> **Goal:** Reproduce the complete pod network namespace lifecycle — from `clone(CLONE_NEWNET)` through CNI wiring — and debug a running pod's network state from the host using `nsenter`.
 
 ---
 
@@ -21,12 +21,6 @@ sudo crictl ps | head -5
 
 ---
 
-## Why This Matters
-
-Network namespaces are the kernel primitive that gives each Kubernetes pod its own isolated network identity. Understanding their lifecycle — creation, wiring, inspection, and teardown — lets you reason about pod networking at the most fundamental level.
-
----
-
 ## 1. What a Network Namespace Contains
 
 A network namespace is a **complete, isolated copy** of the network stack:
@@ -38,10 +32,10 @@ A network namespace is a **complete, isolated copy** of the network stack:
 | Routing tables | Yes |
 | iptables/nftables rules | Yes |
 | Conntrack table | Yes |
-| Sockets | Yes (can't be shared across namespaces) |
+| Sockets | Yes (cannot be shared across namespaces) |
 | BPF programs attached to interfaces | Yes |
 
-What is **not** isolated: the physical hardware, kernel sysctl `net.*` globals (partially), and network namespaces themselves (they are managed from the host).
+What is **not** isolated: the physical hardware, kernel sysctl `net.*` globals (partially), and network namespaces themselves (managed from the host).
 
 ---
 
@@ -65,8 +59,40 @@ ip netns del red
 
 # Show which namespace a process is in
 ls -la /proc/<pid>/ns/net
-# Namespaces of all processes:
-# ls -la /proc/*/ns/net | sort -k11
+
+# List all namespaces known to the kernel
+lsns -t net
+```
+
+### Architecture: Namespace / Pause / CNI Wiring
+
+```mermaid
+flowchart LR
+    subgraph node [Host network namespace]
+        K[kubelet]
+        CRI[containerd / CRI-O]
+        CNI[CNI plugin binary]
+        HOST_VETH[veth-host-side\ne.g. cali1a2b3c]
+        BRIDGE[bridge / VTEP\ne.g. cni0 or flannel.1]
+        HOST_VETH --- BRIDGE
+    end
+
+    subgraph pod [Pod network namespace]
+        PAUSE[pause container\nholds namespace open]
+        APP[app container\nshares namespace]
+        ETH0[eth0\n10.244.0.10/24]
+        PAUSE --- ETH0
+        APP --- ETH0
+    end
+
+    K -->|1. schedules pod| CRI
+    CRI -->|2. creates namespace via clone CLONE_NEWNET| pod
+    CRI -->|3. calls CNI ADD| CNI
+    CNI -->|4. creates veth pair| HOST_VETH
+    HOST_VETH <-->|veth pair| ETH0
+
+    style node fill:#1a3a5c,color:#fff
+    style pod fill:#2d5a27,color:#fff
 ```
 
 ---
@@ -117,38 +143,59 @@ kubectl exec -it <pod-name> -- sh
 # Then: ip addr, ip route, ss, nslookup, curl
 ```
 
+### Namespace / Runtime Configuration Reference
+
+| Item | Location / Command | Notes |
+|------|-------------------|-------|
+| Named namespace bind-mount | `/var/run/netns/<name>` | Created by `ip netns add`; CNI uses this path |
+| Pod namespace (containerd) | `/proc/<pause_pid>/ns/net` | Accessed via `nsenter -t <pid> -n` |
+| List namespaces (kernel) | `lsns -t net` | Shows PID, NSID, and process name |
+| Namespace inode ID | `stat /proc/<pid>/ns/net` | Same inode = same namespace |
+| Pause container image | `registry.k8s.io/pause:3.x` | Configured in kubelet `--pod-infra-container-image` |
+| CNI binary directory | `/opt/cni/bin/` | CNI plugins must be executable here |
+| CNI config directory | `/etc/cni/net.d/` | JSON config files; first sorted file is used |
+
+### Kernel Namespace Limit Parameters
+
+| Parameter | Default | Effect | When to change |
+|-----------|---------|--------|----------------|
+| `user.max_net_namespaces` | `unlimited` (varies by distro) | Maximum network namespaces the user namespace can create | Set a cap on shared nodes to prevent namespace exhaustion attacks |
+| `user.max_user_namespaces` | `7182` (distro-dependent) | Caps nested user namespaces (affects rootless containers) | Raise if rootless container runtimes are used (Podman, rootless containerd) |
+| `net.core.default_qdisc` | `pfifo_fast` | Default queueing discipline applied to new veth interfaces | Set to `fq_codel` or `noqueue` on Kubernetes nodes for lower pod latency |
+| `net.ipv4.conf.default.rp_filter` | `1` | rp_filter value applied to newly created interfaces | Set to `0` before CNI creates veths if CNI uses asymmetric routing |
+| `net.ipv4.conf.default.forwarding` | `0` | IP forwarding default for new interfaces | Set to `1` so veth pairs created by CNI forward without per-interface config |
+
 ---
 
 ## 5. Network Namespace Lifecycle with CNI
 
 When a pod is scheduled, this sequence occurs:
 
-```
-kubelet → CRI (containerd/crio)
-  1. CRI creates the pod sandbox (pause container)
-     └── Calls: clone(CLONE_NEWNET) → new network namespace created
-     └── Namespace file: /var/run/netns/cni-<uuid>  (bind-mounted for CNI)
+```mermaid
+sequenceDiagram
+    participant K as kubelet
+    participant CRI as containerd / CRI-O
+    participant CNI as CNI plugin
+    participant NS as Pod namespace
+    participant HOST as Host namespace
 
-  2. CRI calls CNI plugin: ADD command
-     └── CNI reads namespace path from args
-     └── CNI creates veth pair
-     └── CNI moves one veth end into the namespace
-     └── CNI assigns IP address
-     └── CNI sets up routes (inside namespace and on host)
-     └── CNI may install iptables/eBPF rules
-
-  3. App containers join the same namespace (--network=container:pause)
-
-  4. Pod is Running
-
-When pod is deleted:
-  5. CRI calls CNI plugin: DEL command
-     └── CNI removes IP from IPAM pool
-     └── CNI removes host-side veth (destroying the pair)
-     └── CNI removes routes
-  6. CRI destroys the namespace
-     └── Namespace file unlinked
-     └── Last reference drops → kernel frees the namespace
+    K->>CRI: Create pod sandbox
+    CRI->>NS: clone(CLONE_NEWNET) — new namespace
+    CRI->>HOST: Bind-mount namespace at /var/run/netns/cni-UUID
+    CRI->>CNI: Exec CNI binary with ADD + namespace path
+    CNI->>HOST: ip link add eth0-host type veth peer name eth0
+    CNI->>NS: ip link set eth0 netns <ns-path>
+    CNI->>NS: ip addr add <pod-ip>/24 dev eth0
+    CNI->>NS: ip route add default via <gateway>
+    CNI->>HOST: ip link set eth0-host master cni0 (bridge)
+    CNI-->>CRI: Return result JSON (pod IP, gateway)
+    CRI->>NS: Start app containers sharing namespace
+    Note over NS: Pod is Running
+    K->>CRI: Delete pod
+    CRI->>CNI: Exec CNI binary with DEL + namespace path
+    CNI->>HOST: ip link del eth0-host (destroys veth pair)
+    CRI->>HOST: Unlink /var/run/netns/cni-UUID
+    Note over NS: Namespace freed by kernel
 ```
 
 ---
@@ -156,6 +203,7 @@ When pod is deleted:
 ## 6. Namespace Sharing Edge Cases
 
 ### hostNetwork pods
+
 Some system pods (kube-proxy, CNI agents) run in the **host network namespace**:
 
 ```yaml
@@ -172,7 +220,10 @@ kubectl get pod -n kube-system -o wide | grep -E "kube-proxy|calico-node"
 Risks: a compromised `hostNetwork` pod can see and modify all host network state.
 
 ### Shared network between pods (non-standard)
+
 Pods can share a namespace using `shareProcessNamespace` + init container tricks, but the standard model is one namespace per pod.
+
+> **See also:** [Lesson 03 — iptables and Netfilter](03-iptables-and-netfilter.md) for how iptables rules are namespace-scoped — each pod namespace has its own iptables state independent of the host, though kube-proxy rules only exist in the host namespace.
 
 ---
 
@@ -247,21 +298,117 @@ ip netns exec cni-pod-sim ip link set lo up
 ip netns exec cni-pod-sim ip link set eth0 up
 ip netns exec cni-pod-sim ip addr add 10.244.0.100/24 dev eth0
 ip netns exec cni-pod-sim ip route add default via 10.244.0.1
+```
 
-# Step 5: Verify
+### Step-by-step Observation
+
+```bash
+# Verify the namespace was created
+ip netns list
+# → cni-pod-sim (id: N)
+
+# Confirm the veth pair spans both namespaces
+ip link show eth0-host
+# → eth0-host@if<N>: <BROADCAST,MULTICAST,UP,LOWER_UP> ...
+
+ip netns exec cni-pod-sim ip link show eth0
+# → eth0@if<M>: <BROADCAST,MULTICAST,UP,LOWER_UP> ...
+
+# Step 5: Verify pod-side networking
 ip netns exec cni-pod-sim ip addr
+# → 2: eth0 ... inet 10.244.0.100/24 brd 10.244.0.255 scope global eth0
+
 ip netns exec cni-pod-sim ip route
+# → default via 10.244.0.1 dev eth0
+# → 10.244.0.0/24 dev eth0 proto kernel scope link src 10.244.0.100
+
 ip netns exec cni-pod-sim ping -c3 10.244.0.1
+# → PING 10.244.0.1: 3 packets transmitted, 3 received, 0% packet loss
+
+# Confirm namespace inode to verify isolation
+readlink /proc/$$/ns/net
+# → net:[<host-ns-inode>]
+readlink /proc/$(ip netns exec cni-pod-sim sh -c 'echo $$')/ns/net
+# → net:[<different-inode>]  ← proves separate namespace
+```
+
+### Verification
+
+```bash
+# Confirm full setup
+lsns -t net
+# → host namespace + cni-pod-sim listed
 
 # Step 6: Simulate CNI DEL (pod deletion)
 ip link del eth0-host     # destroys veth pair; eth0 inside ns also gone
 ip link del cni0
 ip netns del cni-pod-sim
+
+# Confirm cleanup
+ip netns list   # → (empty or no cni-pod-sim)
+lsns -t net     # → only host namespace remains
 ```
 
 ---
 
-## 10. Summary
+## Troubleshooting
+
+| Symptom | Likely Cause | Diagnostic Command | Fix |
+|---------|-------------|-------------------|-----|
+| `ip netns list` shows nothing but pods are running | containerd uses `/proc/<pid>/ns/net` paths, not `/var/run/netns/` | `lsns -t net` | Use `nsenter -t <pause_pid> -n <cmd>` to access namespace directly |
+| Pod networking works but `kubectl exec` times out | Pod's loopback is DOWN | `nsenter -t <pause_pid> -n ip link show lo` | `nsenter -t <pause_pid> -n ip link set lo up` |
+| Orphan namespaces accumulate on node | CNI DEL failed during pod deletion; namespace not cleaned up | `ls /var/run/netns/ | wc -l` vs `crictl pods | wc -l` | Manually delete orphan files from `/var/run/netns/`; fix CNI plugin logs |
+| `nsenter` returns `ENOENT` or permission denied | PID not found or running without root | `ps aux | grep pause` | Run with `sudo`; verify pause container is still running |
+| Two pods can communicate via localhost | They share a network namespace (same pod) | `kubectl get pod <name> -o jsonpath='{.spec.containers[*].name}'` | Expected behavior for sidecar containers in the same pod |
+| Pod IP missing after CNI failure | CNI ADD failed partway through; namespace exists but veth not wired | `nsenter -t <pid> -n ip addr` shows no eth0 | Delete and re-create pod; check CNI plugin logs via `journalctl -u containerd` |
+| hostNetwork pod sees all node traffic | Pod running with `hostNetwork: true` by design or misconfiguration | `kubectl get pod -o yaml | grep hostNetwork` | Remove `hostNetwork: true` unless required; apply PodSecurityPolicy or OPA to restrict |
+
+---
+
+## Production Checklist
+
+- [ ] Namespace count (`ls /var/run/netns/ | wc -l`) monitored and alerted when it diverges from running pod count by more than 10%
+- [ ] CNI plugin version pinned in node image; update tested in staging before rolling to production
+- [ ] `hostNetwork: true` restricted via PodSecurity admission or OPA/Gatekeeper policy — only approved system workloads allowed
+- [ ] Node-level debugging tooling (`nsenter`, `crictl`, `lsns`) pre-installed on all nodes; do not rely on cluster access alone for debugging
+- [ ] CNI binary directory `/opt/cni/bin/` permissions verified (executable, owned by root) after every node image rebuild
+- [ ] Pause container image pinned to a specific digest in `--pod-infra-container-image` to prevent silent upgrades during node reboot
+- [ ] Namespace leak detection script run weekly; orphaned namespaces cleaned before they affect kernel namespace limit
+
+---
+
+## Common Anti-Patterns
+
+| What people do | Why it breaks | Correct approach |
+|----------------|--------------|-----------------|
+| Run `ip netns exec` to debug pods directly | On containerd nodes, pod namespaces are not registered in `/var/run/netns/`; command fails silently | Use `nsenter -t <pause_pid> -n <cmd>` or `kubectl debug` with a netshoot sidecar |
+| Delete the pause container to "restart" networking | Destroying the pause container destroys the namespace and all app container sockets; kubelet then terminates the entire pod | Delete the pod via Kubernetes API and let the scheduler reschedule it |
+| Use `hostNetwork: true` for performance | Bypasses all namespace isolation; a bug in the app can affect host routing/firewall state | Use high-performance CNIs (Cilium with XDP, Multus + DPDK) that keep namespace isolation |
+| Assume CNI failure leaves no residue | A partial CNI ADD can leave orphan veth interfaces and stale IPs in the IPAM store | Always check CNI plugin exit codes in kubelet logs; implement CNI plugin liveness probes |
+| Hard-code pause container PID for scripting | PID changes every time the pod is recreated; scripts break silently | Use `crictl inspect` or `/proc/<pid>/ns/net` paths dynamically |
+
+---
+
+## Quick Reference
+
+| Use Case | Command |
+|----------|---------|
+| Create named namespace | `ip netns add <name>` |
+| List named namespaces | `ip netns list` |
+| Execute command in namespace | `ip netns exec <name> <cmd>` |
+| List all kernel namespaces | `lsns -t net` |
+| Find pause PID for pod | `crictl inspect <pause-container-id> \| jq '.info.pid'` |
+| Enter pod namespace (nsenter) | `nsenter -t <pause_pid> -n ip addr` |
+| Check namespace inode | `readlink /proc/<pid>/ns/net` |
+| List CNI configs | `ls /etc/cni/net.d/` |
+| Check CNI binaries | `ls /opt/cni/bin/` |
+| Count namespaces on node | `ls /var/run/netns/ \| wc -l` |
+| Debug pod with netshoot | `kubectl debug -it <pod> --image=nicolaka/netshoot` |
+| View pod namespace file | `ls -la /var/run/netns/cni-*` |
+
+---
+
+## Summary
 
 | Concept | Key Detail |
 |---------|-----------|

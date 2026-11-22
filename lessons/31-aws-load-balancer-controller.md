@@ -4,6 +4,8 @@
 > **Prerequisites:** [Lesson 20 — Cloud Load Balancers](20-cloud-load-balancers.md), [Lesson 29 — EKS Networking](29-aws-eks-networking.md)  
 > **Duration:** ~2.5 hours
 
+> **Goal:** Configure AWS Load Balancer Controller to provision ALBs via Ingress and NLBs via Service, using IRSA, IngressGroups, weighted canary routing, and WAFv2 integration.
+
 ---
 
 ## Practice Setup
@@ -31,11 +33,68 @@ aws elbv2 describe-load-balancers \
 | ALB | No | Yes (via Ingress) |
 | Target type | Instance only | Instance or IP (pod-level) |
 | Annotations | Limited | 50+ annotations |
+| IngressGroup | No | Yes — share one ALB across Ingresses |
+| WAFv2 integration | No | Yes |
+| Weighted routing | No | Yes (canary via ALB listener rules) |
 | Maintenance | Deprecated | Actively developed |
 
 ---
 
-## 2. NLB via Service (type: LoadBalancer)
+## 2. Controller Architecture
+
+The LBC watches Ingress and Service resources, reconciles against the ELBv2 API, and creates or updates ALB or NLB resources. It authenticates to AWS via IRSA (IAM Role for Service Account) — no EC2 instance profile needed.
+
+```mermaid
+flowchart LR
+    subgraph K8s["Kubernetes Cluster"]
+        IC[Ingress / Service\nresource] -->|watch events| LBC[aws-load-balancer-controller\nkube-system pod]
+        SA[ServiceAccount\nIRSA annotation] --> LBC
+        TGB[TargetGroupBinding\nCRD] --> LBC
+    end
+    subgraph AWS["AWS ELBv2 API"]
+        LBC -->|CreateLoadBalancer| ALB[Application\nLoad Balancer]
+        LBC -->|CreateLoadBalancer| NLB[Network\nLoad Balancer]
+        ALB --> TG1[Target Group\ntarget-type=ip]
+        NLB --> TG2[Target Group\ntarget-type=instance]
+        TG1 -->|direct pod ENI| Pods[EKS Pods]
+        TG2 -->|NodePort→kube-proxy| Nodes[EKS Nodes]
+    end
+    subgraph IAM["IAM / OIDC"]
+        SA -->|assume role via OIDC| IRSA[IAM Role\nAWSLoadBalancerControllerPolicy]
+        IRSA --> AWS
+    end
+```
+
+> **See also:** [Lesson 29 — EKS Networking](29-aws-eks-networking.md) for VPC CNI and ENI assignment that enable ip target type.
+
+---
+
+## 3. ALB Provisioning Flow
+
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant K8s as Kubernetes API
+    participant LBC as aws-load-balancer-controller
+    participant AWS as AWS ELBv2 API
+
+    Dev->>K8s: kubectl apply Ingress (ingressClassName: alb)
+    K8s->>LBC: Ingress event (informer)
+    LBC->>AWS: DescribeLoadBalancers (check existing)
+    LBC->>AWS: CreateLoadBalancer (ALB, scheme, subnets)
+    LBC->>AWS: CreateTargetGroup (per backend Service)
+    LBC->>AWS: RegisterTargets (pod IPs or node IPs)
+    LBC->>AWS: CreateListener (HTTP:80, HTTPS:443)
+    LBC->>AWS: CreateRule (host/path → target group)
+    AWS-->>LBC: LoadBalancer DNS name
+    LBC->>K8s: Patch Ingress .status.loadBalancer.ingress[0].hostname
+    Dev->>K8s: kubectl get ingress (shows ADDRESS)
+    Note over Dev,K8s: Create Route53 CNAME/alias to ALB DNS
+```
+
+---
+
+## 4. NLB via Service (type: LoadBalancer)
 
 ```yaml
 apiVersion: v1
@@ -98,7 +157,7 @@ service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
 
 ---
 
-## 3. ALB via Ingress
+## 5. ALB via Ingress
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -153,7 +212,7 @@ spec:
 
 ---
 
-## 4. IngressGroup — Share One ALB Across Ingresses
+## 6. IngressGroup — Share One ALB Across Ingresses
 
 ```yaml
 # Multiple Ingress resources share one ALB (cost saving)
@@ -173,7 +232,7 @@ kubectl get ingress -A | grep production
 
 ---
 
-## 5. TargetGroupBinding — Attach External Target Groups
+## 7. TargetGroupBinding — Attach External Target Groups
 
 ```yaml
 # Register pods directly to an existing Target Group (useful for blue/green)
@@ -191,7 +250,7 @@ spec:
 
 ---
 
-## 6. Weighted Routing for Canary Deployments
+## 8. Weighted Routing for Canary Deployments
 
 ```yaml
 # Two services, weighted via annotations
@@ -219,9 +278,11 @@ spec:
                   name: use-annotation
 ```
 
+> **See also:** [Lesson 33 — ArgoCD GitOps](33-argocd-gitops.md) for Argo Rollouts progressive delivery using ALB weighted target groups.
+
 ---
 
-## 7. IAM Permissions
+## 9. IAM Permissions (IRSA)
 
 The LBC needs IAM permissions to manage ALBs and NLBs:
 
@@ -246,42 +307,136 @@ eksctl create iamserviceaccount \
 
 ---
 
-## 8. Troubleshooting
+## 10. Key Annotation Reference
+
+### NLB Service Annotations
+
+| Parameter | Default | Effect | When to change |
+|-----------|---------|--------|----------------|
+| `aws-load-balancer-type` | (CCM) | Set to `external` to force LBC ownership | Always set when using LBC for NLBs |
+| `aws-load-balancer-nlb-target-type` | `instance` | `ip` sends directly to pod ENI | Use `ip` for lower latency + accurate client IP |
+| `aws-load-balancer-scheme` | `internal` | `internet-facing` creates public NLB | External-facing services |
+| `aws-load-balancer-cross-zone-load-balancing-enabled` | `false` | Evenly distributes across AZs | Multi-AZ clusters with uneven node counts |
+| `aws-load-balancer-eip-allocations` | (dynamic IPs) | Assign static Elastic IPs per AZ | IP allowlisting by external partners |
+| `aws-load-balancer-ssl-cert` | (none) | ACM cert ARN for TLS termination | HTTPS/TLS on NLB |
+| `aws-load-balancer-healthcheck-interval` | `30` | Seconds between health checks | Tune for faster failover (10s) |
+
+### ALB Ingress Annotations
+
+| Parameter | Default | Effect | When to change |
+|-----------|---------|--------|----------------|
+| `alb.ingress.kubernetes.io/target-type` | `instance` | `ip` routes directly to pod | Lower latency; requires VPC CNI |
+| `alb.ingress.kubernetes.io/scheme` | `internal` | `internet-facing` for public ALB | Public-facing applications |
+| `alb.ingress.kubernetes.io/group.name` | (none) | Share one ALB across multiple Ingresses | Multiple services to save ALB cost |
+| `alb.ingress.kubernetes.io/group.order` | `0` | Priority of rules within the shared ALB | Prevent rule conflicts in shared ALB |
+| `alb.ingress.kubernetes.io/wafv2-acl-arn` | (none) | Attach WAFv2 Web ACL to ALB | DDoS and bot protection for public APIs |
+| `alb.ingress.kubernetes.io/ssl-redirect` | (none) | `443` redirects all HTTP to HTTPS | Enforce TLS in production |
+| `alb.ingress.kubernetes.io/healthcheck-interval-seconds` | `15` | Seconds between ALB health checks | Tune for fast pod failover vs noise |
+
+---
+
+## 11. Hands-On Practice
 
 ```bash
-# 1. Check controller logs
-kubectl logs -n kube-system deploy/aws-load-balancer-controller | tail -50
+# 1. Verify LBC is running and has IRSA wired up
+kubectl get sa aws-load-balancer-controller -n kube-system \
+  -o jsonpath='{.metadata.annotations.eks\.amazonaws\.com/role-arn}'
+# Expected: arn:aws:iam::123456789:role/AWSLoadBalancerControllerRole
 
-# 2. Is the Ingress being reconciled?
-kubectl describe ingress web-ingress | grep -A10 "Events"
-# Events:
-#   Normal  SuccessfullyReconciled  Reconciled
+# 2. Confirm IngressClass is registered
+kubectl get ingressclass alb -o yaml | grep controller
+# Expected: controller: ingress.k8s.aws/alb
 
-# 3. What ALB was created?
-kubectl get ingress web-ingress -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+# 3. Create a minimal ALB Ingress and watch reconciliation
+kubectl apply -f web-ingress.yaml
+kubectl describe ingress web-ingress | grep -A 20 Events
+# Expected: Normal  SuccessfullyReconciled ... Reconciled
 
-# 4. Are target groups healthy?
-aws elbv2 describe-target-health \
-  --target-group-arn arn:aws:elasticloadbalancing:...
+# 4. Get the provisioned ALB DNS name
+kubectl get ingress web-ingress \
+  -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+# Expected: k8s-default-webingress-XXXX.us-east-1.elb.amazonaws.com
 
-# 5. IAM issues
-kubectl logs -n kube-system deploy/aws-load-balancer-controller | grep -i "unauthorized\|AccessDenied"
+# 5. Verify target group health (ip-mode shows pod IPs; instance-mode shows node IPs)
+TG_ARN=$(aws elbv2 describe-target-groups \
+  --query 'TargetGroups[?contains(TargetGroupName,`k8s`)].TargetGroupArn' \
+  --output text | head -1)
+aws elbv2 describe-target-health --target-group-arn "$TG_ARN" \
+  --query 'TargetHealthDescriptions[*].[Target.Id,Target.Port,TargetHealth.State]' \
+  --output table
+# Expected: pod IPs with State=healthy (ip-mode) or node IPs (instance-mode)
 
-# 6. Subnet not found
-kubectl logs -n kube-system deploy/aws-load-balancer-controller | grep "subnet"
-# → Check subnet tags (kubernetes.io/role/elb)
+# 6. Verify IngressGroup — services in same group share one ALB
+kubectl get ingress -A \
+  -o custom-columns='NS:.metadata.namespace,NAME:.metadata.name,GROUP:.metadata.annotations.alb\.ingress\.kubernetes\.io/group\.name,ADDR:.status.loadBalancer.ingress[0].hostname'
+# Expected: same ADDR for all Ingresses in the same group
 
-# Common issues:
-# 1. Missing subnet tags → LBC can't find subnets
-# 2. Missing IAM permissions → "AccessDenied" in logs
-# 3. Wrong ingressClassName → LBC ignores the Ingress
-# 4. Target group health check failing → pods not ready or wrong path
-# 5. Certificate ARN in wrong region → 400 from ACM
+# 7. Test weighted canary routing — confirm traffic split
+for i in $(seq 1 20); do curl -s https://web.example.com/ | grep -o "v[12]"; done | sort | uniq -c
+# Expected: approximately 18x v1, 2x v2 (90/10 split)
 ```
 
 ---
 
-## 9. Summary
+## Troubleshooting
+
+| Symptom | Likely Cause | Diagnostic Command | Fix |
+|---------|-------------|-------------------|-----|
+| Ingress has no ADDRESS after 2 min | LBC not running or wrong IngressClass | `kubectl logs -n kube-system deploy/aws-load-balancer-controller \| tail -30` | Verify `ingressClassName: alb` and LBC pod status |
+| `AccessDenied` in LBC logs | Missing IRSA or wrong IAM policy | `kubectl logs -n kube-system deploy/aws-load-balancer-controller \| grep AccessDenied` | Recreate IRSA with `eksctl create iamserviceaccount` |
+| `No subnets found` in LBC logs | Subnets missing ELB role tags | `aws ec2 describe-subnets --filters Name=tag-key,Values=kubernetes.io/role/elb` | Tag public subnets `kubernetes.io/role/elb=1`, private: `kubernetes.io/role/internal-elb=1` |
+| Target group health check failing | Wrong health check path, port, or pods not ready | `aws elbv2 describe-target-health --target-group-arn <arn>` | Set `alb.ingress.kubernetes.io/healthcheck-path` and verify pod readiness |
+| Two ALBs created for same IngressGroup | Different `group.name` spelling or case | `kubectl get ingress -A -o jsonpath='{..annotations}'` | Ensure exact same `group.name` value across all Ingresses |
+| 502 Bad Gateway from ALB | Pod not ready or wrong `targetPort` | `kubectl get endpoints <service>` | Verify pod readiness and Service `targetPort` matches container port |
+| Certificate error on HTTPS | ACM cert in wrong AWS region | `aws acm describe-certificate --certificate-arn <arn>` | Use cert ARN from same region as EKS cluster |
+| WAF blocking legitimate traffic | Overly strict WAF rules | Check WAF sampled requests in AWS Console | Add IP set allow-rule or adjust managed rule group sensitivity |
+
+---
+
+## Production Checklist
+
+- [ ] Subnet tags set: `kubernetes.io/role/elb=1` (public subnets) and `kubernetes.io/role/internal-elb=1` (private subnets)
+- [ ] IRSA configured — LBC ServiceAccount has `eks.amazonaws.com/role-arn` annotation, no EC2 instance profile
+- [ ] ALB access logs enabled, shipped to versioned S3 bucket with 90-day lifecycle policy
+- [ ] WAFv2 ACL attached to all internet-facing ALBs via `wafv2-acl-arn` annotation
+- [ ] `ssl-redirect: "443"` enforces HTTPS; HTTP listener only redirects, never serves content
+- [ ] IngressGroup used to minimize ALB count across namespaces (ALB limit: 50 per region by default)
+- [ ] `target-type: ip` used with VPC CNI for direct pod routing and accurate client IP logging
+
+---
+
+## Common Anti-Patterns
+
+| What people do | Why it breaks | Correct approach |
+|----------------|--------------|-----------------|
+| Use legacy CCM annotation (`aws-load-balancer-type: nlb`) | Creates classic NLB via old in-tree controller, misses LBC features like IP mode and WAF | Add `external` value and use full LBC annotation set |
+| One Ingress per service with no `group.name` | Each Ingress creates a separate ALB — costly and exhausts the 50 ALB regional limit quickly | Group with `alb.ingress.kubernetes.io/group.name` to share one ALB |
+| `target-type: instance` for latency-sensitive workloads | Adds NodePort hop and kube-proxy latency; source IP is node IP, losing client identity | Use `target-type: ip` with VPC CNI for direct pod routing |
+| Hard-code ALB DNS name in app config or external DNS | ALB DNS changes on delete and recreate, breaking connectivity | Create Route53 alias or CNAME record pointing to the ALB DNS name |
+| No WAF on internet-facing ALBs | Exposes APIs to bots, scrapers, and common OWASP exploits without filtering | Attach WAFv2 ACL via `alb.ingress.kubernetes.io/wafv2-acl-arn` annotation |
+
+---
+
+## Quick Reference
+
+| Use Case | Command |
+|----------|---------|
+| Check LBC is running | `kubectl get deploy -n kube-system aws-load-balancer-controller` |
+| Get ALB DNS for Ingress | `kubectl get ingress <name> -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'` |
+| Watch LBC reconciliation logs | `kubectl logs -n kube-system deploy/aws-load-balancer-controller -f` |
+| List all TargetGroupBindings | `kubectl get targetgroupbindings -A` |
+| List ALBs in account | `aws elbv2 describe-load-balancers --query 'LoadBalancers[?Type==\`application\`].[LoadBalancerName,State.Code]' --output table` |
+| Check target group health | `aws elbv2 describe-target-health --target-group-arn <arn>` |
+| View IngressGroup members | `kubectl get ingress -A -l alb.ingress.kubernetes.io/group.name=<group>` |
+| Check required subnet tags | `aws ec2 describe-subnets --filters Name=tag-key,Values=kubernetes.io/role/elb --query 'Subnets[*].[SubnetId,Tags]'` |
+| Force LBC to re-reconcile Ingress | `kubectl annotate ingress <name> reconcile="$(date +%s)" --overwrite` |
+| Get IRSA role on LBC ServiceAccount | `kubectl get sa aws-load-balancer-controller -n kube-system -o jsonpath='{.metadata.annotations.eks\.amazonaws\.com/role-arn}'` |
+| Describe IngressClass | `kubectl describe ingressclass alb` |
+| Watch Ingress events | `kubectl get events -n <ns> --field-selector involvedObject.name=<ingress-name> -w` |
+
+---
+
+## Summary
 
 | Resource | AWS Component | Use Case |
 |---------|--------------|---------|

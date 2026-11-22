@@ -4,6 +4,8 @@
 > **Prerequisites:** [Lesson 22 — Multi-Cluster Networking](22-multi-cluster-networking.md), [Lesson 16 — Network Policies](16-network-policies.md)  
 > **Duration:** ~2 hours
 
+> **Goal:** Use ArgoCD to manage NetworkPolicies, CoreDNS configs, and Ingress rules as code — with sync waves for ordered delivery, ApplicationSets for multi-cluster rollout, and drift auto-remediation.
+
 ---
 
 ## Practice Setup
@@ -19,45 +21,30 @@ kubectl logs -n argocd -l app.kubernetes.io/name=argocd-application-controller -
 
 ---
 
-## Why This Matters
-
-Network configuration in Kubernetes — NetworkPolicies, CoreDNS ConfigMaps, Ingress rules, CNI configs, service mesh policies — changes constantly. Applied manually with `kubectl apply`, these changes are invisible: no audit trail, no rollback, no consistency guarantee across clusters.
-
-ArgoCD solves this by making Git the single source of truth. Every NetworkPolicy, every Ingress, every EgressFirewall lives in a repository and ArgoCD continuously reconciles the cluster to match it. For a network engineer, this means drift detection (someone edited a firewall rule by hand? ArgoCD flags it), guaranteed ordering (NetworkPolicy before app, CNI config before everything), and one-command rollback when a policy change breaks connectivity.
-
----
-
 ## 1. ArgoCD Architecture
 
-```
-  Git Repository (network-policies/, ingress/, cni-configs/)
-         │
-         │  pull (every 3 min or webhook)
-         ▼
-  ┌─────────────────────────────────────────────────────────────┐
-  │                      ArgoCD                                  │
-  │                                                             │
-  │  ┌──────────────┐    ┌──────────────────────────────────┐  │
-  │  │  repo-server  │    │  application-controller          │  │
-  │  │  - clones repo│    │  - watches Application CRDs      │  │
-  │  │  - renders    │    │  - compares live vs desired      │  │
-  │  │    manifests  │    │  - triggers sync                 │  │
-  │  │  - Helm/Kust. │    └──────────────┬───────────────────┘  │
-  │  └──────┬────────┘                   │                      │
-  │         │                     ┌──────▼───────┐              │
-  │  ┌──────▼────────┐            │  argocd-server│              │
-  │  │     Redis      │            │  - REST API   │              │
-  │  │  (cache layer) │            │  - Web UI     │              │
-  │  └───────────────┘            │  - CLI target │              │
-  │                               └───────────────┘              │
-  │  ┌───────────────┐                                           │
-  │  │  Dex (optional│                                           │
-  │  │  OIDC/SSO)    │                                           │
-  │  └───────────────┘                                           │
-  └─────────────────────────────────────────────────────────────┘
-         │  kubectl apply (uses cluster kubeconfig)
-         ▼
-  Kubernetes Cluster (NetworkPolicy, Ingress, Service, ...)
+```mermaid
+flowchart LR
+    subgraph Git["Git Repository"]
+        NP[network-policies/]
+        IC[ingress/]
+        CNI[cni-configs/]
+    end
+    subgraph ArgoCD["ArgoCD (argocd namespace)"]
+        RS[repo-server\nclones repo\nrenders Helm/Kustomize] --> Redis[(Redis\ncache)]
+        AC[application-controller\nwatches Application CRDs\ncompares live vs desired] --> AC
+        SRV[argocd-server\nREST API + Web UI + CLI]
+        DEX[Dex\nOIDC/SSO\noptional]
+    end
+    subgraph Clusters["Target Clusters"]
+        K1[Cluster 1\nNetworkPolicy, Ingress, ...]
+        K2[Cluster 2\nNetworkPolicy, Ingress, ...]
+    end
+    Git -->|pull every 3 min\nor webhook push| RS
+    RS --> AC
+    AC -->|kubectl apply| K1
+    AC -->|kubectl apply| K2
+    SRV --> AC
 ```
 
 ```bash
@@ -77,7 +64,32 @@ kubectl port-forward svc/argocd-server -n argocd 8080:443
 
 ---
 
-## 2. Application and ApplicationSet CRDs
+## 2. GitOps Sync Flow
+
+```mermaid
+sequenceDiagram
+    participant Dev as Network Engineer
+    participant Git as Git Repository
+    participant Webhook as GitHub Webhook
+    participant ArgoCD as ArgoCD\napplication-controller
+    participant K8s as Kubernetes API
+
+    Dev->>Git: git push (new NetworkPolicy or Ingress change)
+    Git->>Webhook: POST /api/webhook (if webhook configured)
+    Webhook->>ArgoCD: trigger immediate sync
+    ArgoCD->>Git: clone / fetch latest revision
+    ArgoCD->>K8s: GET live manifests (compare)
+    Note over ArgoCD,K8s: Diff: live != desired (OutOfSync)
+    ArgoCD->>K8s: kubectl apply (sync waves order)
+    K8s-->>ArgoCD: resource events (applied/failed)
+    ArgoCD->>ArgoCD: health check (Healthy / Degraded)
+    Note over Dev,ArgoCD: selfHeal=true: reverts manual changes automatically
+    Dev->>ArgoCD: argocd app get (verify Synced + Healthy)
+```
+
+---
+
+## 3. Application and ApplicationSet CRDs
 
 ### Application — single cluster, single source
 
@@ -160,7 +172,7 @@ ArgoCD will detect drift the moment someone edits this ConfigMap manually.
 
 ---
 
-## 3. Sync Waves for Network-Dependent Resources
+## 4. Sync Waves for Network-Dependent Resources
 
 Network resources must deploy in a specific order. A NetworkPolicy that blocks traffic must exist *before* the app starts, not after.
 
@@ -251,7 +263,7 @@ argocd app resources network-stack
 
 ---
 
-## 4. Multi-Cluster Deployment with ApplicationSet
+## 5. Multi-Cluster Deployment with ApplicationSet
 
 Deploy the same NetworkPolicy baseline to every cluster from a single Application definition.
 
@@ -307,7 +319,7 @@ argocd app list | grep network-baseline
 
 ---
 
-## 5. Health Checks for Network Resources
+## 6. Health Checks for Network Resources
 
 ArgoCD has built-in health checks for core Kubernetes resources. Network resources vary:
 
@@ -364,7 +376,7 @@ data:
 
 ---
 
-## 6. Detecting Network Policy Drift
+## 7. Detecting Network Policy Drift
 
 `selfHeal: true` means ArgoCD detects and reverses any out-of-band change within seconds.
 
@@ -401,7 +413,7 @@ argocd app set network-policies --sync-policy automated
 
 ---
 
-## 7. Argo Rollouts: Progressive Delivery with Network Integration
+## 8. Argo Rollouts: Progressive Delivery with Network Integration
 
 Argo Rollouts enables canary and blue-green deployments with network-layer traffic splitting.
 
@@ -452,9 +464,11 @@ spec:
           weight: 10
 ```
 
+> **See also:** [Lesson 31 — AWS Load Balancer Controller](31-aws-load-balancer-controller.md) for weighted ALB target groups as an alternative to Istio for canary traffic splitting.
+
 ---
 
-## 8. Practical: Zero-Trust Network Stack via GitOps
+## 9. Practical: Zero-Trust Network Stack via GitOps
 
 ### Git repository structure
 
@@ -555,81 +569,130 @@ spec:
 
 ---
 
-## 9. Troubleshooting
+## 10. Application Configuration Reference
 
-### ArgoCD blocked by its own NetworkPolicy
+| Parameter | Default | Effect | When to change |
+|-----------|---------|--------|----------------|
+| `syncPolicy.automated.prune` | `false` | Delete resources removed from Git | Enable in production — prevents ghost resources |
+| `syncPolicy.automated.selfHeal` | `false` | Revert manual out-of-band changes | Enable for security-sensitive resources (NetworkPolicy) |
+| `syncPolicy.syncOptions.CreateNamespace` | `false` | Create namespace if missing | Enable for autonomous app deployment |
+| `syncPolicy.syncOptions.ServerSideApply` | `false` | Use server-side apply (better conflict handling) | Enable when multiple controllers manage same resource |
+| `argocd.argoproj.io/sync-wave` | `"0"` | Integer controlling sync order (-1 to N) | Use -1 for CRDs, 0 for CNI, 1 for NetworkPolicy, 2+ for apps |
+| `timeout.reconciliation` (argocd-cm) | `180s` | How often ArgoCD polls Git | Reduce to `30s` or use webhooks for fast drift detection |
+| `resource.exclusions` (argocd-cm) | (none) | Exclude resources from management | Use for high-churn resources like Jobs ArgoCD shouldn't sync |
 
-The most common issue: you deploy a default-deny NetworkPolicy and ArgoCD can no longer reach the cluster API or webhook.
+### ApplicationSet Generators
 
-```yaml
-# Always include this in your network-baseline:
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-argocd-server
-  namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "-1"   # must exist BEFORE anything else
-spec:
-  podSelector:
-    matchLabels:
-      app.kubernetes.io/name: argocd-server
-  policyTypes:
-    - Ingress
-    - Egress
-  ingress:
-    - {}   # allow all inbound to ArgoCD UI/API
-  egress:
-    - {}   # allow ArgoCD to reach all cluster APIs
-```
-
-### Sync stuck on a resource
-
-```bash
-# See detailed sync error
-argocd app sync network-policies --dry-run
-argocd app get network-policies --show-operation
-
-# Common causes for network resources:
-# 1. CRD not installed → sync wave -1 missing
-# 2. NetworkPolicy blocking ArgoCD webhook → add allow rule
-# 3. Resource finalizer preventing deletion → check for calico/cilium finalizers
-# 4. RBAC: ArgoCD service account lacks permission for custom CRDs
-kubectl auth can-i create networkpolicies --as=system:serviceaccount:argocd:argocd-application-controller
-
-# 5. Namespace not created → add CreateNamespace=true syncOption
-```
-
-### Resource health unknown
-
-```bash
-# Unknown health = ArgoCD has no health check for this resource type
-# Common for: BGPPeer, IPPool, EgressIP, Gateway API types
-argocd app get network-policies | grep Unknown
-
-# Fix: add custom health check in argocd-cm, or use:
-kubectl annotate application network-policies \
-  argocd.argoproj.io/ignore-resource-updates='{"bgppeers.projectcalico.org": ["status"]}' -n argocd
-```
-
-### Webhook delivery failures
-
-```bash
-# Check if webhook is reachable from GitHub/GitLab
-# ArgoCD server must be accessible from the internet (or use pull-based polling)
-kubectl get svc argocd-server -n argocd   # must have external IP
-
-# Check webhook secret matches
-kubectl get secret argocd-secret -n argocd -o jsonpath='{.data.webhook\.github\.secret}' | base64 -d
-
-# Fallback: increase poll interval if webhooks are unreliable
-kubectl edit cm argocd-cm -n argocd
-# Add: timeout.reconciliation: "30s"   (default 3m)
-```
+| Generator | Use Case | Example |
+|-----------|---------|---------|
+| `clusters` | One app per registered ArgoCD cluster | Deploy NetworkPolicy baseline to all prod clusters |
+| `git` (directory) | One app per directory in repo | One app per team folder |
+| `git` (file) | One app per JSON/YAML config file | One app per cluster config file |
+| `list` | Explicit list of values | Fixed set of clusters with custom parameters |
+| `matrix` | Cartesian product of two generators | All clusters × all environments |
 
 ---
 
-## 10. Summary
+## 11. Hands-On Practice
+
+```bash
+# 1. Check ArgoCD application health and sync status
+argocd app list
+# EXPECTED: NAME=network-policies, STATUS=Synced, HEALTH=Healthy
+
+# 2. See current diff between Git and live cluster
+argocd app diff network-policies
+# EXPECTED: no output (synced) or +/- lines showing drift
+
+# 3. Simulate drift — manually edit a NetworkPolicy
+kubectl patch networkpolicy allow-frontend-to-backend -n production \
+  --type='json' -p='[{"op":"add","path":"/spec/ingress/0/ports/0","value":{"port":9999}}]'
+
+# 4. Observe ArgoCD detects OutOfSync within 3 min (or faster with webhook)
+argocd app get network-policies
+# EXPECTED: STATUS=OutOfSync, details show the spurious port 9999
+
+# 5. Force a dry-run sync to preview changes
+argocd app sync network-policies --dry-run
+# EXPECTED: shows kubectl apply operations that would run
+
+# 6. Trigger real sync to revert the drift
+argocd app sync network-policies
+# EXPECTED: Synced, NetworkPolicy restored to Git state
+
+# 7. Watch waves progress in an ApplicationSet sync
+argocd app sync zero-trust-production-eu
+argocd app get zero-trust-production-eu --watch
+# EXPECTED: resources sync in wave order -1, 0, 1, 2, 3
+
+# 8. Verify ArgoCD can manage NetworkPolicies (RBAC check)
+kubectl auth can-i create networkpolicies \
+  --as=system:serviceaccount:argocd:argocd-application-controller -n production
+# EXPECTED: yes
+```
+
+> **See also:** [Lesson 16 — Network Policies](16-network-policies.md) for NetworkPolicy syntax and default-deny patterns used in wave 0.
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely Cause | Diagnostic Command | Fix |
+|---------|-------------|-------------------|-----|
+| Application stuck `OutOfSync` and won't sync | Resource finalizer preventing deletion | `argocd app get <name> --show-operation` | Remove finalizer: `kubectl patch <resource> -p '{"metadata":{"finalizers":[]}}' --type=merge` |
+| Sync fails with `CRD not found` | CRD not in wave -1 | `argocd app sync <name> --dry-run` | Add `argocd.argoproj.io/sync-wave: "-1"` to CRD manifests |
+| ArgoCD cannot reach cluster API after NetworkPolicy deploy | Default-deny blocked ArgoCD egress | `kubectl logs -n argocd deploy/argocd-application-controller \| grep error` | Add wave -1 NetworkPolicy allowing argocd namespace egress to API server |
+| `selfHeal` not reverting manual change | RBAC: ArgoCD service account lacks permission | `kubectl auth can-i update networkpolicies --as=system:serviceaccount:argocd:argocd-application-controller -n <ns>` | Add ClusterRole with network resource permissions to ArgoCD SA |
+| ApplicationSet not creating apps for new cluster | Cluster secret missing label | `kubectl get secrets -n argocd -l argocd.argoproj.io/secret-type=cluster` | Label cluster secret: `kubectl label secret <name> -n argocd environment=production` |
+| Webhook not triggering sync | ArgoCD server unreachable from GitHub | `kubectl get svc argocd-server -n argocd` | Expose via Ingress or LoadBalancer; verify webhook secret matches |
+| `Unknown` health for custom CRDs (BGPPeer, IPPool) | No built-in health check for CNI CRDs | `argocd app get <name> \| grep Unknown` | Add custom Lua health check in `argocd-cm` or mark resource as ignored |
+
+---
+
+## Production Checklist
+
+- [ ] ArgoCD namespace has wave -1 NetworkPolicy allowing egress to all cluster API servers
+- [ ] `selfHeal: true` enabled on all NetworkPolicy and security-critical Applications
+- [ ] `prune: true` enabled — ghost resources from deleted Git entries are removed
+- [ ] AppProject RBAC configured — teams can only sync to their own namespace
+- [ ] Webhook configured for sub-minute drift detection (not relying on 3-minute poll)
+- [ ] `timeout.reconciliation` tuned or webhooks used for security-sensitive applications
+- [ ] All cluster secrets in ArgoCD are labeled correctly for ApplicationSet generators
+
+---
+
+## Common Anti-Patterns
+
+| What people do | Why it breaks | Correct approach |
+|----------------|--------------|-----------------|
+| Deploy default-deny without wave -1 ArgoCD allow policy | ArgoCD loses access to its own cluster mid-sync | Always put ArgoCD self-allow NetworkPolicy at wave -1 |
+| `selfHeal: false` on NetworkPolicies | Manual edits (even accidental `kubectl apply`) persist undetected | Enable `selfHeal: true` for all security-enforcing resources |
+| No sync waves — all resources at wave 0 | Ingress created before Deployment, NetworkPolicy after app traffic starts | Annotate with sync-wave: CRDs first, policies before apps, Ingress last |
+| One Application per namespace with no AppProject | No team isolation — any ArgoCD user can deploy to any cluster | Create AppProject per team with `destinations` and `sourceRepos` restricted |
+| Managing `coredns` ConfigMap manually alongside ArgoCD | ArgoCD reverts manual DNS changes immediately with selfHeal | Commit all CoreDNS changes to Git; use `kubectl edit` only in ArgoCD-managed PRs |
+
+---
+
+## Quick Reference
+
+| Use Case | Command |
+|----------|---------|
+| List all applications | `argocd app list` |
+| Get app status | `argocd app get <name>` |
+| Show git-vs-live diff | `argocd app diff <name>` |
+| Force immediate sync | `argocd app sync <name>` |
+| Dry-run sync | `argocd app sync <name> --dry-run` |
+| Watch sync progress | `argocd app get <name> --watch` |
+| List app resources and waves | `argocd app resources <name>` |
+| Check sync history | `argocd app history <name>` |
+| Rollback to previous version | `argocd app rollback <name> <revision-id>` |
+| Register a cluster | `argocd cluster add <context-name> --name <label>` |
+| List registered clusters | `argocd cluster list` |
+| Check RBAC permissions | `kubectl auth can-i create networkpolicies --as=system:serviceaccount:argocd:argocd-application-controller -n <ns>` |
+
+---
+
+## Summary
 
 | Concept | ArgoCD Implementation |
 |---------|----------------------|

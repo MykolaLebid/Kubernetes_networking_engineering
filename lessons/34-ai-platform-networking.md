@@ -4,6 +4,8 @@
 > **Prerequisites:** [Lesson 09 — CNI Specification](09-cni-specification.md), [Lesson 07 — Bare Metal Network Infrastructure](07-bare-metal-network-infrastructure.md), [Lesson 10 — eBPF and XDP](10-ebpf-xdp.md)  
 > **Duration:** ~3 hours
 
+> **Goal:** Design and operate the network stack for GPU-intensive AI training clusters — including SR-IOV, RDMA via Multus, rail-optimized topology, NCCL tuning, and lossless RoCE configuration with PFC and ECN.
+
 ---
 
 ## Practice Setup
@@ -20,17 +22,6 @@ kubectl get pods -n nvidia-operator 2>/dev/null || echo "NVIDIA Operator not ins
 ```
 
 > **Note:** Most labs in this lesson require real GPU/RDMA hardware. Use the commands to understand the patterns; the architecture diagrams are the core learning objective here.
-
----
-
-## Why This Matters
-
-Generative AI workloads — LLM training, fine-tuning, and high-throughput inference — are fundamentally different from web service workloads. A 100-billion-parameter model training job needs to move terabytes of gradient data between hundreds of GPUs per second. Standard Kubernetes pod networking (1–10 Gbps per pod) is completely inadequate. As a network engineer, you are now responsible for:
-
-- Provisioning 400 GbE or InfiniBand HDR/NDR fabric between GPU nodes
-- Configuring SR-IOV so pods bypass the kernel and get near-NIC performance
-- Wiring RDMA-capable secondary NICs via Multus
-- Ensuring the right network topology (rail-optimized) so GPU-to-GPU traffic never crosses a bottleneck
 
 ---
 
@@ -64,30 +55,42 @@ Standard pod networking adds kernel overhead (copy to/from sk_buff, through ipta
 
 The standard design for GPU clusters. Each GPU in a server has its own NIC connected to a dedicated ToR switch ("rail"). Within a server, GPUs communicate via NVLink; between servers, all-reduce traffic flows over the rails.
 
+```mermaid
+flowchart TD
+    subgraph Spine["Spine Switches (400 GbE uplinks)"]
+        S1[Spine-1]
+        S2[Spine-2]
+        S3[Spine-3]
+        S4[Spine-4]
+    end
+    subgraph Rails["Leaf / ToR Switches — one per GPU rail"]
+        R0[Rail-0\nToR-0]
+        R1[Rail-1\nToR-1]
+        R2[Rail-2\nToR-2]
+        R3[Rail-3\nToR-3]
+    end
+    subgraph ServerA["GPU Server A (DGX H100)"]
+        G0[GPU0+NIC0]
+        G1[GPU1+NIC1]
+        G2[GPU2+NIC2]
+        G3[GPU3+NIC3]
+        NVL[NVLink mesh\n900 GB/s all-to-all]
+    end
+    S1 --- R0
+    S2 --- R1
+    S3 --- R2
+    S4 --- R3
+    R0 --- G0
+    R1 --- G1
+    R2 --- G2
+    R3 --- G3
+    G0 --- NVL
+    G1 --- NVL
+    G2 --- NVL
+    G3 --- NVL
 ```
-Rail-Optimized Spine-Leaf for 4 GPU Servers (8 GPUs each):
 
-              ┌──────────────────────────────────────────────────────────────┐
-              │                     SPINE SWITCHES                           │
-              │   Spine-1    Spine-2    Spine-3    Spine-4    (400GbE ports) │
-              └────┬──────────┬──────────┬──────────┬────────────────────────┘
-                   │          │          │          │
-  ┌────────────────┼──────────┼──────────┼──────────┼──────────────────────┐
-  │   LEAF / ToR SWITCHES (one per "rail")          │                       │
-  │  Rail-0  Rail-1  Rail-2  Rail-3  Rail-4  Rail-5  Rail-6  Rail-7         │
-  │  ToR-0   ToR-1   ToR-2   ToR-3   ToR-4   ToR-5   ToR-6   ToR-7         │
-  └──┬────────┬────────┬────────┬────────┬────────┬────────┬────────┬───────┘
-     │        │        │        │        │        │        │        │
-  ┌──┴────────┴────────┴────────┴────────┴────────┴────────┴────────┴───────┐
-  │  GPU Server A (DGX H100)                                                 │
-  │  GPU0──NIC0  GPU1──NIC1  GPU2──NIC2  GPU3──NIC3  ... GPU7──NIC7         │
-  │  NVLink mesh (900 GB/s all-to-all within server)                         │
-  └──────────────────────────────────────────────────────────────────────────┘
-
-Each NIC connects to a DIFFERENT ToR switch (rail).
-AllReduce between servers: each GPU uses its own NIC → no congestion on a single switch.
-Bisection bandwidth = 8 × 400 Gbps = 3.2 Tbps per server (non-blocking).
-```
+Each NIC connects to a **different** ToR switch (rail). AllReduce between servers: each GPU uses its own NIC, so no congestion on a single switch. Bisection bandwidth = 8 × 400 Gbps = 3.2 Tbps per server (non-blocking).
 
 ### Fat-Tree (Classic HPC)
 
@@ -131,7 +134,73 @@ RDMA:
 
 ---
 
-## 4. SR-IOV: Giving Pods Direct NIC Access
+## 4. AI Networking Stack Architecture
+
+```mermaid
+flowchart LR
+    subgraph Pod["Training Pod"]
+        ETH[eth0\nCNI standard\n10.244.x.x]
+        NET1[net1\nSR-IOV VF\n192.168.100.x]
+        GPU[GPU\nnvidia.com/gpu: 1]
+        NET1 -->|GPUDirect RDMA\nbypasses CPU+RAM| GPU
+    end
+    subgraph Node["GPU Node"]
+        PF[Physical NIC\nConnectX-7\n400 GbE]
+        VF0[VF0]
+        VF1[VF1]
+        VF2[VF2]
+        PF --> VF0
+        PF --> VF1
+        PF --> VF2
+        VF0 --> NET1
+    end
+    subgraph Ops["Kubernetes Operators"]
+        NFD[Node Feature\nDiscovery]
+        GPUOp[GPU Operator\ndriver + device-plugin\n+ DCGM metrics]
+        NetOp[Network Operator\nOFED + SR-IOV\n+ RDMA plugin]
+    end
+    subgraph Fabric["Network Fabric"]
+        ToR[ToR Switch\nRail-0\nPFC+ECN enabled]
+        Spine[Spine Switch]
+        ToR --> Spine
+    end
+    PF --> ToR
+    ETH -->|management\nkubelet/DNS/kubectl| Node
+    NFD --> GPUOp
+    NFD --> NetOp
+```
+
+---
+
+## 5. NCCL AllReduce Training Flow
+
+```mermaid
+sequenceDiagram
+    participant S as Scheduler\n(Volcano gang)
+    participant P0 as Pod-0\nGPU0 Node-A
+    participant P1 as Pod-1\nGPU1 Node-B
+    participant NCCL as NCCL\nlibrary
+
+    S->>P0: schedule (all 8 pods start together)
+    S->>P1: schedule (gang scheduling)
+    P0->>NCCL: init (NCCL_SOCKET_IFNAME=eth0)
+    P1->>NCCL: init
+    Note over P0,P1: Rendezvous via management eth0
+    NCCL->>NCCL: topology discovery (NVLink > IB > RoCE > TCP)
+    NCCL->>P0: assign ring roles
+    NCCL->>P1: assign ring roles
+    loop Every training step
+        P0->>P1: send gradient shard via net1 (RDMA VF)\nGPUDirect: GPU memory → NIC → wire
+        P1->>P0: send gradient shard via net1 (RDMA VF)
+        Note over P0,P1: AllReduce completes when all shards aggregated
+    end
+    P0->>P0: update model weights
+    P1->>P1: update model weights
+```
+
+---
+
+## 6. SR-IOV: Giving Pods Direct NIC Access
 
 SR-IOV (Single Root I/O Virtualization) partitions one physical NIC into multiple Virtual Functions (VFs). Each pod gets a VF — a hardware NIC slice — bypassing the kernel entirely.
 
@@ -192,7 +261,7 @@ EOF
 
 ---
 
-## 5. Multus: Dual NIC Pods (Management + RDMA)
+## 7. Multus: Dual NIC Pods (Management + RDMA)
 
 AI training pods need two networks:
 - **eth0** (standard CNI): kubelet health probes, DNS, kubectl exec
@@ -257,35 +326,25 @@ kubectl exec -it gpu-training-0 -- ibv_rc_pingpong -d mlx5_0 -g 0
 
 ---
 
-## 6. NVIDIA Operators Stack
+## 8. NVIDIA Operators Stack
 
-NVIDIA provides three Kubernetes operators that work together:
-
-```
-  ┌────────────────────────────────────────────────────────────────────────┐
-  │  Node Feature Discovery (NFD)                                          │
-  │  Labels nodes: feature.node.kubernetes.io/pci-10de.present=true       │
-  │               nvidia.com/gpu.product=NVIDIA-H100-80GB                 │
-  └──────────────────────────────────┬─────────────────────────────────────┘
-                                     │ detected labels
-  ┌──────────────────────────────────▼─────────────────────────────────────┐
-  │  NVIDIA GPU Operator                                                    │
-  │  Installs and manages:                                                  │
-  │  ├── nvidia-driver (kernel module)                                     │
-  │  ├── nvidia-container-toolkit (container runtime hook)                 │
-  │  ├── nvidia-device-plugin (k8s resource: nvidia.com/gpu)              │
-  │  ├── dcgm-exporter (GPU metrics → Prometheus)                          │
-  │  └── gpu-feature-discovery (labels: memory, model, MIG config)        │
-  └──────────────────────────────────┬─────────────────────────────────────┘
-                                     │
-  ┌──────────────────────────────────▼─────────────────────────────────────┐
-  │  NVIDIA Network Operator                                               │
-  │  Installs and manages:                                                 │
-  │  ├── Mellanox OFED drivers (ConnectX NIC drivers)                     │
-  │  ├── rdma-shared-device-plugin (k8s resource: rdma/rdma)             │
-  │  ├── SR-IOV device plugin                                             │
-  │  └── Secondary network IPAM (whereabouts)                             │
-  └────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    NFD[Node Feature Discovery\nlabels: pci-10de.present=true\nnvidia.com/gpu.product=H100] --> GPUOp
+    NFD --> NetOp
+    subgraph GPUOp["NVIDIA GPU Operator"]
+        DRV[nvidia-driver\nkernel module]
+        CTK[nvidia-container-toolkit\nruntime hook]
+        DP[nvidia-device-plugin\nk8s resource: nvidia.com/gpu]
+        DCGM[dcgm-exporter\nGPU metrics → Prometheus]
+        GFD[gpu-feature-discovery\nlabels: memory, model, MIG config]
+    end
+    subgraph NetOp["NVIDIA Network Operator"]
+        OFED[Mellanox OFED drivers\nConnectX NIC drivers]
+        RDMA[rdma-shared-device-plugin\nk8s resource: rdma/rdma]
+        SRIOV[SR-IOV device plugin]
+        WA[Secondary network IPAM\nwhereabouts]
+    end
 ```
 
 ```bash
@@ -311,7 +370,7 @@ kubectl get node -o json | jq -r '.items[] | .metadata.name + " RDMA: " + .statu
 
 ---
 
-## 7. MIG — Multi-Instance GPU Partitioning
+## 9. MIG — Multi-Instance GPU Partitioning
 
 NVIDIA H100/A100 support MIG (Multi-Instance GPU): hardware partitioning of one GPU into up to 7 isolated slices. Network engineers need to understand MIG for resource planning.
 
@@ -342,7 +401,7 @@ resources:
 
 ---
 
-## 8. NCCL and All-Reduce Tuning
+## 10. NCCL and All-Reduce Tuning
 
 NCCL is the communication library that PyTorch and TensorFlow use for distributed training. It auto-selects the best transport: NVLink > InfiniBand > RoCE > TCP.
 
@@ -368,7 +427,7 @@ env:
 
 ---
 
-## 9. AWS EFA — Elastic Fabric Adapter
+## 11. AWS EFA — Elastic Fabric Adapter
 
 AWS's custom RDMA-capable interconnect for P4d/P5 instances running LLM training.
 
@@ -417,7 +476,7 @@ kubectl get node -l node.kubernetes.io/instance-type=p4d.24xlarge \
 
 ---
 
-## 10. Distributed Training Job Patterns
+## 12. Distributed Training Job Patterns
 
 ### PyTorchJob (Kubeflow)
 
@@ -489,7 +548,7 @@ spec:
 
 ---
 
-## 11. Network Policy Considerations for AI Clusters
+## 13. Network Policy Considerations for AI Clusters
 
 AI training pods have different network requirements than web services:
 
@@ -529,7 +588,7 @@ spec:
 
 ---
 
-## 12. Observability for AI Networks
+## 14. Observability for AI Networks
 
 ```bash
 # DCGM metrics (GPU Operator deploys dcgm-exporter automatically)
@@ -553,7 +612,7 @@ kubectl exec -it gpu-training-0 -- \
 
 ---
 
-## 13. Topology-Aware Scheduling
+## 15. Topology-Aware Scheduling
 
 The scheduler must place training pods to minimize network hops. Use topology hints and affinity rules.
 
@@ -591,7 +650,7 @@ affinity:
 
 ---
 
-## 14. PFC and ECN for RoCE Stability
+## 16. PFC and ECN for RoCE Stability
 
 RoCE requires lossless Ethernet. Without Priority Flow Control (PFC), a single dropped packet can stall RDMA for hundreds of milliseconds.
 
@@ -628,7 +687,152 @@ cat /sys/class/net/ens4f0/ecn_enable   # 1 = ECN enabled
 
 ---
 
-## 15. Summary
+## 17. Key Configuration Reference
+
+### SR-IOV and RDMA Parameters
+
+| Parameter | Default | Effect | When to change |
+|-----------|---------|--------|----------------|
+| `numVfs` in SriovNetworkNodePolicy | 0 | Number of VFs to create on the PF | Set to 1 per GPU (8 for 8-GPU servers) |
+| `deviceType` | `netdevice` | `vfio-pci` for DPDK/userspace; `netdevice` for kernel + RDMA | Use `netdevice` for RDMA; `vfio-pci` for DPDK only |
+| `isRdma` | `false` | Expose RDMA resource alongside VF | Always true for AI training workloads |
+| `hugepages-2Mi` limit | (none) | Pre-allocates huge pages for RDMA pinned memory | Required for RDMA; set to 2–8 Gi per pod |
+| `NCCL_IB_DISABLE` env | (auto) | `0` forces IB/RoCE; `1` forces TCP | Force `0` to prevent NCCL falling back to slow TCP |
+| `NCCL_NET_GDR_LEVEL` | `0` | `5` enables GPUDirect RDMA (GPU mem directly to NIC) | Set `5` on nodes with nvidia-peermem loaded |
+| `NCCL_SOCKET_IFNAME` | (auto) | Interface for NCCL rendezvous (use management eth0, not RDMA) | Always set explicitly on dual-NIC pods |
+
+### PFC/ECN Switch Configuration Reference
+
+| Parameter | Recommended Value | Effect | Risk if wrong |
+|-----------|------------------|--------|--------------|
+| PFC priority | 3 (CoS 3 = RDMA) | Marks RDMA traffic class as no-drop | Wrong priority = PFC not protecting RDMA flows |
+| ECN threshold | 150–200 KB | Buffer fill level that triggers ECN marking | Too low = excessive CNPs; too high = too many drops |
+| DCQCN alpha | 0.0625 | Rate reduction factor per congestion event | Too high = oscillation; too low = slow convergence |
+| MTU (jumbo frames) | 9000 bytes | Reduces header overhead for large RDMA messages | Must match end-to-end: NIC, switch, and remote NIC |
+
+---
+
+## 18. Hands-On Practice
+
+```bash
+# 1. Check allocatable GPU and RDMA resources per node
+kubectl get nodes -o json | jq -r '
+  .items[] |
+  .metadata.name as $name |
+  .status.allocatable |
+  "\($name): GPU=\(.["nvidia.com/gpu"] // "0") RDMA=\(.["rdma/rdma"] // "0") hugepages=\(.["hugepages-2Mi"] // "0")"'
+
+# 2. Verify SR-IOV VFs are created on the node
+kubectl get sriovnetworknodestates -n sriov-network-operator -o json | \
+  jq '.items[].status.interfaces[] | {name:.name, numVfs:.numVfs, totalvfs:.totalvfs}'
+
+# 3. Confirm Multus is active (secondary networks available)
+kubectl get network-attachment-definitions -A
+# EXPECTED: rdma-net in the namespace where training pods run
+
+# 4. Launch a test pod with dual NIC and verify interfaces
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rdma-test
+  annotations:
+    k8s.v1.cni.cncf.io/networks: rdma-net
+spec:
+  containers:
+  - name: test
+    image: nicolaka/netshoot
+    command: ["sleep","infinity"]
+    resources:
+      limits:
+        rdma/rdma: 1
+        hugepages-2Mi: 2Gi
+        memory: 4Gi
+EOF
+
+kubectl exec rdma-test -- ip addr show
+# EXPECTED: eth0 (CNI address) + net1 (SR-IOV RDMA address)
+
+kubectl exec rdma-test -- ls /dev/infiniband/
+# EXPECTED: uverbs0 (if RDMA NIC present on node)
+
+# 5. Run NCCL bandwidth test (requires GPU nodes)
+kubectl exec -it gpu-training-0 -- \
+  /opt/nccl-tests/build/all_reduce_perf -b 128M -e 4G -f 2 -g 1
+# EXPECTED: >200 GB/s on H100 with IB NDR fabric
+
+# 6. Check DCGM NVLink metrics (GPU Operator required)
+kubectl port-forward -n gpu-operator svc/dcgm-exporter 9400:9400 &
+curl -s localhost:9400/metrics | grep -E "NVLINK|PCIE" | head -20
+
+# 7. Verify PFC is active on the RDMA NIC
+kubectl debug node/<gpu-node> -it --image=nicolaka/netshoot -- \
+  ethtool -a ens4f0
+# EXPECTED: PFC enabled on priority 3
+```
+
+> **See also:** [Lesson 07 — Bare Metal Network Infrastructure](07-bare-metal-network-infrastructure.md) for ToR switch configuration and ECMP fabric design that underpins rail-optimized GPU clusters.
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely Cause | Diagnostic Command | Fix |
+|---------|-------------|-------------------|-----|
+| NCCL falls back to TCP, training very slow | RDMA NIC not visible inside pod or `NCCL_IB_DISABLE=1` | `kubectl exec <pod> -- env \| grep NCCL` and `ls /dev/infiniband/` | Set `NCCL_IB_DISABLE=0`, verify SR-IOV VF and RDMA resource allocated |
+| Pod stuck in Pending with `rdma/rdma: 0` available | SR-IOV device plugin not running or VFs not created | `kubectl get pods -n sriov-network-operator` | Check SriovNetworkNodePolicy and node labels; verify VF count with `ip link show` on node |
+| RDMA bandwidth test shows ~10% of expected | PFC not enabled — packet drops causing RDMA retries | `kubectl exec <pod> -- ibv_devinfo -v \| grep port_state` and `ethtool -S <nic> \| grep discard` | Enable PFC on switch and NIC for RDMA traffic class (CoS 3) |
+| Training job hangs at NCCL init | Gang scheduling failure — not all pods started together | `kubectl get pods -l training-job=<name>` | Use Volcano with `minAvailable=total_replicas` for gang scheduling |
+| GPU Operator pods CrashLooping | Kernel version incompatible with NVIDIA driver | `kubectl logs -n gpu-operator <driver-pod>` | Use GPU Operator with `driver.version` matching node kernel; use pre-installed driver mode |
+| `hugepages-2Mi` allocation fails | Hugepages not pre-allocated on node | `kubectl describe node <node> \| grep hugepages` | Add `--max-pods=110 --reserved-memory` or configure hugepages via NodeFeatureDiscovery |
+| NCCL topology file error | Pods cannot find topology XML | `kubectl exec <pod> -- cat $NCCL_TOPO_FILE` | Mount topology file via ConfigMap or bake into training image |
+
+---
+
+## Production Checklist
+
+- [ ] Rail-optimized topology: each GPU's NIC is on a separate ToR switch (no two GPUs per server share a ToR)
+- [ ] PFC enabled on priority 3 end-to-end: server NIC, ToR switch, and spine switch
+- [ ] ECN + DCQCN configured on all switches; jumbo frames (MTU 9000) enabled end-to-end
+- [ ] SR-IOV VFs created equal to max GPUs per node (1 VF per GPU); `isRdma: true`
+- [ ] NVIDIA GPU Operator and Network Operator both healthy; DCGM exporter shipping metrics
+- [ ] Volcano scheduler deployed; all training jobs use `schedulingPolicy.minAvailable=total_replicas`
+- [ ] NCCL env vars set explicitly: `NCCL_SOCKET_IFNAME=eth0`, `NCCL_IB_DISABLE=0`, `NCCL_NET_GDR_LEVEL=5`
+
+---
+
+## Common Anti-Patterns
+
+| What people do | Why it breaks | Correct approach |
+|----------------|--------------|-----------------|
+| Use standard pod networking (eth0 only) for training | Kernel overhead and 10 Gbps limits reduce AllReduce bandwidth by 10-40x | Add SR-IOV secondary interface via Multus for RDMA traffic |
+| Apply NetworkPolicy to RDMA interface (net1) | NetworkPolicy only applies to eth0 — net1 is unmanaged by Kubernetes CNI | Use SR-IOV VF ACLs or InfiniBand PKeys for RDMA-plane access control |
+| Place multiple GPUs from same server on same ToR | AllReduce between servers all competes for one switch uplink | Rail-optimized topology: one ToR per GPU rail, never share a ToR within a server |
+| No gang scheduling for multi-node jobs | Pods start at different times; first pods idle-wait, wasting GPU compute budget | Use Volcano gang scheduling with `minAvailable = total replicas` |
+| Disable jumbo frames to avoid MTU mismatches | RDMA SEND/RECV efficiency drops 30-50% at 1500 MTU | Set MTU 9000 end-to-end: NIC, switch ports, and pod network interface |
+
+---
+
+## Quick Reference
+
+| Use Case | Command |
+|----------|---------|
+| Check allocatable GPUs per node | `kubectl get nodes -o custom-columns='NODE:.metadata.name,GPU:.status.allocatable.nvidia\.com/gpu'` |
+| Check allocatable RDMA per node | `kubectl get nodes -o custom-columns='NODE:.metadata.name,RDMA:.status.allocatable.rdma/rdma'` |
+| List SR-IOV node states | `kubectl get sriovnetworknodestates -n sriov-network-operator` |
+| List NetworkAttachmentDefinitions | `kubectl get network-attachment-definitions -A` |
+| Get GPU Operator pod status | `kubectl get pods -n gpu-operator` |
+| Get Network Operator pod status | `kubectl get pods -n network-operator` |
+| Run NCCL AllReduce benchmark | `kubectl exec -it <pod> -- /opt/nccl-tests/build/all_reduce_perf -b 1G -e 16G -f 2 -g 1` |
+| Check NVLink bandwidth (DCGM) | `curl -s localhost:9400/metrics \| grep NVLINK_BANDWIDTH` |
+| Verify RDMA device in pod | `kubectl exec <pod> -- ls /dev/infiniband/` |
+| Check IB port state | `kubectl exec <pod> -- ibv_devinfo -v \| grep -E 'port_state\|active_mtu'` |
+| Enable MIG profile on node | `kubectl label node <node> nvidia.com/mig.config=all-1g.10gb` |
+| Inspect GPU topology on node | `kubectl exec <pod> -- nvidia-smi topo -m` |
+
+---
+
+## Summary
 
 | Concept | Detail |
 |---------|--------|

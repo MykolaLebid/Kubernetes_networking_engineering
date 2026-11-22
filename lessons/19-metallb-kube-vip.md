@@ -1,8 +1,10 @@
-# Lesson 17 — Load Balancing on Bare Metal: MetalLB and kube-vip
+# Lesson 19 — Load Balancing on Bare Metal: MetalLB and kube-vip
 
 > **Track:** Network Foundation — Bare Metal  
-> **Prerequisites:** [Lesson 06 — BGP](06-bgp-fundamentals.md), [Lesson 12 — Services](13-kubernetes-services-kube-proxy.md)  
+> **Prerequisites:** [Lesson 06 — BGP Fundamentals](06-bgp-fundamentals.md), [Lesson 13 — Kubernetes Services](13-kubernetes-services-kube-proxy.md)  
 > **Duration:** ~2.5 hours
+
+> **Goal:** Configure MetalLB in L2 and BGP modes to provide LoadBalancer services on bare-metal clusters, compare with kube-vip for control-plane HA, and diagnose ARP and BGP announcement failures.
 
 ---
 
@@ -20,11 +22,28 @@ arp -n | head -20
 ip neigh show
 ```
 
----
+Observation commands — run after installing MetalLB and creating a LoadBalancer service:
 
-## Why This Matters
+```bash
+# Watch MetalLB speaker announcements in real time
+kubectl logs -n metallb-system -l app.kubernetes.io/component=speaker -f &
 
-Cloud Kubernetes clusters get a load balancer automatically when you create a `type: LoadBalancer` service. On bare metal, that request stays pending forever — `EXTERNAL-IP: <pending>` — until you deploy MetalLB or kube-vip. These tools bring cloud-like LoadBalancer provisioning to on-premises and bare-metal clusters.
+# Create a test LoadBalancer service
+kubectl create deployment web --image=nginx --replicas=2
+kubectl expose deployment web --type=LoadBalancer --port=80
+
+# Watch the service get an EXTERNAL-IP assigned from the pool
+kubectl get svc web -w
+# Expect: EXTERNAL-IP changes from <pending> to 192.168.100.xxx
+
+# From outside the cluster, verify ARP resolution (L2 mode)
+# arping -I eth0 192.168.100.100   # should respond from the elected speaker node
+
+# Check which node is currently serving the VIP
+kubectl get events -n metallb-system | grep -i announcing
+```
+
+> **See also:** [Lesson 06 — BGP Fundamentals](06-bgp-fundamentals.md) for BGP session setup and ECMP concepts used by MetalLB BGP mode.
 
 ---
 
@@ -38,6 +57,26 @@ kubectl get svc web
 ```
 
 The Cloud Controller Manager (CCM) provisions cloud LBs. On bare metal, you need to run your own LB controller.
+
+```mermaid
+flowchart LR
+    subgraph cloud["Cloud Cluster"]
+        SVC1["Service\ntype: LoadBalancer"]
+        CCM["Cloud Controller Manager"]
+        CLB["Cloud LB\n(AWS NLB / GCP / Azure)"]
+    end
+    subgraph bare["Bare Metal Cluster"]
+        SVC2["Service\ntype: LoadBalancer"]
+        MLB["MetalLB / kube-vip"]
+        VIP["VIP (ARP/BGP)\n192.168.100.100"]
+    end
+
+    SVC1 -->|"triggers provisioning"| CCM --> CLB
+    SVC2 -->|"triggers provisioning"| MLB --> VIP
+
+    style CLB fill:#cce,stroke:#66c
+    style VIP fill:#cec,stroke:#6c6
+```
 
 ---
 
@@ -64,6 +103,26 @@ kubectl get pods -n metallb-system
 ## 3. MetalLB L2 Mode
 
 The speaker pod on the node holding the VIP responds to ARP requests for that IP.
+
+```mermaid
+sequenceDiagram
+    participant Router as Upstream Router
+    participant Node1 as Node 1 (elected speaker)
+    participant Node2 as Node 2
+    participant Spk as MetalLB Speaker (Node 1)
+    participant Pod as Backend Pod
+
+    Note over Spk: Leader election: Node 1 wins for 192.168.100.100
+
+    Router->>Node1: ARP request: who has 192.168.100.100?
+    Spk-->>Router: ARP reply: 192.168.100.100 is at <node1-MAC>
+    Router->>Node1: TCP packet to 192.168.100.100:80
+    Node1->>Pod: forward via kube-proxy (may DNAT to Node 2 pod)
+
+    Note over Node1,Node2: On node failure:
+    Spk-->>Router: gratuitous ARP from Node 2 (new leader)
+    Note over Router: Router updates ARP cache (~10 s)
+```
 
 ```yaml
 # Configure an IP address pool
@@ -135,6 +194,18 @@ spec:
 - Fast failover (BFD sub-second)
 - Works across L3 boundaries (across routers, not just L2)
 
+### Key BGP/Pool Parameters
+
+| Parameter | Default | Effect | When to change |
+|-----------|---------|--------|----------------|
+| `myASN` | — | Local AS number for the BGP session | Use private ASN (64512-65535); must match router config |
+| `peerASN` | — | Upstream router's AS number | Match the ToR switch configuration |
+| `holdTime` | `90s` | BGP session dead timer | Reduce to `30s` for faster failover detection |
+| `aggregationLength` | `32` (IPv4) | Prefix length for advertised routes | Use `32` for per-VIP /32 host routes; aggregate with /24 to reduce BGP table size |
+| `communities` | (none) | BGP community strings appended to routes | Signal upstream policy (e.g., no-export, local-pref) |
+| `bfdProfile` | (none) | Enables BFD for sub-second failure detection | Production BGP — combine with fast BFD for <1s failover |
+| `IPAddressPool.addresses` | — | CIDR or range of allocatable IPs | Must not overlap with node or pod subnets |
+
 ---
 
 ## 5. Using the LoadBalancer Service
@@ -195,8 +266,14 @@ data:
 ```
 
 **kube-vip vs MetalLB:**
-- kube-vip: also handles control-plane VIP (HA API server), simpler setup
-- MetalLB: more mature, BGP ECMP, richer IP pool management
+
+| Feature | kube-vip | MetalLB |
+|---------|----------|---------|
+| Control-plane VIP (HA API server) | Yes | No |
+| L2 / ARP mode | Yes (VRRP) | Yes |
+| BGP mode | Yes | Yes (more mature) |
+| IP pool management CRDs | Basic (ConfigMap range) | Full (IPAddressPool, L2Advertisement, BGPAdvertisement) |
+| Recommended for | Control-plane HA + simple LB | Production LoadBalancer services |
 
 ---
 
@@ -217,41 +294,7 @@ metadata:
 
 ---
 
-## 8. Troubleshooting
-
-```bash
-# MetalLB: Is the speaker announcing the IP?
-kubectl logs -n metallb-system -l app.kubernetes.io/component=speaker | \
-  grep -E "announcing|withdraw|ERROR"
-
-# Check which node is the speaker for a VIP
-kubectl get events -n metallb-system | grep announcing
-
-# Is the VIP reachable at L2?
-arping -I eth0 192.168.100.105  # from outside the cluster
-
-# Is the VIP route in BGP (BGP mode)?
-# On ToR switch:
-# show bgp ipv4 unicast 192.168.100.105
-
-# Check IP pool allocation
-kubectl get ipaddresspool -n metallb-system
-kubectl describe ipaddresspool production-pool -n metallb-system
-
-# kube-vip: check leader election
-kubectl logs -n kube-system -l app=kube-vip | grep -E "leader|VIP|ERROR"
-
-# Common issues:
-# 1. VIP in same subnet as nodes? (L2 mode requirement)
-# 2. ARP blocked by switch (port security)
-# 3. BGP session not established (firewall on TCP 179)
-# 4. IP pool exhausted
-# 5. Node firewall blocking traffic on the VIP port
-```
-
----
-
-## 9. Production Considerations
+## 8. Production Considerations
 
 ```bash
 # Separate the LB VIP range from node IPs to avoid conflicts
@@ -279,7 +322,64 @@ spec:
 
 ---
 
-## 10. Summary
+## Troubleshooting
+
+| Symptom | Likely Cause | Diagnostic Command | Fix |
+|---------|-------------|-------------------|-----|
+| `EXTERNAL-IP: <pending>` after MetalLB install | No IPAddressPool or L2Advertisement/BGPAdvertisement created | `kubectl get ipaddresspools,l2advertisements -n metallb-system` | Create IPAddressPool and the appropriate Advertisement CRD |
+| VIP assigned but unreachable from outside cluster | VIP is in a different subnet than clients (L2 mode) or BGP session is not established | `arping -I eth0 <VIP>` from outside; `kubectl logs -n metallb-system -l component=speaker | grep bgp` | For L2: ensure VIP is in same broadcast domain; for BGP: check session with router |
+| ARP not responding for VIP | Speaker not elected or port security on switch blocking gratuitous ARP | `kubectl get events -n metallb-system | grep announcing` | Check speaker pod logs; disable port-security / ARP inspection on the connected switch port |
+| BGP session not established | Firewall blocking TCP 179 between node and router | `telnet <router-ip> 179` from node | Open TCP 179 on host firewall and network ACLs |
+| IP pool exhausted — service stays pending | All IPs in pool are allocated | `kubectl describe ipaddresspool production-pool -n metallb-system` | Expand pool address range or add a second IPAddressPool |
+| Traffic only reaches one pod (L2 mode) | L2 mode is single-node ingress; kube-proxy distributes after the node | `kubectl get pods -o wide -l app=web` — all traffic enters one node | Accept this limitation for L2; switch to BGP mode with ECMP for true per-node distribution |
+| kube-vip leader not switching after node failure | Leader lease stuck or ARP cache not refreshed on upstream router | `kubectl logs -n kube-system -l app=kube-vip | grep -E 'leader|VIP'` | Increase ARP probe frequency in kube-vip config; check upstream router ARP cache timeout |
+
+---
+
+## Production Checklist
+
+- [ ] VIP address pool configured in a separate subnet from node and pod CIDRs to prevent IP conflicts
+- [ ] BGP mode used for production workloads (L2 mode is for dev/lab only — single ingress node is a bottleneck)
+- [ ] BGP peer `holdTime` and `keepaliveTime` tuned; BFDProfile configured for sub-second failover
+- [ ] Switch port security and gratuitous ARP inspection disabled (or explicitly permitted) for nodes running MetalLB speakers
+- [ ] IP address pool size planned with headroom — allocating 100% causes new services to stay pending
+- [ ] kube-vip deployed for control-plane HA if running a multi-master bare-metal cluster
+- [ ] MetalLB speaker resource limits set (DaemonSet pods run on every node — size accordingly)
+
+---
+
+## Common Anti-Patterns
+
+| What people do | Why it breaks | Correct approach |
+|----------------|--------------|-----------------|
+| Use L2 mode in production expecting high availability | L2 mode is single-node: only one node holds the VIP at a time; failover takes ~10 s and traffic is not distributed across nodes | Use BGP mode with ECMP in production for true multi-node load distribution and sub-second failover with BFD |
+| Put VIP pool in the same /24 as the node IPs | The LB may assign an IP already used by a node or another static device on the subnet | Always allocate the VIP pool from a dedicated subnet or range that is not shared with node addresses |
+| Forget to open TCP 179 (BGP) on node firewalls | BGP sessions never establish; MetalLB speaker logs show repeated connection refused; VIPs stay unannounced | Pre-open TCP 179 between all nodes and each BGP peer (ToR switch) in the host firewall before installing MetalLB |
+| Use MetalLB and kube-vip for LoadBalancer services simultaneously | Both tools race to handle the same Service resources; one or both fail to announce correctly | Pick one tool per cluster for LoadBalancer services; kube-vip for control-plane HA can coexist if LoadBalancer mode is disabled in one of them |
+| Request a specific IP with `metallb.io/loadBalancerIPs` without first checking pool availability | Service stays pending with an event saying the requested IP is not in any pool | Verify the IP is within a configured IPAddressPool range before annotating the Service |
+
+---
+
+## Quick Reference
+
+| Use Case | Command |
+|----------|---------|
+| List MetalLB pods | `kubectl get pods -n metallb-system` |
+| List IP address pools | `kubectl get ipaddresspools -n metallb-system` |
+| List all LoadBalancer services | `kubectl get svc -A --field-selector spec.type=LoadBalancer` |
+| Watch speaker announcement logs | `kubectl logs -n metallb-system -l app.kubernetes.io/component=speaker -f` |
+| Check events in metallb-system | `kubectl get events -n metallb-system --sort-by='.lastTimestamp'` |
+| Check which node is speaker for a VIP | `kubectl get events -n metallb-system | grep announcing` |
+| Test ARP response for VIP (from outside cluster) | `arping -I <iface> <VIP>` |
+| Describe IP pool allocation | `kubectl describe ipaddresspool <name> -n metallb-system` |
+| Check kube-vip leader election | `kubectl logs -n kube-system -l app=kube-vip | grep -E 'leader\|VIP'` |
+| Request specific IP for a service | Add annotation `metallb.io/loadBalancerIPs: <IP>` to Service |
+| Share IP across two services | Add same `metallb.io/allow-shared-ip: "<key>"` to both Services |
+| Describe MetalLB controller | `kubectl describe pod -n metallb-system -l app.kubernetes.io/component=controller` |
+
+---
+
+## Summary
 
 | Tool | Mode | Failover | Load Distribution |
 |------|------|---------|-----------------|
@@ -298,4 +398,4 @@ spec:
 
 ---
 
-**Next:** [Lesson 18 — Cloud Provider Load Balancers](20-cloud-load-balancers.md)
+**Next:** [Lesson 20 — Cloud Provider Load Balancers](20-cloud-load-balancers.md)

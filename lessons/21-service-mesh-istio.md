@@ -1,8 +1,8 @@
 # Lesson 21 — Service Mesh with Istio
 
-> **Track:** Network Foundation — Bare Metal & Cloud  
-> **Prerequisites:** [Lesson 12 — Services](13-kubernetes-services-kube-proxy.md), [Lesson 16 — Network Policies](16-network-policies.md)  
-> **Duration:** ~3 hours
+> **Track:** Network Foundation — Bare Metal & Cloud | **Prerequisites:** [Lesson 12 — Services](13-kubernetes-services-kube-proxy.md), [Lesson 16 — Network Policies](16-network-policies.md) | **Duration:** ~3 hours
+
+> **Goal:** Configure Istio sidecar injection, enforce mTLS between services, and control traffic with VirtualService and DestinationRule policies.
 
 ---
 
@@ -12,87 +12,99 @@
 # Terminal 1 — Mac (istioctl + kubectl)
 istioctl version 2>/dev/null || echo "Install: curl -L https://istio.io/downloadIstio | sh -"
 kubectl get pods -n istio-system 2>/dev/null
-istioctl proxy-status 2>/dev/null | head -10
+istioctl proxy-status 2>/dev/null | head -10   # expect: SYNCED for each pod
 
 # Terminal 2 — Mac
-kubectl get peerauthentication -A 2>/dev/null
-kubectl get authorizationpolicy -A 2>/dev/null
-kubectl get virtualservice,destinationrule -A 2>/dev/null
+kubectl get peerauthentication -A 2>/dev/null           # check mTLS mode
+kubectl get authorizationpolicy -A 2>/dev/null          # check access rules
+kubectl get virtualservice,destinationrule -A 2>/dev/null  # check traffic config
+
+# Verify sidecar injection label
+kubectl get namespace default --show-labels | grep istio-injection
+# expect: istio-injection=enabled
 ```
-
----
-
-## Why This Matters
-
-A service mesh adds mTLS, observability, traffic management, and fault injection between services — without changing application code. Istio is the most feature-rich option. Understanding it lets you secure inter-service communication, implement progressive delivery, and get distributed tracing with zero application changes.
 
 ---
 
 ## 1. Architecture
 
 ### Sidecar Mode (classic Istio)
-```
-Pod
-├── App container         (port 8080)
-└── Envoy sidecar proxy   (intercepts all traffic via iptables)
 
-Traffic flow:
-  Caller Pod → Envoy → (mTLS) → Envoy → App Pod
-                          ↑
-                    Istiod provides certs, config
+```mermaid
+flowchart LR
+    subgraph ClusterControl["Control Plane (istio-system)"]
+        istiod["istiod\n(Pilot + CA + Galley)"]
+    end
+
+    subgraph PodA["Pod A"]
+        appA["App :8080"]
+        envoyA["Envoy sidecar\n:15001 out / :15006 in"]
+        appA <--> envoyA
+    end
+
+    subgraph PodB["Pod B"]
+        appB["App :8080"]
+        envoyB["Envoy sidecar\n:15001 out / :15006 in"]
+        envoyB <--> appB
+    end
+
+    istiod -- "xDS config + certs" --> envoyA
+    istiod -- "xDS config + certs" --> envoyB
+    envoyA -- "mTLS (SPIFFE/X.509)" --> envoyB
+
+    style ClusterControl fill:#e8f4fd,stroke:#2196F3
+    style PodA fill:#f3e5f5,stroke:#9C27B0
+    style PodB fill:#f3e5f5,stroke:#9C27B0
 ```
 
 ### Ambient Mode (sidecar-less, Istio 1.18+)
-```
-Node
-├── ztunnel (per-node, L4 mTLS proxy)
-└── waypoint proxy (per-namespace, L7 policy)
 
-Traffic flow:
-  Pod → ztunnel (L4 mTLS) → ztunnel → Pod
-  (or) → waypoint proxy (L7 policy) →
+```mermaid
+flowchart LR
+    subgraph Node1["Node 1"]
+        zt1["ztunnel\n(per-node, L4 mTLS)"]
+        wp["waypoint proxy\n(per-namespace, L7)"]
+        p1["Pod"]
+        p1 --> zt1
+        zt1 --> wp
+    end
+    subgraph Node2["Node 2"]
+        zt2["ztunnel\n(per-node, L4 mTLS)"]
+        p2["Pod"]
+        zt2 --> p2
+    end
+    wp -- "mTLS HBONE tunnel" --> zt2
+    style Node1 fill:#e8f5e9,stroke:#4CAF50
+    style Node2 fill:#e8f5e9,stroke:#4CAF50
 ```
 
 Ambient mode eliminates sidecar overhead; ztunnel handles mTLS transparently.
 
-```
-Sidecar Injection + mTLS Handshake Flow
+### Sidecar Injection + mTLS Handshake Flow
 
-  kubectl apply pod.yaml
-        │
-        ▼
-  API Server → MutatingWebhookConfiguration (istiod)
-        │
-        ▼
-  Pod spec modified: inject envoy sidecar container
-  + init container (iptables: redirect all traffic → envoy :15001)
-        │
-        ▼
-  Pod running:
-  ┌─────────────────────────────────────────────┐
-  │  Pod A                                      │
-  │  ┌────────────┐    ┌────────────────────┐   │
-  │  │ App (8080) │◄──►│ Envoy sidecar      │   │
-  │  │            │    │ :15001 (outbound)  │   │
-  │  └────────────┘    │ :15006 (inbound)   │   │
-  │                    └─────────┬──────────┘   │
-  └──────────────────────────────┼──────────────┘
-                                 │ mTLS (SPIFFE/X.509)
-  ┌──────────────────────────────┼──────────────┐
-  │  Pod B                       │              │
-  │                    ┌─────────▼──────────┐   │
-  │                    │ Envoy sidecar      │   │
-  │                    │ :15006 (inbound)   │   │
-  │  ┌────────────┐    │ :15001 (outbound)  │   │
-  │  │ App (8080) │◄──►│                    │   │
-  │  └────────────┘    └────────────────────┘   │
-  └─────────────────────────────────────────────┘
+```mermaid
+sequenceDiagram
+    participant K as kubectl apply
+    participant API as API Server
+    participant MWC as MutatingWebhook (istiod)
+    participant POD as Pod (running)
+    participant ISTIOD as istiod CA
+    participant ENVOY_A as Envoy A (sidecar)
+    participant ENVOY_B as Envoy B (sidecar)
 
-mTLS handshake (SPIFFE/X.509 certificates from istiod CA):
-  Envoy A presents: spiffe://cluster.local/ns/default/sa/frontend
-  Envoy B validates against istiod-issued CA cert → trusts it
-  Envoy B presents: spiffe://cluster.local/ns/default/sa/backend
-  Envoy A validates → mutual trust established → TLS session begins
+    K->>API: Create pod spec
+    API->>MWC: Admission webhook call
+    MWC-->>API: Mutated spec + istio-proxy container + init container
+    API->>POD: Schedule pod
+    POD->>ISTIOD: CSR for SPIFFE cert (spiffe://cluster.local/ns/default/sa/frontend)
+    ISTIOD-->>POD: X.509 SVID cert issued
+    ENVOY_A->>ENVOY_B: TLS ClientHello + SPIFFE cert
+    ENVOY_B->>ISTIOD: Verify cert against CA bundle
+    ISTIOD-->>ENVOY_B: Valid
+    ENVOY_B-->>ENVOY_A: TLS ServerHello + own SPIFFE cert
+    ENVOY_A->>ISTIOD: Verify cert against CA bundle
+    ISTIOD-->>ENVOY_A: Valid
+    ENVOY_A-->>ENVOY_B: mTLS session established — data flows
 ```
 
 ---
@@ -110,12 +122,14 @@ istioctl install --set profile=default -y
 # Verify
 istioctl verify-install
 kubectl get pods -n istio-system
+# expect: istiod Running, istio-ingressgateway Running
 
 # Enable sidecar injection for a namespace
 kubectl label namespace default istio-injection=enabled
 
 # Check injection is working
 kubectl get namespace default --show-labels
+# expect: istio-injection=enabled
 ```
 
 ```bash
@@ -124,6 +138,17 @@ istioctl install --set profile=ambient -y
 # No sidecar injection needed — ztunnel handles it per-node
 kubectl label namespace default istio.io/dataplane-mode=ambient
 ```
+
+### Istio Profile Reference
+
+| Parameter | Default | Effect | When to change |
+|-----------|---------|--------|----------------|
+| `profile` | `default` | Control plane + ingressgateway | Use `minimal` for custom ingress |
+| `values.pilot.traceSampling` | `1.0` | % of requests traced | Lower in high-traffic prod |
+| `values.global.proxy.resources.requests.cpu` | `10m` | Envoy sidecar CPU request | Increase for high-RPS services |
+| `values.global.proxy.resources.requests.memory` | `128Mi` | Envoy sidecar memory | Increase for large XDS configs |
+| `meshConfig.accessLogFile` | `""` (disabled) | Envoy access log destination | Set `/dev/stdout` for debugging |
+| `meshConfig.defaultConfig.concurrency` | `2` | Envoy worker threads | Match vCPU count on large nodes |
 
 ---
 
@@ -149,7 +174,20 @@ istioctl authn tls-check <pod-name>.default
 
 # Check certificate used
 istioctl proxy-config secret <pod-name>.default
+# expect: cert validity, SPIFFE URI in SAN
+
+# See all mTLS CONFLICT states cluster-wide
+istioctl authn tls-check --all-namespaces 2>/dev/null | grep CONFLICT
+# empty = no conflicts
 ```
+
+### PeerAuthentication Mode Reference
+
+| Mode | Behavior | When to use |
+|------|----------|-------------|
+| `STRICT` | mTLS only; plain text rejected | Full mesh — all sidecars injected |
+| `PERMISSIVE` | Accept both mTLS and plain text | Migration: external clients still plain |
+| `DISABLE` | Plain text only | Debug only — never in production |
 
 ---
 
@@ -266,6 +304,17 @@ spec:
         version: v2
 ```
 
+### VirtualService / DestinationRule Key Parameters
+
+| Parameter | Default | Effect | When to change |
+|-----------|---------|--------|----------------|
+| `retries.attempts` | 2 | Max retry count | Increase for idempotent reads |
+| `retries.perTryTimeout` | 25s | Timeout per attempt | Match upstream SLA |
+| `outlierDetection.consecutiveGatewayErrors` | 5 | Errors before ejection | Lower for fast failover |
+| `outlierDetection.baseEjectionTime` | 30s | How long host stays ejected | Increase for slow recovery |
+| `connectionPool.tcp.maxConnections` | 2^32-1 | Max TCP connections | Set for connection limiting |
+| `connectionPool.http.http1MaxPendingRequests` | 2^32-1 | Max queued HTTP/1 requests | Tune to prevent queue buildup |
+
 ---
 
 ## 6. Ingress with Istio Gateway
@@ -322,6 +371,7 @@ kubectl apply -f samples/addons/kiali.yaml
 
 # Access Kiali (service mesh topology)
 istioctl dashboard kiali
+# expect: topology graph with traffic flows and mTLS lock icons
 
 # Access Jaeger (distributed tracing)
 istioctl dashboard jaeger
@@ -334,14 +384,21 @@ istioctl dashboard grafana
 # CLI observability
 # Envoy access logs (per sidecar)
 kubectl logs <pod> -c istio-proxy | head -20
+# expect: JSON log lines with method, path, response_code, upstream_cluster
 
 # Proxy config dump
 istioctl proxy-config cluster <pod>.default
+# expect: table with FQDN, PORT, SUBSET, DIRECTION, TYPE
+
 istioctl proxy-config listener <pod>.default
+# expect: virtual listeners 0.0.0.0:15001 (outbound) and per-port entries
+
 istioctl proxy-config route <pod>.default
+# expect: virtual host routing rules
 
 # Check for traffic issues
-istioctl analyze   # validates Istio config
+istioctl analyze   # validates Istio config — reports errors and warnings
+# expect: "No validation issues found" or list of issues
 ```
 
 ---
@@ -364,11 +421,22 @@ kubectl patch svc istio-ingressgateway -n istio-system \
 # AWS: becomes an NLB
 # GKE: becomes a Passthrough NLB
 kubectl get svc istio-ingressgateway -n istio-system
+# expect: EXTERNAL-IP populated within ~60 seconds
 ```
 
 ---
 
-## 9. Troubleshooting Istio
+## Troubleshooting
+
+| Symptom | Likely Cause | Diagnostic Command | Fix |
+|---------|-------------|-------------------|-----|
+| Sidecar not injected | Namespace missing label | `kubectl get ns <ns> --show-labels` | `kubectl label ns <ns> istio-injection=enabled` |
+| 503 Service Unavailable | mTLS conflict (one side STRICT, other plain) | `istioctl authn tls-check <pod>.default` | Add PeerAuthentication PERMISSIVE or inject sidecar in caller |
+| `upstream connect error` | DestinationRule subset has no matching pods | `istioctl proxy-config cluster <pod>.default \| grep <service>` | Verify label selector in subset matches pod labels |
+| Envoy not synced to istiod | istiod unavailable or network partition | `istioctl proxy-status` — look for `NOT SENT` | Check `kubectl logs -n istio-system -l app=istiod` |
+| AuthorizationPolicy blocking | DENY rule or missing ALLOW rule | `kubectl logs <pod> -c istio-proxy \| grep RBAC` | Add explicit ALLOW or check principal format |
+| High latency after mesh enable | Envoy sidecar CPU/memory starved | `kubectl top pod <pod> --containers` | Increase `values.global.proxy.resources` limits |
+| Certificate expired | SVID cert not rotated | `istioctl proxy-config secret <pod>.default` | Restart istiod to force rotation |
 
 ```bash
 # 1. Is sidecar injected?
@@ -411,9 +479,54 @@ EOF
 istioctl experimental envoy-stats <pod>
 ```
 
+> **See also:** [Lesson 16 — Network Policies](16-network-policies.md) for base NetworkPolicy before layering Istio AuthorizationPolicy.
+
 ---
 
-## 10. Summary
+## Production Checklist
+
+- [ ] PeerAuthentication set to `STRICT` in all application namespaces (not PERMISSIVE)
+- [ ] AuthorizationPolicy default-deny applied per namespace before deploying workloads
+- [ ] `istioctl analyze` runs clean in CI — zero errors or warnings
+- [ ] Envoy sidecar CPU/memory requests and limits set to prevent noisy-neighbor starvation
+- [ ] Distributed tracing (Jaeger/Zipkin) sampling rate tuned — not 100% in high-RPS production
+- [ ] Istio ingress gateway has a PodDisruptionBudget with `minAvailable: 1`
+- [ ] Certificate rotation tested — SVID expiry handled without service interruption
+
+---
+
+## Common Anti-Patterns
+
+| What people do | Why it breaks | Correct approach |
+|----------------|--------------|-----------------|
+| Apply PeerAuthentication STRICT before all pods have sidecars | Non-injected pods cannot complete mTLS handshake — 503 errors | Enable PERMISSIVE first, verify all pods have sidecar, then switch to STRICT |
+| Use namespace-wide `deny-all` AuthorizationPolicy without allow rules | Blocks health checks and monitoring, causing cascading failures | Add explicit ALLOW for health check paths and monitoring principals first |
+| Deploy VirtualService subsets before DestinationRule is applied | Envoy has no subset configuration — 503 on subset routing | Apply DestinationRule before or simultaneously with VirtualService |
+| Run Istio control plane (istiod) with a single replica | istiod failure causes cert rotation and config push to stop | Set `replicaCount: 2` or more and add PodAntiAffinity |
+| Forget to annotate sidecar resource limits | Envoy sidecar consumes unbounded CPU — evicts application containers | Always set `sidecar.istio.io/proxyCPU` and `proxyCPULimit` annotations |
+
+---
+
+## Quick Reference
+
+| Use Case | Command |
+|----------|---------|
+| Check sidecar injection status for all pods | `istioctl proxy-status` |
+| Inspect Envoy cluster config for a pod | `istioctl proxy-config cluster <pod>.default` |
+| Check mTLS status for a service | `istioctl authn tls-check <pod>.default` |
+| Validate all Istio configs | `istioctl analyze` |
+| View Envoy access logs | `kubectl logs <pod> -c istio-proxy` |
+| Open Kiali topology dashboard | `istioctl dashboard kiali` |
+| Check secret/cert for a sidecar | `istioctl proxy-config secret <pod>.default` |
+| Enable sidecar injection on namespace | `kubectl label ns <ns> istio-injection=enabled` |
+| Temporarily disable mTLS for debugging | Apply PeerAuthentication `mode: PERMISSIVE` |
+| Force Envoy config re-push from istiod | `kubectl rollout restart deployment -n istio-system istiod` |
+| Get Envoy listener table | `istioctl proxy-config listener <pod>.default` |
+| Install observability stack | `kubectl apply -f samples/addons/` |
+
+---
+
+## Summary
 
 | Feature | Istio Mechanism |
 |---------|----------------|
@@ -437,4 +550,4 @@ istioctl experimental envoy-stats <pod>
 
 ---
 
-**Next:** [Lesson 10 — eBPF and XDP in Kubernetes Networking](10-ebpf-xdp.md)
+**Next:** [Lesson 22 — Multi-Cluster Networking](22-multi-cluster-networking.md)
