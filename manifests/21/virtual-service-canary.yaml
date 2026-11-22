@@ -1,0 +1,46 @@
+# virtual-service-canary.yaml
+# Istio VirtualService implementing a 90/10 canary traffic split between
+# the stable and canary subsets of a service. Works with the DestinationRule
+# in destination-rule.yaml which defines those subsets.
+# Apply with: kubectl apply -f virtual-service-canary.yaml
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: web-vs
+  namespace: default
+spec:
+  hosts:
+    - web   # Matches the Kubernetes Service name; use FQDN for cross-namespace
+  gateways:
+    - mesh        # Apply to all in-mesh (pod-to-pod) traffic
+    # - web-gateway   # Uncomment to also apply to Gateway traffic
+  http:
+    # Header-based routing: 100% to canary if x-canary header is set
+    - match:
+        - headers:
+            x-canary:
+              exact: "true"
+      route:
+        - destination:
+            host: web
+            subset: canary
+          weight: 100
+
+    # Default weighted split: 90% stable, 10% canary
+    - route:
+        - destination:
+            host: web
+            subset: stable
+          weight: 90
+        - destination:
+            host: web
+            subset: canary
+          weight: 10
+      # Retry policy: retry on 5xx or connection errors
+      retries:
+        attempts: 3
+        perTryTimeout: 5s
+        retryOn: "5xx,reset,connect-failure,retriable-4xx"
+      # Timeout for the entire request
+      timeout: 30s

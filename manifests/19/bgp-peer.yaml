@@ -1,0 +1,53 @@
+# bgp-peer.yaml
+# MetalLB BGPPeer and BGPAdvertisement for BGP-mode LoadBalancer Services.
+# BGP mode is more scalable than L2 and works across routers. Each node
+# establishes a BGP session with the ToR router and advertises Service VIPs.
+# Prerequisites: MetalLB installed, BGPPeer CRDs available (metallb.io/v1beta2)
+# Apply with: kubectl apply -f bgp-peer.yaml
+---
+# Define the upstream BGP router (Top-of-Rack switch or router)
+apiVersion: metallb.io/v1beta2
+kind: BGPPeer
+metadata:
+  name: tor-router
+  namespace: metallb-system
+spec:
+  myASN: 65001          # Your cluster's ASN (private range: 64512-65534)
+  peerASN: 65000        # The router's ASN
+  peerAddress: 192.168.1.1   # IP of the BGP router/switch
+  peerPort: 179
+  # holdTime: 90s       # BGP hold timer
+  # keepaliveTime: 30s  # BGP keepalive interval
+  # Optional: restrict which nodes peer with this router
+  # nodeSelectors:
+  #   - matchLabels:
+  #       kubernetes.io/role: worker
+  # Optional: BFD profile for faster failure detection
+  # bfdProfile: default
+---
+# Optional: second BGP peer for redundancy (ECMP)
+apiVersion: metallb.io/v1beta2
+kind: BGPPeer
+metadata:
+  name: tor-router-secondary
+  namespace: metallb-system
+spec:
+  myASN: 65001
+  peerASN: 65000
+  peerAddress: 192.168.1.2   # Second router for redundancy
+  peerPort: 179
+---
+# BGPAdvertisement: advertise IPs from production-pool via BGP
+apiVersion: metallb.io/v1beta1
+kind: BGPAdvertisement
+metadata:
+  name: bgp-advertisement
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+    - production-pool    # Must match IPAddressPool name from ipaddresspool.yaml
+  # communities:
+  #   - 65000:1          # BGP community to tag advertisements
+  # aggregationLength: 32   # Advertise /32 host routes (default) or aggregate
+  # peers:
+  #   - tor-router       # Optionally restrict to specific peers

@@ -515,6 +515,37 @@ oc get routes -A -o json \
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** What are the three TLS termination modes for OpenShift Routes, and in which mode is path-based routing impossible?
+
+   <details><summary>Answer</summary>
+
+   The three modes are: **edge** (TLS terminates at the HAProxy router; plain HTTP is forwarded to the backend pod), **reencrypt** (TLS terminates at the router, and HAProxy opens a new TLS connection to the pod using a destination CA certificate), and **passthrough** (the encrypted stream is forwarded unchanged to the pod based solely on SNI hostname). Path-based routing is impossible in **passthrough** mode because HAProxy never decrypts the connection and therefore cannot inspect the HTTP path — it can only route by the hostname in the TLS SNI field.
+
+   </details>
+
+2. **[Scenario question]** A Route shows `Admitted: True` but users receive 503 Service Unavailable. How would you check whether the backend pods are healthy from the HAProxy router's perspective?
+
+   <details><summary>Answer</summary>
+
+   Connect to the HAProxy stats socket inside the router pod using `echo "show stat" | socat - /var/lib/haproxy/run/haproxy.sock | cut -d, -f1,2,18,19` — the output shows each backend server entry with `UP` or `DOWN` status. A `DOWN` entry means HAProxy cannot reach the pod (readiness probe failing, wrong targetPort, or pod not yet ready). Also check `oc get endpoints <service>` to verify that at least one pod IP is in the `Addresses` list rather than `NotReadyAddresses`.
+
+   </details>
+
+3. **[Practical question]** What command would you run to check whether a specific Route was admitted by the HAProxy router?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   oc describe route web-edge | grep -A 15 "Status:"
+   ```
+   Look for the `Admitted: True` condition under the `Ingress` section and confirm the `RouterName` field shows which IngressController accepted it; `Admitted: False` means the router rejected the route due to a hostname conflict or admission policy violation, and the `Message` field will explain why.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

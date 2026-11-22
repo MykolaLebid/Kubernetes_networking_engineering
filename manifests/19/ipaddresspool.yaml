@@ -1,0 +1,42 @@
+# ipaddresspool.yaml
+# MetalLB IPAddressPool and L2Advertisement for bare-metal LoadBalancer Services.
+# IPAddressPool defines the range of IPs MetalLB can assign to LoadBalancer Services.
+# L2Advertisement advertises those IPs via ARP/NDP (Layer 2 / gratuitous ARP).
+# Prerequisites: MetalLB must be installed (https://metallb.io/installation/)
+# Apply with: kubectl apply -f ipaddresspool.yaml
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: production-pool
+  namespace: metallb-system
+spec:
+  addresses:
+    # Range of IPs to assign to LoadBalancer Services.
+    # These IPs must be routable on the network where your nodes live.
+    - 192.168.100.100-192.168.100.120
+    # You can also specify individual IPs or CIDR blocks:
+    # - 192.168.100.200/32
+  # autoAssign: true (default) means IPs are automatically picked from this pool.
+  # Set to false if you want to assign IPs only when explicitly requested.
+  autoAssign: true
+  # avoidBuggyIPs: true skips .0 and .255 addresses
+  avoidBuggyIPs: true
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: l2-advertisement
+  namespace: metallb-system
+spec:
+  # Restrict this advertisement to the production-pool only.
+  # If ipAddressPools is omitted, all pools are advertised.
+  ipAddressPools:
+    - production-pool
+  # Optionally restrict which nodes are allowed to announce this pool.
+  # If omitted, any node can be elected as the speaker.
+  # nodeSelectors:
+  #   - matchLabels:
+  #       kubernetes.io/role: worker
+  # interfaces:
+  #   - eth0   # Optionally restrict to a specific network interface

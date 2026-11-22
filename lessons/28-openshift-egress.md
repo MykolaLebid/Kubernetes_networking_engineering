@@ -406,6 +406,37 @@ oc logs -n openshift-ovn-kubernetes ovnkube-node-xxxxx -c ovn-controller \
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** Why must the EgressIP address be from the same subnet as the egress-assignable node, and what happens if you configure an IP from a different subnet?
+
+   <details><summary>Answer</summary>
+
+   OVN-Kubernetes implements EgressIP by adding the EgressIP as a secondary address to the node's physical NIC (via `ip addr add`). For this to be reachable by the upstream router, the IP must be within the subnet already associated with that NIC — otherwise the router has no route to deliver return traffic back to the EgressIP address, and the SNAT flows will never complete. If you configure an EgressIP from a foreign subnet, the OVN controller will fail to assign it and the EgressIP resource will show an error in its `status.conditions` field.
+
+   </details>
+
+2. **[Scenario question]** An EgressFirewall is applied to the `production` namespace with an Allow rule for a specific CIDR and a final Deny-all rule. After deployment, all pods fail DNS resolution. What rule is missing?
+
+   <details><summary>Answer</summary>
+
+   The EgressFirewall is missing an explicit Allow rule for DNS traffic before the Deny-all. Because EgressFirewall rules are evaluated in order and the first match wins, the Deny-all blocks UDP/TCP port 53 egress to `0.0.0.0/0` before the pods can reach CoreDNS. Add an `Allow` rule targeting `cidrSelector: 0.0.0.0/0` with `ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]` placed before the Deny-all rule. This is a mandatory addition to every EgressFirewall that uses a final deny.
+
+   </details>
+
+3. **[Practical question]** What command would you run to check which node is currently holding a specific EgressIP and whether both EgressIPs in an HA pair are assigned to different nodes?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   oc get egressip billing-egress -o wide
+   ```
+   The output shows the `ASSIGNED NODE` column for each EgressIP address; for HA you should see two rows with different node names. If both IPs are assigned to the same node or one shows no assignment, check whether at least two nodes are labeled `k8s.ovn.org/egress-assignable` with `oc get nodes -l k8s.ovn.org/egress-assignable`.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

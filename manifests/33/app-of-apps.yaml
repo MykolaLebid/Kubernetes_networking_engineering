@@ -1,0 +1,30 @@
+# app-of-apps.yaml
+# ArgoCD "App of Apps" pattern: a single Application that points to a Git
+# directory containing other Application manifests. When synced, ArgoCD will
+# discover and deploy all child applications. This is the recommended pattern
+# for managing many applications or environments with GitOps.
+# Apply with: kubectl apply -f app-of-apps.yaml -n argocd
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-of-apps
+  namespace: argocd
+  # Finalizer ensures child apps are deleted when this app is deleted
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/your-org/your-gitops-repo.git
+    targetRevision: main   # Branch, tag, or commit SHA
+    path: apps/            # Directory containing child Application manifests
+  destination:
+    server: https://kubernetes.default.svc   # In-cluster deployment
+    namespace: argocd     # Child Application objects live in the argocd namespace
+  syncPolicy:
+    automated:
+      prune: true       # Delete resources no longer in Git
+      selfHeal: true    # Revert manual changes to match Git state
+    syncOptions:
+      - CreateNamespace=true   # Create target namespaces if they don't exist

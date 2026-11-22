@@ -851,6 +851,37 @@ kubectl debug node/<gpu-node> -it --image=nicolaka/netshoot -- \
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** How does RDMA eliminate CPU overhead for GPU-to-GPU communication, and why does this matter for distributed training workloads?
+
+   <details><summary>Answer</summary>
+
+   RDMA (Remote Direct Memory Access) allows the NIC to read from and write directly into application memory (registered GPU or host buffers) using DMA, completely bypassing the CPU and OS kernel. In contrast, conventional TCP communication requires the CPU to copy data into a kernel socket buffer, process TCP/IP headers, and copy again into the application buffer — multiple CPU cycles and memory copies per message. For AllReduce operations in NCCL during distributed training, each rank exchanges gigabytes of gradient data per step; RDMA reduces that exchange latency from microseconds (TCP) to sub-microsecond, and frees GPU-local CPUs to stay focused on the training computation rather than network I/O.
+
+   </details>
+
+2. **[Scenario question]** An NCCL AllReduce operation falls back to TCP/IP instead of RDMA, dramatically slowing a multi-node GPU training job. What two things would you check first to diagnose whether RDMA is unavailable in the pod?
+
+   <details><summary>Answer</summary>
+
+   First, check the `NCCL_IB_DISABLE` environment variable inside the pod: if it is set to `1`, NCCL explicitly skips InfiniBand/RDMA. Set it to `0` or remove it. Second, check whether the InfiniBand device is present in the pod by running `ls /dev/infiniband/` — if no devices appear (such as `uverbs0` or `rdma_cm`), the SR-IOV virtual function or RDMA device was not passed through to the pod. Verify that the pod's resource request includes the RDMA resource (e.g. `rdma/hca_shared_devices_a: 1`) and that the RDMA device plugin DaemonSet is running.
+
+   </details>
+
+3. **[Practical question]** What command would you run inside a GPU training pod to verify that InfiniBand RDMA devices are available and accessible to the workload?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   kubectl exec -it gpu-training-0 -- ls /dev/infiniband/
+   ```
+   You should see character devices such as `uverbs0`, `rdma_cm`, and `issm0`. If the directory is empty or does not exist, the RDMA device was not allocated to the pod. Also run `kubectl exec -it gpu-training-0 -- ibv_devinfo` (if `libibverbs` is installed) to list all RDMA devices with their ports and GIDs — a device in `PORT_ACTIVE` state with a valid GID confirms end-to-end RDMA capability.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

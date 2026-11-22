@@ -1,0 +1,18 @@
+# default-deny-all.yaml
+# Applies a default-deny NetworkPolicy for both ingress and egress in a namespace.
+# Once applied, NO traffic (in or out) is allowed unless explicitly permitted by
+# additional NetworkPolicy objects. Apply this first, then layer allow policies on top.
+# WARNING: This will immediately break connectivity — apply allow-dns-egress.yaml next.
+# Apply with: kubectl apply -f default-deny-all.yaml -n <namespace>
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: default
+spec:
+  podSelector: {}   # Matches ALL pods in the namespace
+  policyTypes:
+    - Ingress
+    - Egress
+  # No ingress or egress rules — all traffic is denied

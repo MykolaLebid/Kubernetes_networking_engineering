@@ -475,6 +475,37 @@ metadata:
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** What is an `IngressClass` resource, and why must `ingressClassName` be explicitly specified on each Ingress object when multiple Ingress controllers are deployed in the same cluster?
+
+   <details><summary>Answer</summary>
+
+   An `IngressClass` is a cluster-scoped resource that maps a class name (e.g., `nginx`, `traefik`) to a specific Ingress controller. Each Ingress controller watches only for Ingress objects that reference its IngressClass. Without explicit `ingressClassName`, both controllers may try to process the same Ingress object — or neither will, if neither is configured as the default. Run `kubectl get ingressclass` to see installed classes and check the `ingressclass.kubernetes.io/is-default-class: "true"` annotation to identify the cluster default.
+
+   </details>
+
+2. **[Scenario question]** The NGINX Ingress controller returns a `502 Bad Gateway` error for a specific host/path rule. The Ingress object exists, the backend Service exists, and `kubectl get svc` shows the correct port. What is the most likely cause, and how do you confirm it?
+
+   <details><summary>Answer</summary>
+
+   A 502 means the NGINX controller reached the backend Service but got an error from the backend pod — most likely the pod is not ready, is crashing, or the Service's `targetPort` does not match the port the pod is actually listening on. Check `kubectl get endpoints <service-name>` to confirm pods are listed and their ports are correct. If endpoints show `<none>`, the pod selector in the Service does not match any pods. Check pod readiness with `kubectl get pods -l <selector> -o wide` and look at the READY column.
+
+   </details>
+
+3. **[Practical question]** What command would you run to view the full NGINX configuration that the ingress controller has generated from all deployed Ingress resources?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   kubectl exec -n ingress-nginx <controller-pod> -- nginx -T
+   ```
+   This dumps the complete `nginx.conf` including all `server` blocks, `location` blocks, and upstream definitions generated from Ingress resources. It is the definitive way to verify that path rewrites, SSL settings, timeout annotations, and backend proxy targets are configured as expected.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

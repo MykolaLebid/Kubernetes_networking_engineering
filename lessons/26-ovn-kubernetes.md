@@ -410,6 +410,39 @@ oc logs -n openshift-ovn-kubernetes $MASTER -c northd | tail -50
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** How does OVN-Kubernetes enforce NetworkPolicy without using iptables, and what is the control-plane path from a NetworkPolicy object to an enforced flow rule?
+
+   <details><summary>Answer</summary>
+
+   OVN-Kubernetes compiles NetworkPolicy objects into OVN ACLs stored in the Northbound database. `ovn-northd` reads those ACLs and translates them into logical flows in the Southbound database. Each node's `ovn-controller` reads the Southbound DB and programs OpenFlow rules into the OVS `br-int` bridge. The result is that packet filtering happens in the OVS kernel dataplane flow tables — `iptables -L` shows no NetworkPolicy rules because they are enforced entirely within OVS, not netfilter.
+
+   </details>
+
+2. **[Scenario question]** Cross-node pod-to-pod traffic fails but pods on the same node can communicate. What port and protocol must be open between all nodes, and how would you verify it is the issue?
+
+   <details><summary>Answer</summary>
+
+   OVN-Kubernetes uses Geneve tunnels on **UDP port 6081** for cross-node encapsulation. If a firewall or security group blocks UDP 6081 between nodes, intra-node traffic (which stays on the OVS bridge without tunneling) works fine while cross-node traffic silently drops. Verify by running `ss -ulnp | grep 6081` on a node to confirm the port is listening, and use `tcpdump -i eth0 -n udp port 6081` on both nodes to check whether tunnel packets are arriving. The fix is to open UDP 6081 bidirectionally between all node IPs.
+
+   </details>
+
+3. **[Practical question]** What command would you run to simulate a packet from pod-a to pod-b on port 8080 without sending real traffic, to see whether OVN ACLs would allow or drop it?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   oc exec -n openshift-ovn-kubernetes $MASTER -- \
+     ovn-trace <ls-name> \
+     'inport=="pod-a-port"; ip4; ip4.src=10.128.0.5; ip4.dst=10.128.1.5; tcp; tcp.dst=8080'
+   ```
+   The output shows each logical flow table that the simulated packet passes through; look for `output to pod-b-port` for an allow result or `Policy drop` / `drop` for a deny result, which tells you which ACL matched.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

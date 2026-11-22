@@ -1,0 +1,40 @@
+# sg-for-pods.yaml
+# AWS SecurityGroupPolicy for pod-level security groups (SGP) on EKS.
+# Normally all pods on a node share the node's security group. SGP assigns
+# dedicated EC2 security groups directly to individual pods, enabling
+# fine-grained network controls at the security group level.
+# Prerequisites:
+#   - EKS cluster with VPC CNI >= v1.11, ENABLE_POD_ENI=true on aws-node DaemonSet
+#   - Instance type must support branch ENIs (m5, c5, r5, etc. — not t3)
+#   - IAM permissions for VPC CNI to manage branch ENIs
+# Apply with: kubectl apply -f sg-for-pods.yaml
+---
+apiVersion: vpcresources.k8s.aws/v1beta1
+kind: SecurityGroupPolicy
+metadata:
+  name: backend-sg-policy
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: backend   # Applies to all pods with this label in this namespace
+  securityGroups:
+    groupIds:
+      - sg-0abc1234def56789b   # Dedicated security group for backend pods
+      # You can list multiple security groups; all are attached to the pod ENI
+      # - sg-0abc1234def56789c
+---
+# Example: SecurityGroupPolicy using service account selector instead of pod labels
+# Useful for assigning SGs to all pods run by a specific service account
+apiVersion: vpcresources.k8s.aws/v1beta1
+kind: SecurityGroupPolicy
+metadata:
+  name: db-access-sg-policy
+  namespace: default
+spec:
+  serviceAccountSelector:
+    matchLabels:
+      aws.amazonaws.com/role: db-access   # Pods with this SA label get RDS access SG
+  securityGroups:
+    groupIds:
+      - sg-0abc1234def56789d   # Security group that allows RDS access

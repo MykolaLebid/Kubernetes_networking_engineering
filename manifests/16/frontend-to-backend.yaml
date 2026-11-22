@@ -1,0 +1,47 @@
+# frontend-to-backend.yaml
+# Allows pods labeled app=frontend to send traffic to pods labeled app=backend
+# on port 8080. Demonstrates a typical microservice ingress policy pattern where
+# only designated callers can reach a service.
+# Apply with: kubectl apply -f frontend-to-backend.yaml -n <namespace>
+---
+# Policy on the backend: only accept ingress from frontend pods on port 8080
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-allow-from-frontend
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: frontend
+      ports:
+        - port: 8080
+          protocol: TCP
+---
+# Policy on the frontend: allow egress to backend pods on port 8080
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-allow-to-backend
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: frontend
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: backend
+      ports:
+        - port: 8080
+          protocol: TCP

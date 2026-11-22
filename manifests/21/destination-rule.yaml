@@ -1,0 +1,53 @@
+# destination-rule.yaml
+# Istio DestinationRule defining 'stable' and 'canary' subsets for the web Service.
+# Subsets are selected by pod labels (track: stable / track: canary).
+# Also enables connection pool tuning and outlier detection (circuit breaking).
+# Apply with: kubectl apply -f destination-rule.yaml
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: web-dr
+  namespace: default
+spec:
+  host: web   # Must match the Kubernetes Service name
+
+  # Traffic policy applies to all subsets unless overridden
+  trafficPolicy:
+    # Connection pool: limits concurrent connections and pending requests
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 10s
+      http:
+        h2UpgradePolicy: UPGRADE    # Prefer HTTP/2 for in-mesh traffic
+        http1MaxPendingRequests: 100
+        http2MaxRequests: 1000
+    # Outlier detection: circuit-break pods that return errors
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 30s
+      baseEjectionTime: 1m
+      maxEjectionPercent: 50
+    # TLS mode for traffic to this host (mTLS enforced by PeerAuthentication)
+    tls:
+      mode: ISTIO_MUTUAL
+
+  subsets:
+    - name: stable
+      labels:
+        track: stable   # Matches pods with label track=stable
+      trafficPolicy:
+        loadBalancer:
+          simple: ROUND_ROBIN
+
+    - name: canary
+      labels:
+        track: canary   # Matches pods with label track=canary
+      trafficPolicy:
+        loadBalancer:
+          simple: ROUND_ROBIN
+        # Optional: different connection pool for canary to limit blast radius
+        connectionPool:
+          tcp:
+            maxConnections: 20

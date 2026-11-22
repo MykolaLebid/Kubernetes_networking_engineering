@@ -1,0 +1,32 @@
+# allow-monitoring.yaml
+# Allows Prometheus (running in the monitoring namespace with label app=prometheus)
+# to scrape metrics from pods labeled app=backend in the default namespace on port 9090.
+# This is a cross-namespace NetworkPolicy pattern that is common in production clusters.
+# Apply with: kubectl apply -f allow-monitoring.yaml -n default
+---
+# Allow ingress to backend pods from Prometheus in the monitoring namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-scrape
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: backend   # Target: pods to be scraped
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        # Only allow scraping from pods in the 'monitoring' namespace
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - port: 9090      # Change to your app's metrics port if different
+          protocol: TCP
+        - port: 8080      # Also allow scraping on the app port if metrics are there
+          protocol: TCP

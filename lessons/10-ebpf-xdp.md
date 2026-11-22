@@ -488,6 +488,37 @@ grep -E "CONFIG_BPF|CONFIG_XDP|CONFIG_NET_CLS_BPF" /boot/config-$(uname -r)
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** What is the difference between XDP and TC hook eBPF programs in terms of where they execute in the network stack, and why does Cilium use TC hooks rather than XDP for per-pod network policy enforcement?
+
+   <details><summary>Answer</summary>
+
+   XDP runs at the NIC driver level before the kernel allocates an `sk_buff` structure — it is the earliest and fastest hook but only has access to raw packet bytes. TC (Traffic Control) hooks run after `sk_buff` allocation, giving full access to packet metadata, socket information, and the ability to redirect packets to other interfaces. Cilium uses TC hooks on each pod's `lxc` veth interface because policy enforcement requires matching packets by identity labels stored in BPF maps and redirecting accepted traffic — operations that need the richer context available at the TC layer. XDP is used by Cilium for DDoS mitigation and node-level L4 load balancing on the physical NIC.
+
+   </details>
+
+2. **[Scenario question]** After deploying Cilium with `kubeProxyReplacement=strict`, running `cilium bpf lb list` shows no service entries even though `kubectl get svc` shows many services. What is the most likely cause?
+
+   <details><summary>Answer</summary>
+
+   The most likely cause is that the BPF filesystem is not mounted at `/sys/fs/bpf`. Cilium stores its BPF maps (including the service LB map `cilium_lb4_services`) on the BPF filesystem — if it is not mounted, maps cannot be pinned and service entries are lost. Verify with `mount | grep bpf`. A secondary cause is that kube-proxy is still running alongside Cilium, conflicting with the eBPF service maps. Check with `cilium status | grep KubeProxyReplacement` to confirm it shows `Strict`.
+
+   </details>
+
+3. **[Practical question]** What command would you run to list all eBPF programs currently loaded on a node and identify which ones belong to Cilium?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   bpftool prog list | grep cilium
+   ```
+   Each entry shows the program ID, type (e.g., `sched_cls` for TC, `xdp`), and name. On a node with many pods, Cilium loads hundreds of programs — roughly two TC programs per pod interface (ingress and egress). You can also run `bpftool net list` to see programs attached to specific network interfaces.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

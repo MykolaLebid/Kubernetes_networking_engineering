@@ -394,6 +394,37 @@ kubectl exec -n kube-system coredns-xxxxx -- \
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** Why does `ndots:5` in a pod's `/etc/resolv.conf` cause up to 3 extra DNS queries for an external hostname like `api.example.com`, and what does each extra query attempt?
+
+   <details><summary>Answer</summary>
+
+   `ndots:5` means any hostname with fewer than 5 dots is expanded against each search domain before the absolute lookup is tried. `api.example.com` has 2 dots (fewer than 5), so the resolver first tries `api.example.com.default.svc.cluster.local` (gets NXDOMAIN, ~30ms), then `api.example.com.svc.cluster.local` (NXDOMAIN, ~30ms), then `api.example.com.cluster.local` (NXDOMAIN, ~30ms), and finally `api.example.com.` (the absolute name, which succeeds). That is 3 wasted round trips adding 90–300ms of latency before the external name resolves.
+
+   </details>
+
+2. **[Scenario question]** An application pod is making external API calls and experiencing 200–300ms of extra latency on every new connection. No network errors appear. DNS queries eventually succeed. What is the most likely cause, and what is the simplest fix that does not require changing application code?
+
+   <details><summary>Answer</summary>
+
+   The cause is `ndots:5` triggering search-domain expansion for external hostnames that have fewer than 5 dots. The simplest fix is to set `ndots:1` in the pod's `dnsConfig` — this means only hostnames with zero dots trigger search expansion, and `api.example.com` resolves directly on the first query. Add to the pod spec: `spec.dnsConfig.options: [{name: ndots, value: "1"}]`. Alternatively, use fully-qualified domain names with a trailing dot (`api.example.com.`) which bypass the ndots check entirely.
+
+   </details>
+
+3. **[Practical question]** What command would you run to verify that NodeLocal DNSCache is running on every node in the cluster?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   kubectl get pods -n kube-system -l k8s-app=node-local-dns -o wide
+   ```
+   There should be one pod per node, all in Running state. The `-o wide` flag shows which node each pod is on. Additionally, verify that pods on those nodes have `nameserver 169.254.20.10` in their `/etc/resolv.conf` by running `kubectl exec <pod> -- cat /etc/resolv.conf`.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

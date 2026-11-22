@@ -395,6 +395,37 @@ kubectl get pods -o wide -l app=web   # see which nodes have pods
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** Why does `externalTrafficPolicy: Local` preserve the real client IP while `externalTrafficPolicy: Cluster` does not?
+
+   <details><summary>Answer</summary>
+
+   With `Cluster` policy, any node can receive the traffic and kube-proxy SNATs the source IP to the node's own IP before forwarding to a pod on a different node — the original client IP is lost at that SNAT step. With `Local` policy, the cloud LB's health check only marks nodes with ready pods as healthy, so traffic is only sent to nodes that already have a pod; kube-proxy does not SNAT because no cross-node hop is needed. The trade-off is that `Local` can cause uneven distribution if pods are not spread across all nodes.
+
+   </details>
+
+2. **[Scenario question]** An AWS NLB is working but pod logs show the source IP as the EC2 node IP, not the original client IP. Which annotation is most likely misconfigured?
+
+   <details><summary>Answer</summary>
+
+   The NLB is using `target-type: instance` mode, which routes through NodePort and kube-proxy, causing SNAT. Switch to `service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"` so the NLB routes directly to pod IPs (bypassing NodePort). You may also need `service.beta.kubernetes.io/aws-load-balancer-target-group-attributes: "preserve_client_ip.enabled=true"` to ensure the NLB passes the client IP through to the pod.
+
+   </details>
+
+3. **[Practical question]** What command would you run to watch the progression of an EXTERNAL-IP being assigned to a LoadBalancer service?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   kubectl get svc web -w
+   ```
+   Watch for the `EXTERNAL-IP` column to change from `<pending>` to an actual IP or DNS hostname; this transition typically takes 30–120 seconds and is driven by the Cloud Controller Manager calling the cloud provider API to provision the load balancer.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

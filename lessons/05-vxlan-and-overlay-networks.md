@@ -437,6 +437,37 @@ ip -s link show vxlan10
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** VXLAN adds 50 bytes of overhead per packet. Explain where those 50 bytes come from, and what pod MTU you must configure when the physical NIC MTU is 1500 bytes to prevent silent fragmentation.
+
+   <details><summary>Answer</summary>
+
+   The 50-byte overhead breaks down as: outer Ethernet header (14 bytes) + outer IP header (20 bytes) + outer UDP header (8 bytes) + VXLAN header (8 bytes) = 50 bytes total. With a physical NIC MTU of 1500 bytes, the maximum pod payload is 1500 − 50 = **1450 bytes**. Pod interfaces must be configured with MTU 1450 — if left at the default 1500, any packet larger than 1450 bytes will either be fragmented (degrading performance) or silently dropped if the DF (Don't Fragment) bit is set.
+
+   </details>
+
+2. **[Scenario question]** Small HTTP requests between pods on different nodes succeed consistently, but large file transfers fail or hang partway through. VXLAN is in use with default configuration. No error messages appear in the application logs. What is the most likely cause, and how do you confirm it?
+
+   <details><summary>Answer</summary>
+
+   The most likely cause is an MTU mismatch — pod interfaces are configured at MTU 1500 but should be 1450 for VXLAN. Small packets fit within the limit, but large packets exceed 1450 bytes, causing fragmentation or silent drops when the DF bit is set. Confirm with `kubectl exec -- ping -M do -s 1422 <other-pod-ip>` — a payload of 1422 bytes + 28 bytes (ICMP + IP headers) = 1450, which should succeed; `ping -M do -s 1452` should fail or return "Frag needed."
+
+   </details>
+
+3. **[Practical question]** What command would you run to inspect the VXLAN FDB (Forwarding Database) on a Flannel node and verify that the remote VTEP for another node has been populated?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   bridge fdb show dev flannel.1
+   ```
+   Look for entries mapping remote node VTEP MAC addresses to their node IPs (`dst` field). An entry like `00:00:00:00:00:00 dst 192.168.1.20 self permanent` is the flood entry for Node B. If the FDB is empty or missing entries for known nodes, the flanneld daemon is not syncing from the Kubernetes API.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Type | What you practice |

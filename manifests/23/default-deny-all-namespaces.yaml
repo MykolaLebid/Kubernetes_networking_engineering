@@ -1,0 +1,22 @@
+# default-deny-all-namespaces.yaml
+# Calico GlobalNetworkPolicy that denies all ingress and egress for every pod
+# in the cluster, across all namespaces. This is the cluster-wide equivalent of
+# a Kubernetes NetworkPolicy default-deny. Apply with extreme caution — it will
+# break all pod communication until allow policies are layered on top.
+# Prerequisites: Calico CNI with GlobalNetworkPolicy CRD installed
+# Apply with: kubectl apply -f default-deny-all-namespaces.yaml
+---
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: default-deny-all
+spec:
+  # Order: lower number = higher precedence. Use a high number so specific
+  # allow policies (lower order) take precedence over this deny.
+  order: 1000
+  selector: "all()"   # Applies to every workload endpoint in the cluster
+  types:
+    - Ingress
+    - Egress
+  # No ingress or egress rules — all traffic is denied by default
+  # Exceptions can be added by creating GlobalNetworkPolicy objects with order < 1000

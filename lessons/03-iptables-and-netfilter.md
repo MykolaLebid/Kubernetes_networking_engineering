@@ -378,6 +378,37 @@ watch -n1 'iptables -t nat -L KUBE-SERVICES -v -n | head -30'
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** At which Netfilter hook does kube-proxy install its DNAT rules for ClusterIP services, and why must DNAT happen at that specific hook rather than at the FORWARD hook?
+
+   <details><summary>Answer</summary>
+
+   kube-proxy installs DNAT rules in the `nat` table at both the `PREROUTING` hook (for traffic arriving from outside the node) and the `OUTPUT` hook (for traffic originating from local pods). DNAT must happen before the routing decision — if the kernel looked up a route for the original ClusterIP (e.g., `10.96.42.10`), it would find no route for a virtual IP. By rewriting the destination to a real pod IP at PREROUTING, the subsequent routing lookup correctly finds a path to `10.244.x.x`.
+
+   </details>
+
+2. **[Scenario question]** A pod can reach the internet but cannot communicate with a ClusterIP service at `10.96.42.10`. The service has two healthy endpoints and `kubectl get endpoints` shows their IPs. `iptables -t nat -L KUBE-SERVICES` shows no entry for `10.96.42.10`. What is the most likely cause?
+
+   <details><summary>Answer</summary>
+
+   The kube-proxy rules are missing, most likely because kube-proxy is not running on that node or its iptables sync period has not fired since the service was created. Check `kubectl get pods -n kube-system -l k8s-app=kube-proxy` to verify the pod is running. If kube-proxy is running but rules are absent, check for `bridge-nf-call-iptables=0` or the `br_netfilter` module not being loaded — without these, kube-proxy rules cannot intercept bridged pod traffic.
+
+   </details>
+
+3. **[Practical question]** What command would you run to inspect the per-service iptables load-balancing chain for a ClusterIP service and see the DNAT rules for each backend endpoint?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   iptables -t nat -L KUBE-SERVICES -n | grep 10.96.42.10
+   ```
+   This shows the `KUBE-SVC-XXXX` chain name for the service. Then run `iptables -t nat -L KUBE-SVC-XXXX -n` to see the probabilistic load-balancing rules, and `iptables -t nat -L KUBE-SEP-YYYY -n` to see the DNAT rule for each individual endpoint.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Type | What you practice |

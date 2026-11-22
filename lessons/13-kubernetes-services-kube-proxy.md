@@ -413,6 +413,37 @@ annotations:
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** How does kube-proxy implement probabilistic load balancing across multiple endpoints for a ClusterIP service using iptables, and what chain structure does it use?
+
+   <details><summary>Answer</summary>
+
+   kube-proxy creates a three-level chain structure: `KUBE-SERVICES` matches the destination ClusterIP and port, jumping to a per-service `KUBE-SVC-<hash>` chain. Inside that chain, each endpoint gets a `KUBE-SEP-<hash>` rule with a probabilistic `statistic mode random probability` match — the first endpoint gets `0.33`, the second gets `0.5` (of remaining), and the last gets `1.0` (all remaining traffic). Each `KUBE-SEP-<hash>` chain contains the actual `DNAT` rule rewriting the destination to the pod's IP and port (e.g., `DNAT tcp to 10.244.0.5:8080`).
+
+   </details>
+
+2. **[Scenario question]** A ClusterIP service with two healthy endpoints is unreachable from pods on one specific node, but works fine from pods on all other nodes. `kubectl get endpoints` shows both pod IPs. What is the first thing you should check on the failing node?
+
+   <details><summary>Answer</summary>
+
+   Check whether the kube-proxy iptables rules exist on that specific node with `iptables -t nat -L KUBE-SERVICES -n | grep <cluster-ip>`. If the KUBE-SERVICES chain is missing entries for the service, kube-proxy on that node may have failed to sync. Check `kubectl get pods -n kube-system -l k8s-app=kube-proxy` for the node's kube-proxy pod status, and inspect its logs with `kubectl logs -n kube-system <kube-proxy-pod>` for sync errors. Also verify that `net.bridge.bridge-nf-call-iptables=1` is set on the failing node.
+
+   </details>
+
+3. **[Practical question]** What command would you run to find all iptables rules associated with a specific ClusterIP service (e.g., `10.96.42.10`) and see the DNAT targets for its endpoints?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   iptables -t nat -S | grep 10.96.42.10
+   ```
+   This shows the `KUBE-SVC-<hash>` chain name. Then run `iptables -t nat -L KUBE-SVC-<hash> -n` to see the per-endpoint probabilistic rules, and `iptables -t nat -L KUBE-SEP-<hash> -n` for each endpoint chain to confirm the DNAT target IP and port.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

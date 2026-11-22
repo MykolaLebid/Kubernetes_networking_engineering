@@ -412,6 +412,37 @@ oc adm top nodes                                     # node resource pressure?
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** Why does OpenShift manage OVN-Kubernetes through the Cluster Network Operator (CNO) rather than allowing administrators to edit CNI configuration files directly on nodes?
+
+   <details><summary>Answer</summary>
+
+   The CNO acts as the single source of truth for network configuration: it continuously reconciles the `network.operator.openshift.io/cluster` custom resource against the actual state of OVN pods, ConfigMaps, and node settings. If you edit OVS or OVN files directly on a node, the CNO's next reconciliation loop will overwrite your changes. This design ensures consistency across all nodes, makes upgrades safe (the CNO knows how to roll out new OVN versions), and prevents configuration drift that would be impossible to audit through GitOps.
+
+   </details>
+
+2. **[Scenario question]** A pod in `namespace-a` cannot reach a pod in `namespace-b` even though both pods are running. No custom NetworkPolicies have been created. What three auto-created NetworkPolicies does OpenShift place in every new namespace, and which one is preventing this traffic?
+
+   <details><summary>Answer</summary>
+
+   OpenShift automatically creates `allow-same-namespace` (allows traffic within the same namespace), `allow-from-openshift-ingress` (allows the HAProxy router to reach pods), and `allow-from-openshift-monitoring` (allows Prometheus scraping). The policy preventing cross-namespace traffic is the absence of any explicit allow between namespaces — `allow-same-namespace` only permits intra-namespace traffic, and there is no auto-created policy that allows arbitrary cross-namespace traffic. Add a NetworkPolicy in `namespace-b` with a `namespaceSelector` allowing ingress from `namespace-a`.
+
+   </details>
+
+3. **[Practical question]** What command would you run to check the current CNI type, pod CIDR, and service CIDR of an OpenShift cluster?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   oc get network.config.openshift.io cluster -o yaml
+   ```
+   Look for `status.networkType` (should be `OVNKubernetes`), `status.clusterNetwork[].cidr` (default `10.128.0.0/14` with `/23` host prefix), and `status.serviceNetwork` (default `172.30.0.0/16`); these values are set at install time and cannot be changed post-install.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

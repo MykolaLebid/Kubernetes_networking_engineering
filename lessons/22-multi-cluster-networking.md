@@ -474,6 +474,37 @@ subctl diagnose all   # comprehensive health check
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** What DNS suffix does the Multi-Cluster Services (MCS) API use for cross-cluster service discovery, and what two objects must exist before the DNS name resolves?
+
+   <details><summary>Answer</summary>
+
+   Cross-cluster services resolve under the `clusterset.local` domain — for example, `web.default.svc.clusterset.local`. Two objects must exist: a `ServiceExport` in the source cluster (which signals that the service should be shared) and a corresponding `ServiceImport` in the destination cluster (which the MCS controller creates automatically). Without the ServiceExport in the originating cluster, the MCS controller never notifies other clusters, so the ServiceImport and DNS record are never created.
+
+   </details>
+
+2. **[Scenario question]** A Cilium Cluster Mesh shows `DISCONNECTED` between cluster-a and cluster-b even though both clusters are running. What port and protocol should you verify is open between nodes?
+
+   <details><summary>Answer</summary>
+
+   The Cluster Mesh API server uses TCP port 2379 (etcd) for the clustermesh-apiserver mutual TLS connection between clusters. If a firewall or security group blocks TCP 2379 between the node IPs of the two clusters, the mesh will show DISCONNECTED. Run `kubectl logs -n kube-system ds/clustermesh-apiserver` to see TLS or connection refused errors, and open TCP 2379 bidirectionally between the clusters' node CIDR ranges.
+
+   </details>
+
+3. **[Practical question]** What command would you run to check whether two Cilium Cluster Mesh-connected clusters are CONNECTED and how many global services are shared?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   cilium clustermesh status
+   ```
+   Look for lines showing each connected cluster with status `CONNECTED` and a count of `Global services: N`; a `DISCONNECTED` or `PENDING` state indicates an API server reachability or certificate issue that needs further investigation.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

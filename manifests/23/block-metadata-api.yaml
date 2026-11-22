@@ -1,0 +1,46 @@
+# block-metadata-api.yaml
+# NetworkPolicy that blocks pod egress to the cloud provider metadata API
+# endpoint (169.254.169.254). This prevents pods from stealing instance
+# credentials or reading instance metadata, which is a common attack vector
+# for cloud credential exfiltration (SSRF via metadata API).
+# This policy should be applied in every namespace in the cluster.
+# Apply with: kubectl apply -f block-metadata-api.yaml -n <namespace>
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: block-metadata-api
+  namespace: default   # Apply in each namespace (or use Calico GlobalNetworkPolicy)
+spec:
+  podSelector: {}   # Applies to all pods in the namespace
+  policyTypes:
+    - Egress
+  egress:
+    # Allow all egress EXCEPT to the metadata API.
+    # This rule allows everything that is NOT 169.254.169.254.
+    # Note: Kubernetes NetworkPolicy cannot do "deny except" directly —
+    # pair this with a broad allow-all-egress policy that has lower precedence,
+    # OR use Calico's deny rule directly (see GlobalNetworkPolicy below).
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.169.254/32   # AWS/GCP/Azure instance metadata endpoint
+---
+# Calico alternative: explicit deny with higher precedence
+# (Requires Calico and uses order field for precedence)
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: deny-metadata-api
+  namespace: default
+spec:
+  order: 10   # Lower order = higher precedence than default allow rules
+  selector: "all()"
+  types:
+    - Egress
+  egress:
+    - action: Deny
+      destination:
+        nets:
+          - 169.254.169.254/32   # Cloud metadata API (AWS IMDSv1/v2, GCP, Azure)

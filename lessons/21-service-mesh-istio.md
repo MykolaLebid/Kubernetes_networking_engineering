@@ -539,6 +539,37 @@ istioctl experimental envoy-stats <pod>
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** What is the difference between `PeerAuthentication` modes `PERMISSIVE` and `STRICT`, and when should each be used?
+
+   <details><summary>Answer</summary>
+
+   `PERMISSIVE` mode accepts both mTLS-encrypted connections and plain-text connections, which allows non-injected clients (such as external services or pods without sidecars) to still communicate during a migration. `STRICT` mode rejects all plain-text — only connections with valid SPIFFE X.509 certificates are accepted. Use `PERMISSIVE` during the rollout period while injecting sidecars into all workloads, then switch to `STRICT` once every pod in the namespace has an injected Envoy sidecar to guarantee end-to-end mTLS.
+
+   </details>
+
+2. **[Scenario question]** After applying `PeerAuthentication` with `mode: STRICT` to a namespace, several services start returning 503 errors. What is the most likely cause?
+
+   <details><summary>Answer</summary>
+
+   Some caller pods are missing the Istio sidecar — either their namespace does not have the `istio-injection=enabled` label or they were created before the label was applied. Without a sidecar, those pods send plain-text requests that STRICT mode rejects. Run `istioctl authn tls-check <pod>.default` to identify CONFLICT rows and `kubectl describe pod <pod> | grep istio-proxy` to confirm whether the sidecar was injected. The fix is to label the namespace and restart affected pods to trigger injection.
+
+   </details>
+
+3. **[Practical question]** What command would you run to verify that mTLS is active and in STRICT mode between a specific pod and the `web` service?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   istioctl authn tls-check <pod-name>.default
+   ```
+   Look for the row `web.default.svc.cluster.local:80` and confirm the `STATUS` column shows `OK` with both `SERVER` and `CLIENT` columns showing `STRICT`; a `CONFLICT` status means one side is not enforcing mTLS.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

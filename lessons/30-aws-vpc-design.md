@@ -537,6 +537,38 @@ aws logs filter-log-events \
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** Why does the EKS documentation recommend at least /22 subnets per AZ for production clusters, and how does the IP planning formula account for pod IPs?
+
+   <details><summary>Answer</summary>
+
+   The VPC CNI assigns one real VPC IP per pod (not just per node), so a typical medium cluster with 10 nodes × 29 pods each in one AZ already needs 290 pod IPs plus 10 node IPs plus buffer. A /24 subnet provides only 251 usable IPs (259 minus 5 AWS-reserved), which is exhausted quickly. A /22 provides 1,019 usable IPs. The planning formula is: (nodes_per_AZ × 1) + (pods_per_node × nodes_per_AZ) + (LBs × 1) + 20% buffer — always round up to the next power-of-two subnet that accommodates the result.
+
+   </details>
+
+2. **[Scenario question]** A new LoadBalancer Service is stuck in `<pending>` on EKS even though the VPC and subnets exist. The AWS Load Balancer Controller logs show "No subnets found." What subnet tag is most likely missing?
+
+   <details><summary>Answer</summary>
+
+   The subnet is missing the EKS discovery tag. For internal NLBs the required tag is `kubernetes.io/role/internal-elb=1`; for internet-facing NLBs the tag is `kubernetes.io/role/elb=1`. Both internal and external subnets also need `kubernetes.io/cluster/<cluster-name>=shared` (or `owned`). Without these tags the AWS Load Balancer Controller cannot discover which subnets to place the load balancer in. Add the tags with `aws ec2 create-tags --resources <subnet-id> --tags Key=kubernetes.io/role/internal-elb,Value=1`.
+
+   </details>
+
+3. **[Practical question]** What command would you run to check how many IP addresses are still available in a specific EKS subnet?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   aws ec2 describe-subnets --subnet-ids <subnet-id> \
+     --query 'Subnets[0].AvailableIpAddressCount'
+   ```
+   If this number is below 20% of the subnet's total capacity (for example, below 200 for a /22), plan to expand the subnet or add a secondary CIDR (such as `100.64.0.0/16`) before the cluster runs out of IPs and node groups fail to launch.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

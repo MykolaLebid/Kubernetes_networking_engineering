@@ -494,6 +494,37 @@ aws ec2 describe-vpn-connections \
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** Why does VPC Peering become unmanageable for 10 or more VPCs, and what AWS service solves this at scale?
+
+   <details><summary>Answer</summary>
+
+   VPC Peering is non-transitive: each pair of VPCs requires a separate peering connection and route table entry in both VPCs. For N VPCs the number of connections grows as N×(N-1)/2 — a full mesh of 10 VPCs requires 45 peering connections, and 20 VPCs requires 190. Transit Gateway replaces this with a hub-and-spoke model: each VPC attaches to the Transit Gateway once, and the TGW routes between all attachments. Route tables on the TGW can also isolate environments (dev/prod) without separate peering connections.
+
+   </details>
+
+2. **[Scenario question]** Cross-cluster pod-to-pod traffic fails even though VPC routes and security groups are correctly configured. Pods on the same node can communicate, but traffic destined for another node's pod is dropped. What AWS EC2-level setting is likely missing?
+
+   <details><summary>Answer</summary>
+
+   Source/destination checking is enabled on the EC2 instance's ENI by default. This check causes the hypervisor to drop any packet where the source or destination IP is not one of the ENI's own IPs — but pod IPs are secondary IPs or prefix-delegated CIDRs, not the primary ENI IP. For nodes that act as routers (self-managed Kubernetes without VPC CNI), you must disable source/destination checking on each node's primary ENI: `aws ec2 modify-instance-attribute --instance-id <id> --no-source-dest-check`. EKS with VPC CNI handles this automatically.
+
+   </details>
+
+3. **[Practical question]** What AWS CLI command would you run to list all Transit Gateway VPC attachments and their current states to verify that all expected VPCs are attached and active?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   aws ec2 describe-transit-gateway-vpc-attachments --output table
+   ```
+   Look for `State: available` on each attachment. A state of `pending` means the attachment was just created and the TGW route table may not yet have a route to that VPC; a state of `failed` indicates a permissions or subnet issue.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

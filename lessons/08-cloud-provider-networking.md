@@ -510,6 +510,39 @@ gcloud compute instances describe $NODE --format='value(networkInterfaces[0].ali
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** How does the AWS VPC CNI plugin assign IP addresses to pods differently from an overlay-based CNI like Flannel, and what hardware resource on the EC2 instance limits the maximum number of pods per node?
+
+   <details><summary>Answer</summary>
+
+   The AWS VPC CNI plugin assigns pods real VPC IP addresses by using secondary private IPs on Elastic Network Interfaces (ENIs) attached to the EC2 instance. Each secondary IP becomes a pod IP, and routes inside the VPC fabric deliver traffic directly — no VXLAN or overlay tunnel is needed. The limiting factor is the number of ENIs the instance type supports and the number of secondary IPs per ENI. For example, an `m5.xlarge` supports 4 ENIs × 15 IPs/ENI = 60 total IPs, minus 1 per ENI for the primary node IP = 44 maximum pod IPs.
+
+   </details>
+
+2. **[Scenario question]** Pods on an EKS node are stuck in `ContainerCreating` with no IP assigned. `kubectl describe node` shows the node is Ready. The VPC CNI DaemonSet pods are running. What is the most likely cause?
+
+   <details><summary>Answer</summary>
+
+   The most likely cause is that the ENI warm IP pool is exhausted — the node has used all secondary IPs available on its attached ENIs and cannot allocate a new IP for the new pod. Check with `kubectl describe node <node> | grep -i eni` or inspect the VPC CNI logs (`kubectl logs -n kube-system -l k8s-app=aws-node`). The fix is either to scale to a larger instance type with more ENIs, or to enable prefix delegation (`ENABLE_PREFIX_DELEGATION=true`) which allocates `/28` blocks of 16 IPs at a time instead of single IPs, increasing pod density.
+
+   </details>
+
+3. **[Practical question]** What command would you run to find which ENI on an EC2 instance owns a specific pod IP address (e.g., `10.0.1.21`)?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   aws ec2 describe-network-interfaces \
+     --filters "Name=private-ip-address,Values=10.0.1.21" \
+     --query 'NetworkInterfaces[0].{ENI:NetworkInterfaceId,Node:PrivateIpAddress}'
+   ```
+   The output shows the ENI ID that holds this secondary IP. This is useful for correlating pod IPs to ENI security group rules when debugging connectivity issues at the VPC level.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Type | What you practice |

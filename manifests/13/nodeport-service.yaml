@@ -1,0 +1,26 @@
+# nodeport-service.yaml
+# Exposes a Service on a static port (30080) on every cluster node's IP address.
+# External traffic can reach the pods via <NodeIP>:30080. Useful for direct
+# node-level access or when a LoadBalancer is not available.
+# Apply with: kubectl apply -f nodeport-service.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-nodeport
+  namespace: default
+  labels:
+    app: web
+spec:
+  type: NodePort
+  selector:
+    app: web
+  ports:
+    - name: http
+      port: 80          # ClusterIP port (in-cluster)
+      targetPort: 80    # Port on the pod
+      nodePort: 30080   # Port exposed on every node (30000-32767)
+      protocol: TCP
+  # externalTrafficPolicy: Local preserves source IP but may cause uneven load
+  # across nodes. Remove to allow kube-proxy to load-balance across all nodes.
+  externalTrafficPolicy: Local

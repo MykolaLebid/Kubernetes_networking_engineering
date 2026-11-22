@@ -708,6 +708,37 @@ kubectl auth can-i create networkpolicies \
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** Why must network CRDs (such as `Gateway` or `NetworkPolicy` CRDs) be deployed in an earlier sync wave than the resources that use them, and what wave number is typically assigned to CRDs?
+
+   <details><summary>Answer</summary>
+
+   ArgoCD applies resources in wave order and waits for each wave's resources to become healthy before proceeding to the next wave. If a `Gateway` CRD is deployed in wave 0 at the same time as a `Gateway` object, Kubernetes will reject the `Gateway` object with "no matches for kind" because the CRD hasn't been registered yet. CRDs are typically assigned wave `-1` using the annotation `argocd.argoproj.io/sync-wave: "-1"` so they are created and established first. CNI plugins go in wave 0, and higher-level network resources (NetworkPolicy, Gateways, Routes) go in wave 1 or higher.
+
+   </details>
+
+2. **[Scenario question]** An ArgoCD Application syncs a default-deny NetworkPolicy into the `argocd` namespace in wave 0. Mid-sync, the ArgoCD application controller pod can no longer reach the managed cluster's API server and the sync stalls permanently. What went wrong and how do you prevent it?
+
+   <details><summary>Answer</summary>
+
+   The default-deny NetworkPolicy was applied before the ArgoCD allow-ingress policy that permits the application controller to reach the cluster API. As a result, ArgoCD blocked its own control-plane connectivity mid-sync. The fix is to place the ArgoCD allow-ingress NetworkPolicy in wave `-1` or the same wave as the default-deny, so both are applied atomically before ArgoCD's connectivity window closes. Alternatively, place any NetworkPolicy that affects the `argocd` namespace in a separate Application that runs before the main security-hardening Application.
+
+   </details>
+
+3. **[Practical question]** What ArgoCD CLI command would you run to preview the diff between what ArgoCD has cached as the live state and what the Git repository currently contains for a specific Application, without triggering a sync?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   argocd app diff network-policies
+   ```
+   The output shows a standard diff (minus for live, plus for desired) for every resource in the Application. Use this before syncing to confirm that only intended changes will be applied, and to catch accidental drift between what Git says and what is currently running in the cluster.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

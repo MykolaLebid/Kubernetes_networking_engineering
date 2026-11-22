@@ -1,0 +1,141 @@
+# sync-wave-example.yaml
+# ArgoCD Sync Waves ensure resources are applied in a controlled order.
+# Lower wave numbers are applied first. ArgoCD waits for all resources in
+# wave N to become healthy before proceeding to wave N+1.
+# This example demonstrates the recommended order for network-aware GitOps:
+#   Wave -10: Namespaces and CRDs
+#   Wave  0:  CNI configs, storage classes (infrastructure)
+#   Wave  5:  Network policies (security layer)
+#   Wave 10:  Core application workloads
+#   Wave 15:  Dependent/downstream services
+# Apply with: kubectl apply -f sync-wave-example.yaml
+---
+# Wave -10: Create the namespace first
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: production
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+---
+# Wave 0: Apply CNI configuration (e.g., Calico IP pool)
+apiVersion: projectcalico.org/v3
+kind: IPPool
+metadata:
+  name: production-ippool
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  cidr: 10.244.0.0/16
+  ipipMode: Never
+  natOutgoing: true
+  nodeSelector: "all()"
+---
+# Wave 5: Default-deny NetworkPolicy (before workloads are created)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: production
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Wave 5: Allow DNS egress (must be in same wave or lower than deny policy)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: production
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+---
+# Wave 10: Main application Deployment (after network policies are enforced)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+  namespace: production
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web-app
+  template:
+    metadata:
+      labels:
+        app: web-app
+    spec:
+      containers:
+        - name: app
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+---
+# Wave 10: Service for the application
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-app
+  namespace: production
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  selector:
+    app: web-app
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+# Wave 15: Ingress (depends on Service being ready)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web-app-ingress
+  namespace: production
+  annotations:
+    argocd.argoproj.io/sync-wave: "15"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-app
+                port:
+                  number: 80

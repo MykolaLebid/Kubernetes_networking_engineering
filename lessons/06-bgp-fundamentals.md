@@ -427,6 +427,37 @@ BGP is typically not available in public cloud VPCs — cloud providers abstract
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** What is a BGP Route Reflector, and at what cluster size does Calico's documentation recommend switching from a full BGP mesh to a Route Reflector topology?
+
+   <details><summary>Answer</summary>
+
+   In a full BGP mesh every node peers with every other node, resulting in n*(n-1)/2 sessions — 4,950 sessions in a 100-node cluster. A Route Reflector (RR) is a dedicated node that receives BGP routes from all peers and re-advertises (reflects) them back out to all other peers. This reduces each non-RR node to only 2–4 sessions (one per RR). Calico recommends switching to RR topology at approximately 50 nodes, where the mesh overhead begins causing BIRD CPU spikes on route churn.
+
+   </details>
+
+2. **[Scenario question]** A Calico node's BGP session is stuck in the `Active` state and never transitions to `Established`. The peer IP is reachable via `ping`. What is the most likely cause, and what command confirms it?
+
+   <details><summary>Answer</summary>
+
+   The most likely cause is TCP port 179 being blocked by a firewall or security group between the nodes. BGP uses TCP port 179 for session establishment — ICMP (ping) may work while TCP 179 is blocked. Confirm with `telnet <peer-ip> 179`; if it hangs or refuses, the port is blocked. A secondary cause is an ASN mismatch in the BGP peer configuration, which would cause the OPEN message to be rejected immediately after TCP connects.
+
+   </details>
+
+3. **[Practical question]** What command would you run on a Calico node to verify that all BGP sessions are in the `Established` state?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   calicoctl node status
+   ```
+   The output shows each BGP peer, their IP address, ASN, and session state. All peers should show `Established` in the `INFO` column. Any peer showing `Active`, `Connect`, or `Idle` indicates a problem. You can also run `kubectl exec -n calico-system calico-node-xxxxx -- birdcl show protocols` to see the raw BIRD BGP protocol states.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Type | What you practice |

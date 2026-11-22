@@ -393,6 +393,37 @@ ip link del br0
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** A veth pair is described as a "bidirectional virtual wire." What happens to a veth pair's peer interface when the namespace it lives in is deleted, and why does this matter for CNI cleanup?
+
+   <details><summary>Answer</summary>
+
+   When a network namespace is deleted, all interfaces inside it are destroyed. Because a veth pair's two ends are linked, destroying the pod-side end (`eth0` inside the namespace) automatically removes the host-side end (e.g., `cali<hash>`) as well. This means CNI plugins do not need a separate step to delete the host-side veth — running `ip netns del <ns>` or `ip link del <host-side-veth>` cleans up both ends atomically.
+
+   </details>
+
+2. **[Scenario question]** You manually wire up a pod namespace with a veth pair and bridge, but pings from the pod to the bridge gateway IP (`10.244.0.1`) fail with 100% packet loss. The bridge is up, the veth pair is up, and the IP addresses are correct inside the namespace. What is the most likely remaining cause, and what command confirms it?
+
+   <details><summary>Answer</summary>
+
+   The most likely cause is that IP forwarding is disabled on the host (`net.ipv4.ip_forward = 0`), so the kernel silently drops packets that need to be forwarded between the pod namespace and the rest of the network. Run `sysctl net.ipv4.ip_forward` to confirm — if it returns `0`, enable it with `sysctl -w net.ipv4.ip_forward=1`. A secondary cause could be that `net.bridge.bridge-nf-call-iptables=0` or the `br_netfilter` module is not loaded, preventing iptables FORWARD rules from seeing bridged traffic.
+
+   </details>
+
+3. **[Practical question]** What command would you run to verify that IP forwarding is currently enabled on a Kubernetes node?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   sysctl net.ipv4.ip_forward
+   ```
+   The output should show `net.ipv4.ip_forward = 1`. A value of `0` means the node cannot forward packets between pod namespaces and external destinations, breaking cross-node pod communication.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Type | What you practice |

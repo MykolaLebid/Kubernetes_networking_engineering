@@ -432,6 +432,37 @@ modprobe bridge vxlan
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** What three environment variables does kubelet set when invoking a CNI plugin binary for the ADD operation, and what does each one convey to the plugin?
+
+   <details><summary>Answer</summary>
+
+   The three most critical variables are: `CNI_COMMAND=ADD` (which operation to perform — ADD, DEL, or CHECK); `CNI_NETNS=/var/run/netns/cni-<UUID>` (the path to the pre-created network namespace where the pod's interface should be configured); and `CNI_IFNAME=eth0` (the name to give the interface inside the namespace, always `eth0` for the primary pod interface). The plugin reads JSON configuration from stdin and writes the result JSON (including the assigned IP) to stdout.
+
+   </details>
+
+2. **[Scenario question]** A pod is stuck in `ContainerCreating`. The CNI plugin binary (`/opt/cni/bin/calico`) exists and is executable. `journalctl -u kubelet` shows a CNI error. What are the two most likely remaining causes, and how do you investigate each one?
+
+   <details><summary>Answer</summary>
+
+   The two most likely causes are: (1) The IPAM pool is exhausted — no IP addresses remain to allocate. Check with `calicoctl ipam show --show-blocks` to see block utilization, or inspect `/var/lib/cni/networks/<name>/` for host-local IPAM. (2) There is a stale `eth0` interface already present in the target namespace from a failed previous attempt, causing the CNI to fail with "interface already exists." Inspect the namespace with `nsenter -t <pause_pid> -n ip link` to see if `eth0` exists and manually delete it.
+
+   </details>
+
+3. **[Practical question]** What command would you run to check which CNI configuration file will be used by kubelet on a Kubernetes node?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   ls -1 /etc/cni/net.d/
+   ```
+   kubelet uses the first file alphabetically in `/etc/cni/net.d/`. The file with the lowest sort order (e.g., `10-calico.conflist`) wins. If multiple files exist from old CNI installations, the unexpected one may be active. Use `cat /etc/cni/net.d/<first-file>` to confirm the plugin type and IPAM configuration.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Type | What you practice |

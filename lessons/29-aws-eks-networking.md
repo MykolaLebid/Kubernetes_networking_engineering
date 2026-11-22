@@ -465,6 +465,39 @@ kubectl run -it --rm debug --image=nicolaka/netshoot -- \
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** Why does the AWS VPC CNI assign real VPC IP addresses to pods instead of using an overlay network, and what is the main pod density constraint this introduces?
+
+   <details><summary>Answer</summary>
+
+   Real VPC IPs eliminate NAT and tunneling overhead: pod-to-pod traffic stays native L3 routing within the VPC, reducing latency and simplifying security group rules (SGs apply directly to pod IPs). The main constraint is that each IP must come from an ENI secondary IP slot, and each EC2 instance type has hard limits on the number of ENIs and IPs per ENI. For example, an `m5.large` supports 3 ENIs × 10 IPs − 3 (one per ENI for the node) = 27 pods maximum, far less than the default Kubernetes limit of 110. Prefix delegation (`ENABLE_PREFIX_DELEGATION=true`) assigns /28 blocks instead of individual IPs, raising the `m5.large` limit to 48.
+
+   </details>
+
+2. **[Scenario question]** Pods are stuck in Pending with the reason "0/3 nodes are available: 3 Too many pods." The cluster uses `m5.large` nodes without prefix delegation. What is the current maximum pod count per node, and what is the simplest way to raise it?
+
+   <details><summary>Answer</summary>
+
+   An `m5.large` supports 3 ENIs × 10 secondary IPs per ENI, minus 3 (one primary IP per ENI reserved for the node) = 27 pods. Enable prefix delegation by setting `ENABLE_PREFIX_DELEGATION=true` and `WARM_PREFIX_TARGET=1` on the `aws-node` DaemonSet with `kubectl set env ds aws-node -n kube-system ENABLE_PREFIX_DELEGATION=true`; this assigns /28 CIDR blocks (16 IPs each) per ENI slot, raising the `m5.large` limit to 48 pods without changing instance type.
+
+   </details>
+
+3. **[Practical question]** What command would you run to check the current IP warm pool status — how many IPs are assigned versus available — on a specific node?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   kubectl exec -n kube-system $(kubectl get pod -n kube-system -l k8s-app=aws-node \
+     -o jsonpath='{.items[0].metadata.name}') -c aws-node -- \
+     curl -s http://localhost:61678/v1/nodeIPStats | jq .
+   ```
+   Look for `totalIPAddresses`, `assignedIPAddresses`, and `coolDownIPs` fields; if `totalIPAddresses` minus `assignedIPAddresses` is at or near zero, the warm pool is exhausted and new pods will stall while IPAMD attaches more IPs from the EC2 API.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

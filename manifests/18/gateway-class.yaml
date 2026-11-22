@@ -1,0 +1,49 @@
+# gateway-class.yaml
+# GatewayClass and Gateway resources for the Kubernetes Gateway API (v1.0+).
+# GatewayClass defines the controller (e.g., Envoy Gateway, Istio, nginx).
+# Gateway defines a specific L4/L7 listener binding for HTTP and HTTPS traffic.
+# Prerequisites: kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/latest/download/standard-install.yaml
+# Apply with: kubectl apply -f gateway-class.yaml
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: envoy-gateway
+spec:
+  # The controllerName must match the controller installed in the cluster.
+  # For Envoy Gateway: gateway.envoyproxy.io/gatewayclass-controller
+  # For Istio: istio.io/gateway-controller
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  description: "Production gateway using Envoy Gateway"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: prod-gateway
+  namespace: default
+spec:
+  gatewayClassName: envoy-gateway
+  listeners:
+    # HTTP listener — typically used to redirect to HTTPS
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Same   # Only allow HTTPRoutes from this namespace
+
+    # HTTPS listener with TLS termination
+    - name: https
+      protocol: HTTPS
+      port: 443
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: tls-secret   # TLS secret in the same namespace
+            kind: Secret
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              gateway-access: "true"   # Allow routes from namespaces with this label

@@ -423,6 +423,37 @@ ip6tables -t nat -L KUBE-SERVICES -n | head -10
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** How does IPv6 Neighbor Discovery Protocol (NDP) differ from IPv4 ARP in its communication model, and why does Kubernetes require `net.ipv6.conf.all.forwarding=1` on every node in a dual-stack cluster?
+
+   <details><summary>Answer</summary>
+
+   ARP uses Layer 2 broadcast to ask "who has IP X?" — every device on the segment must process the broadcast. NDP uses ICMPv6 Neighbor Solicitation messages sent to a solicited-node multicast address derived from the target IP, so only the target host (and devices explicitly subscribed to that multicast group) process the message. This is more efficient and scales better. The `net.ipv6.conf.all.forwarding=1` sysctl is required because, without it, the node's kernel drops IPv6 packets that need to be forwarded between pod namespaces and the external network — the same requirement as `net.ipv4.ip_forward=1` for IPv4.
+
+   </details>
+
+2. **[Scenario question]** A dual-stack cluster has pods with both IPv4 and IPv6 addresses assigned. IPv4 pings between pods on different nodes work correctly, but `ping6` between pods on different nodes fails with 100% packet loss. What sysctl parameter should you check on the nodes first?
+
+   <details><summary>Answer</summary>
+
+   Check `sysctl net.ipv6.conf.all.forwarding` on the nodes — if it returns `0`, the kernel is not forwarding IPv6 packets between interfaces, causing all cross-node IPv6 traffic to be silently dropped. Set it with `sysctl -w net.ipv6.conf.all.forwarding=1` and persist in `/etc/sysctl.d/99-k8s-ipv6.conf`. Also check `net.bridge.bridge-nf-call-ip6tables=1` and that `ip6tables -t nat -L KUBE-SERVICES -n` shows rules for IPv6 service ClusterIPs.
+
+   </details>
+
+3. **[Practical question]** What command would you run to verify that a service has been assigned both an IPv4 and an IPv6 ClusterIP in a dual-stack cluster?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   kubectl get svc <service-name> -o jsonpath='{.spec.clusterIPs}'
+   ```
+   The output should show two IPs — one IPv4 (e.g., `10.96.42.10`) and one IPv6 (e.g., `fd00:10:96::1`). If only one IP appears, check the service's `ipFamilyPolicy` with `kubectl get svc <name> -o yaml | grep -A3 ipFamily` — it may be set to `SingleStack` instead of `PreferDualStack` or `RequireDualStack`.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

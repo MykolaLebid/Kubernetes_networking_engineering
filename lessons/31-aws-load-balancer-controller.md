@@ -448,6 +448,38 @@ for i in $(seq 1 20); do curl -s https://web.example.com/ | grep -o "v[12]"; don
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** What is the difference between `target-type: instance` and `target-type: ip` for the AWS Load Balancer Controller, and when would you choose each?
+
+   <details><summary>Answer</summary>
+
+   With `target-type: instance`, the ALB or NLB sends traffic to each node's NodePort; kube-proxy on that node then performs a second hop (DNAT) to route the packet to the actual pod, which may be on a different node. With `target-type: ip`, the load balancer registers pod ENI IPs directly as targets and routes traffic in a single hop to the pod without going through kube-proxy. Choose `instance` when pods are using host-network or when you have strict compatibility requirements with older kube-proxy; choose `ip` for lower latency, correct client IP preservation, and direct pod health checks.
+
+   </details>
+
+2. **[Scenario question]** Two teams each defined an `Ingress` with `ingressClassName: alb` for different paths on the same domain. The controller provisioned two separate ALBs, doubling cost. What annotation would consolidate them into one ALB?
+
+   <details><summary>Answer</summary>
+
+   Add the `alb.ingress.kubernetes.io/group.name` annotation with the same value on both Ingress resources, for example `alb.ingress.kubernetes.io/group.name: "shared-prod"`. The AWS Load Balancer Controller merges all Ingress resources that share a group name into a single ALB, combining their listener rules. Each Ingress still manages its own rules independently — deleting one Ingress removes only its rules, not the shared ALB.
+
+   </details>
+
+3. **[Practical question]** What AWS CLI command would you run to check the health of targets registered behind a specific ALB target group, to see which pods are healthy vs. draining vs. unhealthy?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   aws elbv2 describe-target-health \
+     --target-group-arn arn:aws:elasticloadbalancing:<region>:<account>:targetgroup/<name>/<id>
+   ```
+   The output lists each target (IP or instance ID) with its `TargetHealth.State` (`healthy`, `unhealthy`, `draining`, `unused`) and a `TargetHealth.Reason` explaining any failure. Unhealthy targets are typically caused by security group rules blocking the health-check port or the pod not yet passing its readiness probe.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

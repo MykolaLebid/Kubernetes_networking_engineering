@@ -1,0 +1,61 @@
+# coredns-tuned-configmap.yaml
+# CoreDNS ConfigMap with performance tuning:
+#   - cache TTL set to 30s (default is 30s, explicit here for clarity)
+#   - Reduces DNS lookup latency for short-lived pods
+#   - Adds a stub zone for an internal corporate domain
+#   - forward plugin falls back to upstream resolvers
+# Apply with: kubectl apply -f coredns-tuned-configmap.yaml
+# Then restart CoreDNS: kubectl rollout restart deployment coredns -n kube-system
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns
+  namespace: kube-system
+data:
+  Corefile: |
+    .:53 {
+        errors
+        health {
+           lameduck 5s
+        }
+        ready
+
+        # Kubernetes in-cluster DNS
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+           pods insecure
+           fallthrough in-addr.arpa ip6.arpa
+           ttl 30
+        }
+
+        # Stub zone: forward corp.internal queries to on-prem DNS resolver
+        stub corp.internal {
+           nameservers 192.168.1.53 192.168.1.54
+        }
+
+        # Cache responses for up to 30 seconds to reduce upstream load
+        cache 30 {
+            success 9984 30
+            denial  9984  5
+        }
+
+        # Prometheus metrics endpoint
+        prometheus :9153
+
+        # Forward all other queries to upstream resolvers (node's resolv.conf)
+        forward . /etc/resolv.conf {
+            max_concurrent 1000
+            prefer_udp
+        }
+
+        # Reload Corefile changes without restarting CoreDNS
+        reload 10s
+
+        # Log slow queries (> 1s) for diagnostics
+        log . {
+            class error
+        }
+
+        loop
+        loadbalance
+    }

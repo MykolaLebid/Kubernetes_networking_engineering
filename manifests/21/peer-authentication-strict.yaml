@@ -1,0 +1,23 @@
+# peer-authentication-strict.yaml
+# Istio PeerAuthentication policy enforcing STRICT mTLS for an entire namespace.
+# In STRICT mode, all traffic to pods in the namespace MUST use mutual TLS.
+# Plain-text traffic is rejected. Apply this after all services have sidecars.
+# Prerequisites: Istio installed, namespace labeled with istio-injection=enabled
+# Apply with: kubectl apply -f peer-authentication-strict.yaml -n <namespace>
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: default    # Change to target namespace; 'istio-system' applies cluster-wide
+spec:
+  # mtls.mode options:
+  #   STRICT: Only mTLS traffic accepted
+  #   PERMISSIVE: Both mTLS and plain-text accepted (migration mode)
+  #   DISABLE: Mutual TLS disabled
+  mtls:
+    mode: STRICT
+  # Port-level overrides (optional): allow plain-text on a specific port
+  # portLevelMtls:
+  #   8080:
+  #     mode: PERMISSIVE

@@ -485,6 +485,37 @@ az aks create --network-policy azure
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** By default, what is the network policy behavior for a pod that has no NetworkPolicy selecting it, and what changes the moment the first NetworkPolicy is applied to that pod?
+
+   <details><summary>Answer</summary>
+
+   By default, all pod-to-pod traffic is allowed — the network is "flat" with no restrictions. This is the non-isolated state. The moment any NetworkPolicy with a `podSelector` matching that pod is applied, the pod becomes **isolated** in the direction(s) specified by `policyTypes`. From that point, only traffic explicitly whitelisted by the policy's `ingress` or `egress` rules is permitted; all other traffic in that direction is silently dropped. A second (or third) NetworkPolicy selecting the same pod is unioned additively — traffic is allowed if any matching policy permits it.
+
+   </details>
+
+2. **[Scenario question]** After applying a default-deny-all egress NetworkPolicy to a namespace, all application pods immediately lose the ability to resolve service names via DNS. No other egress policy exists. What rule is missing, and what is the most specific way to add it?
+
+   <details><summary>Answer</summary>
+
+   The missing rule is an egress exception for DNS. When an egress policy is applied, all outbound traffic — including DNS queries to CoreDNS — is blocked unless explicitly allowed. The most specific fix is a companion NetworkPolicy that allows egress to `kube-system` namespace pods with label `k8s-app=kube-dns` on UDP and TCP port 53. Using both UDP and TCP port 53 is important because large DNS responses can fall back to TCP. Without this exception, every application call that uses a hostname fails with "name not resolved" rather than a connection error.
+
+   </details>
+
+3. **[Practical question]** What command would you run to test whether a pod named `frontend` in the `default` namespace can establish a TCP connection to `web-service` on port 80?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   kubectl exec frontend -- nc -vz web-service 80
+   ```
+   A successful connection prints `Connection to web-service 80 port [tcp/http] succeeded!`. A timeout (hanging with no output) indicates a NetworkPolicy is silently dropping the traffic. A `Connection refused` means the pod is reachable but nothing is listening on port 80 — a service or pod configuration issue, not a network policy issue.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

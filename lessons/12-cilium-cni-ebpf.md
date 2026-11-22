@@ -422,6 +422,37 @@ az aks create \
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** How does Cilium's identity-based network policy differ from traditional IP-based iptables rules, and why does this make policy more resilient to pod restarts and rescheduling?
+
+   <details><summary>Answer</summary>
+
+   Traditional IP-based iptables rules encode specific pod IP addresses — when a pod restarts or is rescheduled to a new node, it gets a new IP, and every rule referencing the old IP must be updated. Cilium assigns a numeric identity to each pod based on its Kubernetes labels (e.g., `app=frontend` → identity `1234`) and encodes that identity in the packet header during encapsulation. Policy enforcement compares identities, not IPs — so when a pod restarts with a new IP but the same labels, the same identity is assigned and all existing policies continue to apply without any rule updates.
+
+   </details>
+
+2. **[Scenario question]** You deploy a `CiliumNetworkPolicy` to block traffic from a pod labeled `app=attacker` to a pod labeled `app=web`, but traffic still flows through. `cilium endpoint list` shows both pods with correct labels. What is the first thing you should check?
+
+   <details><summary>Answer</summary>
+
+   Run `cilium policy trace --src-pod <ns>/attacker --dst-pod <ns>/web --dport 80` to simulate the policy decision. This shows whether the policy is compiled, which identity labels are being matched, and what the final verdict is. If the trace shows `allow`, the policy selector may not be matching the endpoint labels (check for label key/value typos or namespace scope issues). If `cilium status | grep KubeProxyReplacement` shows kube-proxy is still active, conflicting iptables rules could be allowing traffic that Cilium's eBPF programs block.
+
+   </details>
+
+3. **[Practical question]** What command would you run to observe all dropped network flows in real time using Hubble?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   hubble observe --verdict DROPPED
+   ```
+   Each line shows the source pod, destination pod, destination port, and the policy that caused the drop. This is the most efficient way to debug NetworkPolicy issues in Cilium — it pinpoints exactly which flows are being blocked and by which policy, without requiring packet captures or guesswork about selector matching.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

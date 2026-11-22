@@ -1,0 +1,37 @@
+# eniconfig.yaml
+# AWS VPC CNI ENIConfig for custom networking (secondary CIDR).
+# Custom networking places pod ENIs on subnets different from the node's primary
+# subnet, allowing pods to use a larger IP space (e.g., RFC1918 100.64.0.0/10).
+# Each ENIConfig maps to one AZ+subnet+security-group combination.
+# Prerequisites:
+#   - AWS_VPC_K8S_CNI_CUSTOM_NETWORK_CFG=true set on the aws-node DaemonSet
+#   - ENIConfig CRD installed (part of Amazon VPC CNI >= v1.9)
+# Apply with: kubectl apply -f eniconfig.yaml
+# Then annotate nodes: kubectl annotate node <node> k8s.amazonaws.com/eniConfig=<az>
+---
+apiVersion: crd.k8s.amazonaws.com/v1alpha1
+kind: ENIConfig
+metadata:
+  name: us-east-1a   # Must match the AZ name exactly
+spec:
+  subnet: subnet-0abc1234def56789a   # Subnet in us-east-1a for pod ENIs
+  securityGroups:
+    - sg-0abc1234def56789a   # Security group attached to pod ENIs
+---
+apiVersion: crd.k8s.amazonaws.com/v1alpha1
+kind: ENIConfig
+metadata:
+  name: us-east-1b   # Must match the AZ name exactly
+spec:
+  subnet: subnet-0abc1234def56789b   # Subnet in us-east-1b for pod ENIs
+  securityGroups:
+    - sg-0abc1234def56789a   # Same SG, or use a per-AZ SG
+---
+apiVersion: crd.k8s.amazonaws.com/v1alpha1
+kind: ENIConfig
+metadata:
+  name: us-east-1c
+spec:
+  subnet: subnet-0abc1234def56789c   # Subnet in us-east-1c for pod ENIs
+  securityGroups:
+    - sg-0abc1234def56789a

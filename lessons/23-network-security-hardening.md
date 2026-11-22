@@ -463,6 +463,37 @@ kubectl logs -f job.kube-bench | grep -A3 "5.3"
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** Why must you explicitly add a DNS egress policy (allowing port 53 UDP and TCP) when deploying a default-deny NetworkPolicy, and what breaks if you omit it?
+
+   <details><summary>Answer</summary>
+
+   A default-deny policy with `policyTypes: [Ingress, Egress]` and an empty `podSelector: {}` blocks all outbound traffic including DNS queries to CoreDNS. Without an explicit allow for UDP port 53 (and TCP port 53 for large responses), pods cannot resolve any service names — `nslookup kubernetes.default.svc.cluster.local` will hang or return SERVFAIL. The allow-dns-egress policy must target `0.0.0.0/0` (or specifically the CoreDNS ClusterIP) on ports 53 UDP and TCP, and must be applied in the same namespace simultaneously with or before the deny-all policy.
+
+   </details>
+
+2. **[Scenario question]** A penetration tester demonstrates that a pod in the `production` namespace can query the cloud metadata API at 169.254.169.254 and retrieve an IAM role credential. What NetworkPolicy construct blocks this while still allowing all other internet egress?
+
+   <details><summary>Answer</summary>
+
+   Use an `ipBlock` with an `except` clause in an egress NetworkPolicy: allow `cidr: 0.0.0.0/0` with `except: [169.254.169.254/32]` (and also `169.254.170.2/32` for AWS ECS metadata). This allows egress to all destinations except the metadata API addresses. Apply this policy with `podSelector: {}` to cover all pods in the namespace, and include it in every application namespace — not just the default namespace.
+
+   </details>
+
+3. **[Practical question]** What command would you run to see all currently dropped network flows across all namespaces in real time?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   hubble observe --verdict DROPPED --all-namespaces
+   ```
+   Each output line shows the source pod, destination pod, destination port, and the drop reason (such as `POLICY_DENIED`); use this to identify which flows are being blocked so you can build the precise allow rules needed before enforcing a default-deny posture.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

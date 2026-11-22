@@ -1,0 +1,55 @@
+{
+  "_comment": "CNI conflist for the bridge plugin with bandwidth limiting and port-mapping (DNAT).",
+  "_comment_ref": "CNI Spec lesson 09 — place in /etc/cni/net.d/ on each node. Plugins are chained in order.",
+  "cniVersion": "1.0.0",
+  "name": "k8s-bridge-net",
+  "plugins": [
+    {
+      "type": "bridge",
+      "bridge": "cni0",
+      "isGateway": true,
+      "isDefaultGateway": true,
+      "ipMasq": true,
+      "hairpinMode": true,
+      "ipam": {
+        "type": "host-local",
+        "ranges": [
+          [
+            {
+              "subnet": "10.244.0.0/24",
+              "rangeStart": "10.244.0.10",
+              "rangeEnd": "10.244.0.254",
+              "gateway": "10.244.0.1"
+            }
+          ]
+        ],
+        "routes": [
+          { "dst": "0.0.0.0/0" }
+        ]
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {
+        "portMappings": true
+      },
+      "snat": true
+    },
+    {
+      "type": "bandwidth",
+      "capabilities": {
+        "bandwidth": true
+      },
+      "ingressRate": 104857600,
+      "ingressBurst": 209715200,
+      "egressRate": 104857600,
+      "egressBurst": 209715200
+    },
+    {
+      "type": "tuning",
+      "sysctl": {
+        "net.core.somaxconn": "1024"
+      }
+    }
+  ]
+}

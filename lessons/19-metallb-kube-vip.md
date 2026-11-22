@@ -389,6 +389,37 @@ spec:
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** Why does MetalLB L2 mode result in a single ingress node rather than true load balancing, and how does BGP mode solve this?
+
+   <details><summary>Answer</summary>
+
+   In L2 mode, MetalLB uses leader election so that exactly one node's speaker answers ARP requests for the VIP. All external traffic therefore enters through that one node, which then uses kube-proxy to forward to pods — the LB layer itself is a single point of ingress. BGP mode solves this by having each speaker on multiple nodes advertise the same /32 host route via BGP; the upstream router installs ECMP routes for the VIP and distributes flows across all announcing nodes, giving true per-node load balancing.
+
+   </details>
+
+2. **[Scenario question]** A LoadBalancer service stays in `EXTERNAL-IP: <pending>` even after MetalLB pods are running. What two CRDs should you check first?
+
+   <details><summary>Answer</summary>
+
+   Check that an `IPAddressPool` exists with a valid address range and that an `L2Advertisement` (or `BGPAdvertisement` for BGP mode) references that pool. Without both CRDs, MetalLB's controller will not allocate an IP or advertise it. Run `kubectl get ipaddresspools,l2advertisements -n metallb-system` to confirm both are present. A missing advertisement CRD is the most common oversight after install.
+
+   </details>
+
+3. **[Practical question]** What command would you run to find which node is currently announcing a specific VIP in L2 mode?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   kubectl get events -n metallb-system | grep announcing
+   ```
+   Look for event messages of the form `announcing from node worker-X` — the node named in that event is the current elected speaker for the VIP. You can also watch speaker logs with `kubectl logs -n metallb-system -l app.kubernetes.io/component=speaker -f` for real-time announcement events.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

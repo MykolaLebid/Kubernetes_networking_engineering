@@ -395,6 +395,37 @@ ip netns del node2
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** What is longest-prefix match (LPM) routing, and how does it determine which route is used when a packet could match both a `/24` network route and a `/32` host route in the routing table?
+
+   <details><summary>Answer</summary>
+
+   Longest-prefix match means the kernel selects the route with the most specific (longest) prefix that covers the destination address. A `/32` host route is more specific than a `/24` network route, so if both are present, the `/32` wins regardless of which was added first. This is why Calico installs per-pod `/32` host routes — they always take precedence over broader subnet routes and ensure packets reach the exact pod without ambiguity.
+
+   </details>
+
+2. **[Scenario question]** Cross-node pod-to-pod traffic drops 100% even though `ip route show` on the sending node shows a route to the remote pod CIDR via the correct next-hop. No errors appear. What is the most likely cause, and what single command confirms it?
+
+   <details><summary>Answer</summary>
+
+   The most likely cause is that `net.ipv4.ip_forward=0` on the node, so the kernel drops forwarded packets silently instead of routing them. Run `sysctl net.ipv4.ip_forward` — if it returns `0`, the node is not acting as a router even though routes exist. A secondary cause is `rp_filter=1` (strict reverse path filtering) rejecting asymmetrically routed packets, confirmed with `sysctl net.ipv4.conf.all.rp_filter`.
+
+   </details>
+
+3. **[Practical question]** What command would you run to determine which route a Linux node would use to reach a pod at `10.244.3.7`, including the outbound interface and next-hop IP?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   ip route get 10.244.3.7
+   ```
+   The output shows the selected route, the next-hop IP (`via`), and the outbound interface (`dev`). If the route says `blackhole`, the CNI has installed a drop route for that CIDR because the node is unreachable.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Type | What you practice |

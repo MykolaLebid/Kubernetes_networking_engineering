@@ -476,6 +476,37 @@ You can now trace a packet from a pod's application socket all the way to its de
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** Why does the L1-to-L7 troubleshooting methodology require confirming each layer before moving up, rather than starting at the Kubernetes service layer where the symptom is visible?
+
+   <details><summary>Answer</summary>
+
+   Higher-layer Kubernetes components (Services, NetworkPolicies, kube-proxy) depend on lower-layer correctness — if a route is missing or a veth pair is not wired to the OVS bridge, no amount of Kubernetes-level fixes will restore connectivity. Starting at L1/L2 (interface up, veth connected) and L3 (route present, ip_forward enabled) rules out the most fundamental issues before you spend time debugging iptables rules or Kubernetes endpoints that are actually fine. The golden rule is: confirm each layer is working before moving up, so you stop at the first layer that fails.
+
+   </details>
+
+2. **[Scenario question]** DNS lookups from a pod occasionally time out with exactly a 5-second delay. CoreDNS pods are running and healthy. What two root causes should you check first?
+
+   <details><summary>Answer</summary>
+
+   The two most common causes of 5-second DNS timeouts in Kubernetes are: (1) conntrack table exhaustion — when the nf_conntrack table is full, new UDP connections (including DNS queries) are dropped silently and the client waits for the timeout; check with `dmesg | grep "nf_conntrack: table full"` and compare `nf_conntrack_count` to `nf_conntrack_max`. (2) The conntrack UDP race condition with parallel DNS queries on the same socket — the kernel can SNAT both A and AAAA queries to the same 5-tuple and drop one; check CoreDNS logs for `NXDOMAIN` or timeout patterns, and consider setting `ndots:3` or enabling NodeLocal DNSCache.
+
+   </details>
+
+3. **[Practical question]** What command would you run to watch all denied network flows across the entire cluster in real time?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   hubble observe --verdict DROPPED --all-namespaces
+   ```
+   Each line shows the source and destination pod names, namespace, destination port, and drop reason (such as `POLICY_DENIED` or `UNSUPPORTED_L3_PROTOCOL`); use this output to identify which flows are being blocked and by what policy, then work down the stack with `cilium policy trace` or `tcpdump` if the reason is not a Kubernetes NetworkPolicy.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

@@ -479,6 +479,37 @@ rdma stat show
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** What is the purpose of LACP (802.3ad) bonding on a bare-metal Kubernetes node, and what does the `xmit-hash-policy: layer3+4` setting control?
+
+   <details><summary>Answer</summary>
+
+   LACP bonding aggregates two or more physical NICs into a single logical interface (`bond0`), providing both link redundancy (if one NIC or switch port fails, the bond continues on the remaining link) and increased bandwidth. The `xmit-hash-policy: layer3+4` setting determines how outbound packets are distributed across the active slave links — using a hash of source IP, destination IP, source port, and destination port. This ensures that multiple concurrent flows are spread across both links rather than all going to the same NIC, maximizing bandwidth utilization.
+
+   </details>
+
+2. **[Scenario question]** Two nodes in a spine-leaf cluster cannot reach each other. The bond interface on both nodes shows only one active slave instead of two. LACP is configured on the bond. What is the most likely cause, and what command on the node confirms it?
+
+   <details><summary>Answer</summary>
+
+   The most likely cause is that the switch ports are not configured for LACP (port-channel with `channel-group N mode active`). When the switch does not send LACP PDUs, the bond falls back to only one active slave. Confirm on the node with `cat /proc/net/bonding/bond0` — look at the "MII Status" of each slave and the "Partner Key" field; if the Partner Key is `0`, the switch is not negotiating LACP. Run `tcpdump -i eth0 ether proto 0x8809` to verify LACP PDUs are (or are not) being exchanged.
+
+   </details>
+
+3. **[Practical question]** What command would you run to verify that jumbo frames (MTU 9000) are working end-to-end between two bare-metal Kubernetes nodes?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   ping -M do -s 8972 <remote-node-ip>
+   ```
+   The `-M do` flag sets the Don't Fragment bit and `-s 8972` sends a payload of 8972 bytes. Adding the 28-byte ICMP and IP header overhead gives 9000 bytes total — the maximum for a jumbo frame MTU of 9000. A successful reply confirms end-to-end jumbo frame support. If you receive "Frag needed" or the ping times out, an intermediate interface (switch port, NIC, or bond) has not been configured for MTU 9000.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Type | What you practice |

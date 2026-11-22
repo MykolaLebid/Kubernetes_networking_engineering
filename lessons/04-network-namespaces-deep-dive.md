@@ -422,6 +422,37 @@ lsns -t net     # → only host namespace remains
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** Why does the pause (infra) container serve as the holder of a pod's network namespace, rather than the first application container that starts?
+
+   <details><summary>Answer</summary>
+
+   The pause container is started first and holds the network namespace open for the entire lifetime of the pod. If the application container held the namespace and then crashed and restarted, the namespace (along with its IP address, routes, and sockets) would be destroyed and recreated, breaking network state. The pause container does nothing except hold the namespace file descriptor open via a bind-mount at `/var/run/netns/cni-<UUID>`, ensuring the namespace survives application container restarts.
+
+   </details>
+
+2. **[Scenario question]** You run `ip netns list` on a node running containerd and it shows no namespaces, but `kubectl get pods` shows many running pods. Where are the pod network namespaces, and how do you access one to inspect its routing table?
+
+   <details><summary>Answer</summary>
+
+   On containerd-based nodes, pod namespaces are not registered in `/var/run/netns/` — they are referenced by the pause container's PID via `/proc/<pause_pid>/ns/net`. Find the pause container ID with `crictl ps | grep pause`, get its PID with `crictl inspect <id> | jq '.info.pid'`, then run `nsenter -t <pause_pid> -n ip route` to enter the namespace and inspect its routing table. The command `lsns -t net` lists all kernel-known network namespaces with their PIDs.
+
+   </details>
+
+3. **[Practical question]** What command would you run to inspect the IP addresses and routes of a running pod from the host node, given the pause container's PID?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   nsenter -t <pause_pid> -n ip addr
+   ```
+   This enters the pod's network namespace and runs `ip addr` within it, showing the pod's `eth0` interface with its assigned IP. Follow with `nsenter -t <pause_pid> -n ip route` to see the pod's routing table, which should show a default route via the bridge gateway (e.g., `10.244.0.1`).
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Type | What you practice |

@@ -460,6 +460,37 @@ az aks create --network-policy calico --network-plugin azure ...
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** What is Calico's default IPAM block size, and why does setting an overly large block size (e.g., `/24`) cause IP address starvation across a cluster with many small nodes?
+
+   <details><summary>Answer</summary>
+
+   The default Calico IPAM block size is `/26`, which allocates 64 IP addresses per node. When a block is assigned to a node, all IPs in that block are reserved for that node — even if most are unused. With a `/24` block (256 IPs), a cluster where nodes run only 10–20 pods would waste 230+ IPs per node. A 100-node cluster with `/24` blocks needs a `/8` IP pool (16 million IPs) to avoid exhaustion. Using `/26` or `/27` blocks matched to the actual pods-per-node limit prevents IP starvation and allows more efficient pool utilization.
+
+   </details>
+
+2. **[Scenario question]** New pods cannot get IP addresses even though `calicoctl ipam show --show-blocks` shows blocks with available IPs. After investigation, you find that some IPs are allocated but have no corresponding running pods. How do you identify and release these leaked IPs?
+
+   <details><summary>Answer</summary>
+
+   Run `calicoctl ipam show --ip <ip>` for a suspected leaked IP — if it shows an allocation but the pod name no longer exists in Kubernetes, the IP has leaked. This happens when CNI DEL fails during pod deletion. Release the leaked IP with `calicoctl ipam release --ip=<ip>`. For bulk investigation, compare the allocated IPs in IPAM blocks against running pod IPs from `kubectl get pods -A -o wide`, or use `calicoctl ipam check` to automatically detect and optionally clean orphaned allocations.
+
+   </details>
+
+3. **[Practical question]** What command would you run to check the IPAM block allocation across all nodes in a Calico cluster and see how many IPs are used versus free per block?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   calicoctl ipam show --show-blocks
+   ```
+   The output table shows each CIDR block, which node it is assigned to, the number of IPs used, and the number free. A block showing `IPS USED: 64, IPS FREE: 0` on a node is fully exhausted — new pods on that node will fail to get an IP until a new block is allocated or existing IPs are released.
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |

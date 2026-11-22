@@ -448,6 +448,37 @@ kubectl get ingress,httproute
 
 ---
 
+## Check Your Understanding
+
+1. **[Concept question]** Why does the Gateway API use three separate resource types (GatewayClass, Gateway, HTTPRoute) instead of a single Ingress-like object?
+
+   <details><summary>Answer</summary>
+
+   The three-layer hierarchy maps to real organizational boundaries: infrastructure teams own GatewayClass (which controller handles traffic) and Gateway (listener ports, TLS, allowed namespaces), while application teams own HTTPRoute (routing rules to their backends). This separation means an app team cannot change TLS settings or open new ports on shared infrastructure. The old Ingress API collapsed all roles into one object, forcing teams to use annotation hacks for features like traffic splitting.
+
+   </details>
+
+2. **[Scenario question]** An HTTPRoute you just applied shows `ResolvedRefs: False` in its status conditions and traffic is not flowing. What is the most likely cause, and how do you fix it?
+
+   <details><summary>Answer</summary>
+
+   The most common cause is a missing ReferenceGrant when the HTTPRoute references a backend Service in a different namespace. Without a ReferenceGrant in the target namespace explicitly allowing the route's namespace to reference its Services, the controller rejects the cross-namespace backendRef. Create a `ReferenceGrant` in the Service's namespace with `from.namespace` set to the HTTPRoute's namespace. Verify with `kubectl get referencegrant -n <target-ns>` and re-check `kubectl describe httproute <name>`.
+
+   </details>
+
+3. **[Practical question]** What command would you run to verify that a weighted 90/10 traffic split between `frontend-v1` and `frontend-v2` is actually working as configured?
+
+   <details><summary>Answer</summary>
+
+   ```bash
+   for i in $(seq 1 20); do curl -s -H "Host: web.example.com" http://<gateway-ip>/ | grep -o 'v[12]'; done | sort | uniq -c
+   ```
+   Look for approximately 18 responses tagged `v1` and 2 responses tagged `v2`; if all 20 return `v1`, the HTTPRoute weights are not being applied by the controller (check `kubectl describe httproute` for status conditions).
+
+   </details>
+
+---
+
 ## Online Resources
 
 | Resource | Cost | What you practice |
