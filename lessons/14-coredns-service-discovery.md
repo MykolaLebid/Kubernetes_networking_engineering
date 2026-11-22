@@ -1,8 +1,8 @@
 # Lesson 14 — CoreDNS and Service Discovery
 
-> **Track:** Network Foundation — Bare Metal & Cloud  
-> **Prerequisites:** [Lesson 13 — Kubernetes Services](13-kubernetes-services-kube-proxy.md)  
-> **Duration:** ~2 hours
+> **Track:** Kubernetes Networking · **Prereqs:** [Lesson 13 — Services](13-kubernetes-services-kube-proxy.md) · **Time:** ~1h
+
+> **Goal:** Debug ndots:5 latency, tune CoreDNS for your cluster, and deploy NodeLocal DNSCache.
 
 ---
 
@@ -11,342 +11,180 @@
 ```bash
 # Terminal 1 — Mac (kubectl)
 kubectl get cm -n kube-system coredns -o yaml
-kubectl get pods -n kube-system -l k8s-app=kube-dns
 kubectl get svc -n kube-system kube-dns
 
-# Terminal 2 — debug pod for DNS testing
+# Terminal 2 — debug pod
 kubectl run dns-test --image=nicolaka/netshoot --rm -it --restart=Never -- \
-  sh -c "nslookup kubernetes && nslookup kubernetes.default.svc.cluster.local"
+  sh -c "nslookup kubernetes && cat /etc/resolv.conf"
 ```
 
 ---
 
-## Why This Matters
+## 1. Architecture
 
-DNS is how services find each other in Kubernetes. CoreDNS runs as the cluster DNS server and handles all `*.cluster.local` lookups. Misconfigured DNS is one of the most common and confusing connectivity problems — slow queries, timeouts, and "name not resolved" errors all trace back here.
-
----
-
-## 1. CoreDNS Architecture
-
-```
-Pod → resolv.conf → CoreDNS ClusterIP (10.96.0.10)
-         ↓
-  CoreDNS Pod (Deployment, 2+ replicas)
-         ↓
-  Corefile: plugins chain
-  ├── kubernetes plugin → answer *.cluster.local
-  ├── forward plugin → forward external queries to upstream
-  └── cache plugin → cache responses
+```mermaid
+graph LR
+    P[Pod\n/etc/resolv.conf\nnameserver 10.96.0.10] -->|UDP 53| NLD[NodeLocal DNSCache\n169.254.20.10\nper-node DaemonSet]
+    NLD -->|cache miss| CD[CoreDNS\n10.96.0.10\nDeployment × 2]
+    CD -->|*.cluster.local| K8S[Kubernetes API]
+    CD -->|external| UP[Upstream\n/etc/resolv.conf]
 ```
 
 ```bash
-# CoreDNS deployment
-kubectl get deploy -n kube-system coredns
-kubectl get pods -n kube-system -l k8s-app=kube-dns
-
-# CoreDNS service IP
-kubectl get svc -n kube-system kube-dns
-# NAME       TYPE        CLUSTER-IP   PORT(S)
-# kube-dns   ClusterIP   10.96.0.10   53/UDP,53/TCP
+kubectl get pods -n kube-system -l k8s-app=kube-dns   # CoreDNS pods
+kubectl get svc  -n kube-system kube-dns               # ClusterIP 10.96.0.10
 ```
+
+**DNS name formats:**
+
+| Type | Format | Example |
+|------|--------|---------|
+| Service | `<svc>.<ns>.svc.cluster.local` | `web.default.svc.cluster.local` |
+| StatefulSet pod | `<pod>.<svc>.<ns>.svc.cluster.local` | `db-0.db.default.svc.cluster.local` |
+| Headless SVC | Same — returns pod IP directly | returns `10.244.1.5` |
 
 ---
 
-## 2. Pod DNS Configuration
+## 2. The ndots:5 Latency Trap
 
-Every pod gets a `/etc/resolv.conf` injected by kubelet:
-
+Default `/etc/resolv.conf` in every pod:
 ```
 nameserver 10.96.0.10
 search default.svc.cluster.local svc.cluster.local cluster.local
 options ndots:5
 ```
 
-The **search domains** allow short names:
-- `web` → tries `web.default.svc.cluster.local` first (if ndots ≥ 5 dots)
-- `web.default` → tries `web.default.svc.cluster.local`
-- `web.default.svc.cluster.local` → resolves directly
+Any hostname with **fewer than 5 dots** triggers search-domain expansion before the absolute lookup. External names waste 3 round trips (~90–300 ms):
 
-```bash
-# Check pod's resolv.conf
-kubectl exec -it <pod> -- cat /etc/resolv.conf
+```mermaid
+sequenceDiagram
+    participant P as Pod
+    participant C as CoreDNS
+    Note over P,C: Internal — resolves on first try ✓
+    P->>C: my-svc.default.svc.cluster.local?
+    C-->>P: 10.96.0.42 ✓
+
+    Note over P,C: External (api.example.com, 3 dots) — 4 queries!
+    P->>C: api.example.com.default.svc.cluster.local?
+    C-->>P: NXDOMAIN (+~30ms)
+    P->>C: api.example.com.svc.cluster.local?
+    C-->>P: NXDOMAIN (+~30ms)
+    P->>C: api.example.com.cluster.local?
+    C-->>P: NXDOMAIN (+~30ms)
+    P->>C: api.example.com.?
+    C-->>P: 203.0.113.1 ✓ (300ms wasted)
+```
+
+> **Fix:** Lower `ndots` per pod or use FQDNs (trailing dot: `api.example.com.`).
+
+```yaml
+# Per-pod dnsConfig
+spec:
+  dnsConfig:
+    options:
+      - name: ndots
+        value: "1"
 ```
 
 ---
 
-## 3. DNS Name Formats
-
-```
-<service>.<namespace>.svc.<cluster-domain>
-
-Examples:
-  web.default.svc.cluster.local          ← ClusterIP service
-  db-0.db.default.svc.cluster.local      ← StatefulSet pod (via headless svc)
-  10-244-0-5.default.pod.cluster.local   ← pod IP reverse (rarely used)
-```
+## 3. Corefile — Key Directives
 
 ```bash
-# Test DNS from inside the cluster
-kubectl run -it --rm dns-test --image=nicolaka/netshoot -- \
-  nslookup web.default.svc.cluster.local 10.96.0.10
-
-kubectl run -it --rm dns-test --image=nicolaka/netshoot -- \
-  dig web.default.svc.cluster.local @10.96.0.10 +short
+kubectl get cm -n kube-system coredns -o yaml   # view current config
+kubectl edit cm -n kube-system coredns           # edit (auto-reloads)
 ```
 
----
+| Directive | What it does |
+|-----------|-------------|
+| `kubernetes cluster.local` | Answers `*.cluster.local` from K8s API |
+| `forward . /etc/resolv.conf` | Sends external queries to node's upstream DNS |
+| `cache 30` | Caches positive responses for 30 s |
+| `health` / `ready` | `/health` :8080 and `/ready` :8181 probes |
+| `prometheus :9153` | Metrics endpoint |
 
-## 4. Corefile Configuration
-
-```bash
-# View current CoreDNS config
-kubectl get cm -n kube-system coredns -o yaml
+**Stub zone** (forward a corporate domain to a private resolver):
 ```
-
-Default Corefile:
-```
-.:53 {
-    errors
-    health {
-        lameduck 5s
-    }
-    ready
-    kubernetes cluster.local in-addr.arpa ip6.arpa {
-        pods insecure
-        fallthrough in-addr.arpa ip6.arpa
-        ttl 30
-    }
-    prometheus :9153
-    forward . /etc/resolv.conf {
-        max_concurrent 1000
-    }
-    cache 30
-    loop
-    reload
-    loadbalance
-}
-```
-
----
-
-## 5. Custom DNS Configurations
-
-### Forward specific domains to custom DNS
-```
-# Add to Corefile — route internal domain to corporate DNS
-corp.example.com:53 {
+corp.internal:53 {
     forward . 10.100.0.53
     cache 30
 }
 ```
 
-```bash
-kubectl edit cm -n kube-system coredns
-# Add stanzas before the closing }
-# CoreDNS auto-reloads on ConfigMap change (reload plugin)
-```
-
-### Stub zones for split-horizon DNS
-```
-# Different answers for internal vs external
-internal.example.com:53 {
-    file /etc/coredns/db.internal.example.com
-}
-```
-
-### Hosts file entries
+**Hosts override** (static entry):
 ```
 .:53 {
-    hosts /etc/coredns/customhosts {
-        10.100.0.5  legacy-server.example.com
+    hosts {
+        10.100.0.5  legacy.corp.internal
         fallthrough
     }
-    # ... rest of config
+    # rest of config...
 }
 ```
 
 ---
 
-## 6. ndots and Performance
+## 4. NodeLocal DNSCache
 
-The default `ndots:5` causes each short name to be tried against all search domains before resolving as a FQDN. For a name like `api`, this generates up to 6 DNS queries:
-
-```
-1. api.default.svc.cluster.local
-2. api.svc.cluster.local
-3. api.cluster.local
-4. api.example.com (if set)
-5. api.                (FQDN attempt)
-```
-
-For external names, this adds latency. Fix:
-
-```
-ndots:5 DNS Resolution — The 6-Query Problem
-
-Pod with default resolv.conf:
-  nameserver 10.96.0.10
-  search default.svc.cluster.local svc.cluster.local cluster.local
-  options ndots:5
-
-Query: curl http://my-service  (1 dot → less than 5 → try search domains first)
-
-Query 1: my-service.default.svc.cluster.local  → FOUND ✓ (stops here if exists)
-Query 2: my-service.svc.cluster.local          → NXDOMAIN
-Query 3: my-service.cluster.local              → NXDOMAIN
-Query 4: my-service.                           → NXDOMAIN
-
-Query: curl http://api.external.com  (3 dots → less than 5 → still tries search domains!)
-
-Query 1: api.external.com.default.svc.cluster.local  → NXDOMAIN (~30ms timeout)
-Query 2: api.external.com.svc.cluster.local          → NXDOMAIN (~30ms timeout)
-Query 3: api.external.com.cluster.local              → NXDOMAIN (~30ms timeout)
-Query 4: api.external.com.                           → FOUND ✓
-
-Total latency added: ~90–300ms for external hostnames with fewer than 5 dots
-```
-
-Fix options:
-
-```yaml
-# Option 1: Use FQDNs in app config (add trailing dot)
-# http://external-api.example.com./path
-
-# Option 2: Per-pod dnsConfig
-spec:
-  dnsConfig:
-    options:
-      - name: ndots
-        value: "1"   # only 1 dot needed to skip search domain expansion
-      - name: single-request-reopen  # avoid UDP race condition
-
-# Option 3: Tune globally (affects all new pods)
-kubectl edit cm -n kube-system kubelet-config
-# resolvConf: custom resolv.conf with ndots:1
-```
-
----
-
-## 7. NodeLocal DNSCache
-
-NodeLocal DNSCache runs a DNS cache on each node, reducing latency and CoreDNS load.
-
-```
-Pod → 169.254.20.10 (node-local cache)
-         ↓ (cache miss)
-      CoreDNS
-```
+Runs as a DaemonSet on `169.254.20.10` (link-local). Pods hit the local node cache instead of a ClusterIP — no conntrack overhead, ~10× lower p99 latency for cached queries.
 
 ```bash
-# Install NodeLocal DNSCache
-# https://kubernetes.io/docs/tasks/administer-cluster/nodelocaldns/
-kubectl apply -f nodelocaldns.yaml
+# Deploy (official manifest)
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/kubernetes/master/cluster/addons/dns/nodelocaldns/nodelocaldns.yaml
 
-# Verify
-kubectl get pods -n kube-system -l k8s-app=node-local-dns
+# Verify — one pod per node
+kubectl get pods -n kube-system -l k8s-app=node-local-dns -o wide
 
-# NodeLocal cache listens on the link-local address
-ip addr show nodelocaldns
-# 169.254.20.10/32
-
-# Pods must have this in their resolv.conf nameserver
-kubectl exec -it <pod-with-nodelocaldns> -- cat /etc/resolv.conf
+# Confirm pod resolv.conf points to it
+kubectl exec <pod> -- cat /etc/resolv.conf
 # nameserver 169.254.20.10
 ```
 
-Benefits:
-- ~3ms p99 → ~0.3ms p99 for cached queries
-- Reduces UDP races with TCP fallback
-- Keeps CoreDNS pods from being overwhelmed
+> **Cloud note:** AWS EKS uses `169.254.20.10` with `aws-k8s-cni` automatically. GKE runs NodeLocal by default since 1.15. For bare metal, forward to your on-prem resolver: `forward . <corp-dns-ip>`.
 
 ---
 
-## 8. CoreDNS Metrics
+## 5. Troubleshooting
 
 ```bash
-# CoreDNS exposes Prometheus metrics on port 9153
-kubectl port-forward -n kube-system svc/kube-dns 9153:9153 &
-curl http://localhost:9153/metrics | grep -E "coredns_dns_requests|coredns_dns_responses|coredns_cache"
-
-# Key metrics to watch:
-# coredns_dns_requests_total         — query rate
-# coredns_dns_responses_total        — response rate by rcode
-# coredns_dns_request_duration_seconds — latency
-# coredns_cache_hits_total           — cache effectiveness
-# coredns_forward_requests_total     — upstream query rate
-```
-
----
-
-## 9. Troubleshooting DNS
-
-```bash
-# Step 1: Is CoreDNS running and healthy?
+# 1 — CoreDNS healthy?
 kubectl get pods -n kube-system -l k8s-app=kube-dns
 kubectl logs -n kube-system -l k8s-app=kube-dns | grep -E "WARN|ERROR"
 
-# Step 2: Can a pod reach CoreDNS?
-kubectl run -it --rm dns-debug --image=nicolaka/netshoot -- \
-  nc -vzu 10.96.0.10 53
+# 2 — Pod can reach CoreDNS?
+kubectl run -it --rm d --image=nicolaka/netshoot -- nc -vzu 10.96.0.10 53
 
-# Step 3: Does a simple lookup work?
-kubectl run -it --rm dns-debug --image=nicolaka/netshoot -- \
-  nslookup kubernetes.default.svc.cluster.local
+# 3 — Internal resolution works?
+kubectl run -it --rm d --image=nicolaka/netshoot -- nslookup kubernetes
 
-# Step 4: Does external DNS work?
-kubectl run -it --rm dns-debug --image=nicolaka/netshoot -- \
-  nslookup google.com
+# 4 — External resolution works?
+kubectl run -it --rm d --image=nicolaka/netshoot -- nslookup github.com
 
-# Step 5: Check CoreDNS logs with query logging enabled
-kubectl edit cm -n kube-system coredns
-# Add: log  (inside the .:53 block)
-
-# Step 6: DNS timeout symptoms
-# "dial tcp: lookup <name>: i/o timeout"
-# → check kube-dns iptables rules exist
-iptables -t nat -L KUBE-SERVICES -n | grep 10.96.0.10
-
-# Common issues:
-# 1. ndots:5 causing slow external resolution → lower ndots
-# 2. CoreDNS OOMKilled → increase memory limits
-# 3. conntrack table full → UDP race condition → use TCP or NodeLocal DNSCache
-# 4. Missing forward DNS → check upstream in Corefile
-# 5. Pod not in correct namespace → use FQDN
+# 5 — Enable query logging (temporarily)
+kubectl edit cm -n kube-system coredns   # add "log" inside the .:53 block
 ```
+
+**Common causes:**
+
+| Symptom | Likely cause | Fix |
+|---------|-------------|-----|
+| External names slow (~300ms) | ndots:5 search expansion | Set `ndots:1` or use FQDNs |
+| CoreDNS OOMKilled | Traffic spike | Increase memory limits / add replicas |
+| `i/o timeout` for `10.96.0.10` | kube-proxy DNAT rule missing | Restart kube-proxy |
+| Intermittent NXDOMAIN | UDP conntrack race | Enable NodeLocal DNSCache |
 
 ---
 
-## 10. DNS on Bare Metal vs Cloud
-
-### Bare Metal
-- CoreDNS forwards external queries to your on-prem DNS servers
-- Configure `forward . <corporate-dns-ip>` in Corefile
-- Split-horizon DNS for reaching internal services by their corporate names
-
-### Cloud
-- CoreDNS forwards to the cloud's internal resolver (169.254.169.253 on AWS, 169.254.169.254 on GCP)
-- Cloud resolver handles VPC DNS (`*.internal`, `*.compute.internal`)
-- For custom domains, configure stub zones or forward to Route53/Cloud DNS
-
-```bash
-# AWS: check the VPC DNS resolver
-# Default: 169.254.169.253 or VPC_CIDR + 2 (e.g., 10.0.0.2)
-kubectl get cm -n kube-system coredns -o yaml | grep forward
-```
-
----
-
-## 11. Summary
+## Summary
 
 | Concept | Detail |
 |---------|--------|
-| CoreDNS service IP | `10.96.0.10` (kube-dns) |
-| Pod resolv.conf | Injected by kubelet with search domains + ndots:5 |
-| Service DNS format | `<svc>.<ns>.svc.cluster.local` |
-| ndots:5 problem | Multiple fallback queries for external names |
-| NodeLocal DNSCache | Per-node cache at 169.254.20.10 — reduces latency |
-| Custom forward | Stub zones in Corefile for internal domains |
+| CoreDNS ClusterIP | `10.96.0.10` (default) |
+| Search domains | `<ns>.svc.cluster.local svc.cluster.local cluster.local` |
+| ndots:5 | <5 dots → tries 3 search domains first |
+| Fix ndots | `dnsConfig.options ndots: "1"` per pod |
+| NodeLocal DNSCache | `169.254.20.10` per node — eliminates conntrack for DNS |
+| Stub zone | `corp.internal:53 { forward . <ip> }` in Corefile |
 
 ---
 
