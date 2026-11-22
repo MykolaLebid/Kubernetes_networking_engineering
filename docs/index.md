@@ -91,7 +91,8 @@ flowchart LR
 
 ## Downloads
 
-- [Complete course PDF](https://github.com/MykolaLebid/Kubernetes_networking_engineering/raw/main/kubernetes-network-engineering.pdf) — 34 lessons, 5.6 MB
+- [Complete course PDF](https://github.com/MykolaLebid/Kubernetes_networking_engineering/raw/main/kubernetes-network-engineering.pdf) — 34 lessons with rendered diagrams
+- [Complete course EPUB](https://github.com/MykolaLebid/Kubernetes_networking_engineering/raw/main/kubernetes-network-engineering.epub) — 4.1 MB, reflows on reMarkable and e-readers
 
 ---
 
