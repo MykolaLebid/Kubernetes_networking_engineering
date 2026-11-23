@@ -92,6 +92,7 @@ pandoc "$RENDERED_MD" \
   --metadata title="Kubernetes Network Engineering" \
   --metadata author="Kubernetes Network Engineering Course" \
   --metadata lang="en" \
+  --css epub-table-styles.css \
   2>&1
 
 EPUB_SIZE=$(ls -lh kubernetes-network-engineering.epub | awk '{print $5}')

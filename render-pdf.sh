@@ -87,10 +87,7 @@ pandoc "$RENDERED_MD" \
   --pdf-engine=typst \
   --toc \
   --toc-depth=2 \
-  -V margin-top=20mm \
-  -V margin-bottom=20mm \
-  -V margin-left=20mm \
-  -V margin-right=20mm \
+  -H pdf-table-styles.typ \
   2>&1
 
 PDF_SIZE=$(ls -lh kubernetes-network-engineering.pdf | awk '{print $5}')

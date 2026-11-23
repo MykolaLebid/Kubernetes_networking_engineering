@@ -1,0 +1,69 @@
+/* epub-table-styles.css — injected into EPUB for reMarkable and e-readers */
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85em;
+  margin: 1em 0;
+  page-break-inside: avoid;
+}
+
+thead tr {
+  background-color: #1a3a6b;
+  color: white;
+  font-weight: bold;
+  text-align: left;
+}
+
+th, td {
+  padding: 7px 10px;
+  border-bottom: 1px solid #c8d8ea;
+  vertical-align: top;
+  word-break: break-word;
+}
+
+tbody tr:nth-child(odd) {
+  background-color: #f2f6fb;
+}
+
+tbody tr:nth-child(even) {
+  background-color: #ffffff;
+}
+
+/* Inline code inside tables */
+td code {
+  font-size: 0.85em;
+  background: #f0f0f0;
+  padding: 1px 3px;
+  border-radius: 2px;
+}
+
+/* Code blocks */
+pre {
+  background: #f8f8f8;
+  border: 1px solid #dddddd;
+  border-radius: 4px;
+  padding: 10px;
+  font-size: 0.82em;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Headings */
+h1 { font-size: 1.6em; border-bottom: 2px solid #1a3a6b; padding-bottom: 4px; }
+h2 { font-size: 1.3em; color: #1a3a6b; }
+h3 { font-size: 1.1em; color: #2d6a9f; }
+
+/* Body text */
+body { font-size: 1em; line-height: 1.55; }
+
+/* Blockquotes (Goal callouts) */
+blockquote {
+  border-left: 3px solid #2d6a9f;
+  margin: 0.5em 0;
+  padding: 4px 12px;
+  background: #f0f4f8;
+  font-style: normal;
+}
