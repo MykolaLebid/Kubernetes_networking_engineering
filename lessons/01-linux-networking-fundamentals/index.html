@@ -761,10 +761,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#practice-setup" class="md-nav__link">
+  <a href="#theory" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Practice Setup
+        Theory
       
     </span>
   </a>
@@ -878,10 +878,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#sysctl-configuration-reference" class="md-nav__link">
+  <a href="#industry-applications" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Sysctl Configuration Reference
+        Industry Applications
       
     </span>
   </a>
@@ -894,15 +894,38 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#8-hands-on-lab-simulate-a-two-pod-node" class="md-nav__link">
+  <a href="#practice" class="md-nav__link">
     <span class="md-ellipsis">
       
-        8. Hands-On Lab: Simulate a Two-Pod Node
+        Practice
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="8. Hands-On Lab: Simulate a Two-Pod Node">
+    <nav class="md-nav" aria-label="Practice">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#environment-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment Setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hands-on-lab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hands-On Lab
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Hands-On Lab">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -921,6 +944,22 @@
     <span class="md-ellipsis">
       
         Verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration Reference
       
     </span>
   </a>
@@ -2464,10 +2503,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#practice-setup" class="md-nav__link">
+  <a href="#theory" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Practice Setup
+        Theory
       
     </span>
   </a>
@@ -2581,10 +2620,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#sysctl-configuration-reference" class="md-nav__link">
+  <a href="#industry-applications" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Sysctl Configuration Reference
+        Industry Applications
       
     </span>
   </a>
@@ -2597,15 +2636,38 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#8-hands-on-lab-simulate-a-two-pod-node" class="md-nav__link">
+  <a href="#practice" class="md-nav__link">
     <span class="md-ellipsis">
       
-        8. Hands-On Lab: Simulate a Two-Pod Node
+        Practice
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="8. Hands-On Lab: Simulate a Two-Pod Node">
+    <nav class="md-nav" aria-label="Practice">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#environment-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment Setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hands-on-lab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hands-On Lab
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Hands-On Lab">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2624,6 +2686,22 @@
     <span class="md-ellipsis">
       
         Verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuration-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration Reference
       
     </span>
   </a>
@@ -2742,44 +2820,39 @@
 <p><strong>Track:</strong> Network Foundation — Bare Metal &amp; Cloud · <strong>Prereqs:</strong> Basic Linux command line familiarity · <strong>Time:</strong> ~2 hours</p>
 <p><strong>Goal:</strong> Wire two virtual pods together on a single Linux host using veth pairs, a bridge, and ip_forward — replicating exactly what every CNI plugin does on node startup.</p>
 </blockquote>
+<p><strong>Jump to:</strong> <a href="#theory">Theory</a> · <a href="#practice">Practice</a> · <a href="#troubleshooting">Troubleshooting</a> · <a href="#production-checklist">Production Checklist</a> · <a href="#quick-reference">Quick Reference</a> · <a href="#check-your-understanding">Check Your Understanding</a></p>
 <hr />
-<h2 id="practice-setup">Practice Setup<a class="headerlink" href="#practice-setup" title="Permanent link">&para;</a></h2>
-<p>All commands in this lesson run on <strong>Linux</strong>. Use two terminals side by side:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Terminal 1 — minikube Linux node</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>minikube<span class="w"> </span>ssh
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Terminal 2 — your Mac (observe differences)</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>ip<span class="w"> </span>addr<span class="w">   </span><span class="c1"># uses iproute2mac wrapper</span>
-</span></code></pre></div>
-<p>Inside <code>minikube ssh</code> you have full Linux networking: <code>ip netns</code>, <code>ip link add veth</code>, <code>bridge</code>, <code>iptables</code>, etc.</p>
-<hr />
+<h2 id="theory">Theory<a class="headerlink" href="#theory" title="Permanent link">&para;</a></h2>
 <h2 id="1-the-linux-network-stack">1. The Linux Network Stack<a class="headerlink" href="#1-the-linux-network-stack" title="Permanent link">&para;</a></h2>
 <pre class="mermaid"><code>flowchart LR
-    A[Application\nsockets] --&gt; B[Transport Layer\nTCP / UDP]
-    B --&gt; C[Network Layer\nIP]
-    C --&gt; D[Link Layer\nEthernet / drivers]
-    D --&gt; E[Physical\nNIC / vNIC]
+    A["Application sockets (HTTP/gRPC)"] --"syscall send/recv"--&gt; B["Transport Layer (TCP/UDP :80/:443)"]
+    B --"IP datagram"--&gt; C["Network Layer (IPv4/IPv6)"]
+    C --"Ethernet frame"--&gt; D["Link Layer (eth/veth driver)"]
+    D --"electrical/optical"--&gt; E["Physical NIC (1G/10G/25G)"]
+    C --"kernel virtual path"--&gt; F["CNI Layer (veth/bridge/VXLAN)"]
+    F --"kernel xmit"--&gt; D
 
     style A fill:#4a6fa5,color:#fff
     style B fill:#4a6fa5,color:#fff
     style C fill:#4a6fa5,color:#fff
     style D fill:#4a6fa5,color:#fff
-    style E fill:#4a6fa5,color:#fff</code></pre>
+    style E fill:#4a6fa5,color:#fff
+    style F fill:#2d5a27,color:#fff</code></pre>
 <p>Kubernetes adds virtual layers (veth pairs, bridges, tunnels) <strong>between</strong> the Link and Network layers. The kernel enforces namespace isolation at the network layer — each pod gets its own complete stack. CNI plugins operate at this virtual layer, never touching the physical NIC directly.</p>
 <hr />
 <h2 id="2-network-namespaces">2. Network Namespaces<a class="headerlink" href="#2-network-namespaces" title="Permanent link">&para;</a></h2>
 <p>A <strong>network namespace</strong> gives a process its own isolated network stack: interfaces, routing table, iptables rules, and sockets.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Create a namespace</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>ip<span class="w"> </span>netns<span class="w"> </span>add<span class="w"> </span>ns-blue
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># List namespaces</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>ip<span class="w"> </span>netns<span class="w"> </span>list
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># Run a command inside the namespace</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ns-blue<span class="w"> </span>ip<span class="w"> </span>link<span class="w"> </span>list
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="c1"># Delete</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>ip<span class="w"> </span>netns<span class="w"> </span>del<span class="w"> </span>ns-blue
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Create a namespace</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>ip<span class="w"> </span>netns<span class="w"> </span>add<span class="w"> </span>ns-blue
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># List namespaces</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>ip<span class="w"> </span>netns<span class="w"> </span>list
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># Run a command inside the namespace</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ns-blue<span class="w"> </span>ip<span class="w"> </span>link<span class="w"> </span>list
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># Delete</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>ip<span class="w"> </span>netns<span class="w"> </span>del<span class="w"> </span>ns-blue
 </span></code></pre></div>
 <p>Each Kubernetes <strong>pod</strong> runs in its own network namespace. The pause (infra) container holds the namespace; app containers join it via <code>--network=container:&lt;id&gt;</code>.</p>
 <blockquote>
@@ -2788,90 +2861,100 @@
 <hr />
 <h2 id="3-virtual-ethernet-pairs-veth">3. Virtual Ethernet Pairs (veth)<a class="headerlink" href="#3-virtual-ethernet-pairs-veth" title="Permanent link">&para;</a></h2>
 <p>A <strong>veth pair</strong> is a bidirectional virtual wire connecting two network namespaces. Packets written into one end emerge from the other — zero buffering, kernel-internal path.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Create a veth pair</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>ip<span class="w"> </span>link<span class="w"> </span>add<span class="w"> </span>veth0<span class="w"> </span><span class="nb">type</span><span class="w"> </span>veth<span class="w"> </span>peer<span class="w"> </span>name<span class="w"> </span>veth1
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Move veth1 into ns-blue</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth1<span class="w"> </span>netns<span class="w"> </span>ns-blue
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="c1"># Configure veth0 on the host</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>ip<span class="w"> </span>addr<span class="w"> </span>add<span class="w"> </span><span class="m">10</span>.0.0.1/24<span class="w"> </span>dev<span class="w"> </span>veth0
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth0<span class="w"> </span>up
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="c1"># Configure veth1 inside the namespace</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ns-blue<span class="w"> </span>ip<span class="w"> </span>addr<span class="w"> </span>add<span class="w"> </span><span class="m">10</span>.0.0.2/24<span class="w"> </span>dev<span class="w"> </span>veth1
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ns-blue<span class="w"> </span>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth1<span class="w"> </span>up
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ns-blue<span class="w"> </span>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>lo<span class="w"> </span>up
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>
-</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="c1"># Test connectivity</span>
-</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>ping<span class="w"> </span>-c3<span class="w"> </span><span class="m">10</span>.0.0.2
-</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ns-blue<span class="w"> </span>ping<span class="w"> </span>-c3<span class="w"> </span><span class="m">10</span>.0.0.1
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Create a veth pair</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>ip<span class="w"> </span>link<span class="w"> </span>add<span class="w"> </span>veth0<span class="w"> </span><span class="nb">type</span><span class="w"> </span>veth<span class="w"> </span>peer<span class="w"> </span>name<span class="w"> </span>veth1
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Move veth1 into ns-blue</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth1<span class="w"> </span>netns<span class="w"> </span>ns-blue
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># Configure veth0 on the host</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>ip<span class="w"> </span>addr<span class="w"> </span>add<span class="w"> </span><span class="m">10</span>.0.0.1/24<span class="w"> </span>dev<span class="w"> </span>veth0
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth0<span class="w"> </span>up
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="c1"># Configure veth1 inside the namespace</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ns-blue<span class="w"> </span>ip<span class="w"> </span>addr<span class="w"> </span>add<span class="w"> </span><span class="m">10</span>.0.0.2/24<span class="w"> </span>dev<span class="w"> </span>veth1
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ns-blue<span class="w"> </span>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth1<span class="w"> </span>up
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ns-blue<span class="w"> </span>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>lo<span class="w"> </span>up
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="c1"># Test connectivity</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>ping<span class="w"> </span>-c3<span class="w"> </span><span class="m">10</span>.0.0.2
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ns-blue<span class="w"> </span>ping<span class="w"> </span>-c3<span class="w"> </span><span class="m">10</span>.0.0.1
 </span></code></pre></div>
 <p>This is exactly what a CNI plugin does when it creates a pod: one veth end goes into the pod namespace (named <code>eth0</code> by convention), the other stays on the host (named <code>cali&lt;hash&gt;</code>, <code>veth&lt;hash&gt;</code>, or similar).</p>
 <hr />
 <h2 id="4-linux-bridge">4. Linux Bridge<a class="headerlink" href="#4-linux-bridge" title="Permanent link">&para;</a></h2>
 <p>A <strong>bridge</strong> (layer 2 switch in software) connects multiple veth endpoints so pods on the same node can communicate without routing.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Create a bridge</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>ip<span class="w"> </span>link<span class="w"> </span>add<span class="w"> </span>br0<span class="w"> </span><span class="nb">type</span><span class="w"> </span>bridge
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>br0<span class="w"> </span>up
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>ip<span class="w"> </span>addr<span class="w"> </span>add<span class="w"> </span><span class="m">10</span>.244.0.1/24<span class="w"> </span>dev<span class="w"> </span>br0
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="c1"># Attach veth0 (host side of pod veth pair) to the bridge</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth0<span class="w"> </span>master<span class="w"> </span>br0
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Create a bridge</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>ip<span class="w"> </span>link<span class="w"> </span>add<span class="w"> </span>br0<span class="w"> </span><span class="nb">type</span><span class="w"> </span>bridge
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>br0<span class="w"> </span>up
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>ip<span class="w"> </span>addr<span class="w"> </span>add<span class="w"> </span><span class="m">10</span>.244.0.1/24<span class="w"> </span>dev<span class="w"> </span>br0
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="c1"># Attach veth0 (host side of pod veth pair) to the bridge</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth0<span class="w"> </span>master<span class="w"> </span>br0
 </span></code></pre></div>
 <p>Flannel's <code>cbr0</code>, Docker's <code>docker0</code>, and Calico's <code>cali*</code>-to-bridge wiring all follow this pattern.</p>
 <h3 id="architecture-two-pod-node">Architecture: Two-Pod Node<a class="headerlink" href="#architecture-two-pod-node" title="Permanent link">&para;</a></h3>
 <pre class="mermaid"><code>flowchart LR
     subgraph poda [Pod A namespace]
-        PA[eth0\n10.244.0.10/24]
+        PA["eth0 10.244.0.10/24"]
+        LOBA["lo 127.0.0.1"]
     end
     subgraph podb [Pod B namespace]
-        PB[eth0\n10.244.0.11/24]
+        PB["eth0 10.244.0.11/24"]
+        LOBB["lo 127.0.0.1"]
     end
     subgraph host [Host network namespace]
-        VA[veth-a-br]
-        VB[veth-b-br]
-        BR[br0\n10.244.0.1/24]
-        ETH[eth0 — node NIC]
+        VA["veth-a-br (caliAAAA)"]
+        VB["veth-b-br (caliBBBB)"]
+        BR["br0 10.244.0.1/24"]
+        ETH["eth0 node NIC 192.168.1.10"]
+        RT["kernel routing ip_forward=1"]
     end
 
-    PA &lt;--&gt;|veth pair| VA
-    PB &lt;--&gt;|veth pair| VB
+    PA &lt;--&gt;|"veth pair L2"| VA
+    PB &lt;--&gt;|"veth pair L2"| VB
     VA --- BR
     VB --- BR
     BR --- ETH
+    BR --- RT
 
     style poda fill:#2d5a27,color:#fff
     style podb fill:#2d5a27,color:#fff
     style host fill:#1a3a5c,color:#fff</code></pre>
 <h3 id="flow-pod-a-to-pod-b-same-node">Flow: Pod A to Pod B (same node)<a class="headerlink" href="#flow-pod-a-to-pod-b-same-node" title="Permanent link">&para;</a></h3>
 <pre class="mermaid"><code>sequenceDiagram
-    participant PA as Pod A (10.244.0.10)
-    participant VA as veth-a-br (host)
+    participant PA as Pod A nginx :80
+    participant VA as veth-a-br host-side
+    participant ARP as ARP/FDB table
     participant BR as br0 bridge
-    participant VB as veth-b-br (host)
-    participant PB as Pod B (10.244.0.11)
+    participant VB as veth-b-br host-side
+    participant PB as Pod B redis :6379
 
-    PA-&gt;&gt;VA: Packet src=10.244.0.10 dst=10.244.0.11
-    VA-&gt;&gt;BR: Frame enters bridge port
-    Note over BR: ARP or FDB lookup&lt;br/&gt;dst MAC maps to veth-b-br port
-    BR-&gt;&gt;VB: Frame forwarded to correct port
-    VB-&gt;&gt;PB: Packet delivered to Pod B</code></pre>
+    PA-&gt;&gt;VA: Ethernet frame src=10.244.0.10 dst=10.244.0.11
+    VA-&gt;&gt;BR: Frame arrives at bridge port
+    BR-&gt;&gt;ARP: Lookup dst MAC for 10.244.0.11
+    ARP--&gt;&gt;BR: MAC aa:bb:cc:00:01:02 on port veth-b-br
+    BR-&gt;&gt;VB: Frame forwarded to matched bridge port
+    VB-&gt;&gt;PB: Packet delivered TCP :6379
+    PB--&gt;&gt;VB: TCP reply ACK
+    VB--&gt;&gt;BR: Reply frame
+    BR--&gt;&gt;VA: Forwarded via FDB lookup
+    VA--&gt;&gt;PA: Reply delivered to Pod A</code></pre>
 <hr />
 <h2 id="5-routing-table">5. Routing Table<a class="headerlink" href="#5-routing-table" title="Permanent link">&para;</a></h2>
 <p>Linux uses routing rules to decide where to send packets.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Show main routing table</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>ip<span class="w"> </span>route<span class="w"> </span>show
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Add a route: reach 10.244.1.0/24 via 192.168.1.10</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>ip<span class="w"> </span>route<span class="w"> </span>add<span class="w"> </span><span class="m">10</span>.244.1.0/24<span class="w"> </span>via<span class="w"> </span><span class="m">192</span>.168.1.10<span class="w"> </span>dev<span class="w"> </span>eth0
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># Add a host route for a pod IP (Calico-style)</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>ip<span class="w"> </span>route<span class="w"> </span>add<span class="w"> </span><span class="m">10</span>.244.0.5/32<span class="w"> </span>dev<span class="w"> </span>veth_pod0
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="c1"># Policy routing — multiple tables</span>
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>ip<span class="w"> </span>rule<span class="w"> </span>list
-</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>ip<span class="w"> </span>route<span class="w"> </span>show<span class="w"> </span>table<span class="w"> </span><span class="nb">local</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Show main routing table</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>ip<span class="w"> </span>route<span class="w"> </span>show
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Add a route: reach 10.244.1.0/24 via 192.168.1.10</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>ip<span class="w"> </span>route<span class="w"> </span>add<span class="w"> </span><span class="m">10</span>.244.1.0/24<span class="w"> </span>via<span class="w"> </span><span class="m">192</span>.168.1.10<span class="w"> </span>dev<span class="w"> </span>eth0
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># Add a host route for a pod IP (Calico-style)</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>ip<span class="w"> </span>route<span class="w"> </span>add<span class="w"> </span><span class="m">10</span>.244.0.5/32<span class="w"> </span>dev<span class="w"> </span>veth_pod0
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="c1"># Policy routing — multiple tables</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>ip<span class="w"> </span>rule<span class="w"> </span>list
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>ip<span class="w"> </span>route<span class="w"> </span>show<span class="w"> </span>table<span class="w"> </span><span class="nb">local</span>
 </span></code></pre></div>
 <p>For cross-node pod routing, CNI plugins either:
 - <strong>Add static routes</strong> per remote pod CIDR (Calico BGP, Flannel host-gw)
@@ -2882,34 +2965,152 @@
 <hr />
 <h2 id="6-arp-and-neighbor-table">6. ARP and Neighbor Table<a class="headerlink" href="#6-arp-and-neighbor-table" title="Permanent link">&para;</a></h2>
 <p>ARP resolves IP addresses to MAC addresses within a L2 segment. The kernel caches results in the neighbor table.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Show ARP cache</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>ip<span class="w"> </span>neigh<span class="w"> </span>show
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Flush ARP for an interface</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>ip<span class="w"> </span>neigh<span class="w"> </span>flush<span class="w"> </span>dev<span class="w"> </span>eth0
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># Static ARP entry (useful for VXLAN FDB population)</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>ip<span class="w"> </span>neigh<span class="w"> </span>add<span class="w"> </span><span class="m">10</span>.244.0.5<span class="w"> </span>lladdr<span class="w"> </span>aa:bb:cc:dd:ee:ff<span class="w"> </span>dev<span class="w"> </span>eth0
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Show ARP cache</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>ip<span class="w"> </span>neigh<span class="w"> </span>show
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Flush ARP for an interface</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>ip<span class="w"> </span>neigh<span class="w"> </span>flush<span class="w"> </span>dev<span class="w"> </span>eth0
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># Static ARP entry (useful for VXLAN FDB population)</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>ip<span class="w"> </span>neigh<span class="w"> </span>add<span class="w"> </span><span class="m">10</span>.244.0.5<span class="w"> </span>lladdr<span class="w"> </span>aa:bb:cc:dd:ee:ff<span class="w"> </span>dev<span class="w"> </span>eth0
 </span></code></pre></div>
 <p>Calico uses <code>proxy_arp</code> on each veth so pods can reach any IP without an ARP for the gateway:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>cat<span class="w"> </span>/proc/sys/net/ipv4/conf/cali1234abcd/proxy_arp
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="c1"># → 1</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>cat<span class="w"> </span>/proc/sys/net/ipv4/conf/cali1234abcd/proxy_arp
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="c1"># → 1</span>
 </span></code></pre></div>
 <hr />
 <h2 id="7-key-kernel-parameters-for-kubernetes">7. Key Kernel Parameters for Kubernetes<a class="headerlink" href="#7-key-kernel-parameters-for-kubernetes" title="Permanent link">&para;</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># IP forwarding — required so the node can route between pod and external traffic</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>sysctl<span class="w"> </span>net.ipv4.ip_forward<span class="o">=</span><span class="m">1</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>sysctl<span class="w"> </span>net.ipv6.conf.all.forwarding<span class="o">=</span><span class="m">1</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="c1"># Allow iptables to see bridged traffic (needed by kube-proxy and many CNIs)</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>sysctl<span class="w"> </span>net.bridge.bridge-nf-call-iptables<span class="o">=</span><span class="m">1</span>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>sysctl<span class="w"> </span>net.bridge.bridge-nf-call-ip6tables<span class="o">=</span><span class="m">1</span>
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>
-</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="c1"># Avoid conntrack table exhaustion</span>
-</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>sysctl<span class="w"> </span>net.netfilter.nf_conntrack_max<span class="o">=</span><span class="m">1000000</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># IP forwarding — required so the node can route between pod and external traffic</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>sysctl<span class="w"> </span>net.ipv4.ip_forward<span class="o">=</span><span class="m">1</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>sysctl<span class="w"> </span>net.ipv6.conf.all.forwarding<span class="o">=</span><span class="m">1</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="c1"># Allow iptables to see bridged traffic (needed by kube-proxy and many CNIs)</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>sysctl<span class="w"> </span>net.bridge.bridge-nf-call-iptables<span class="o">=</span><span class="m">1</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>sysctl<span class="w"> </span>net.bridge.bridge-nf-call-ip6tables<span class="o">=</span><span class="m">1</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="c1"># Avoid conntrack table exhaustion</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>sysctl<span class="w"> </span>net.netfilter.nf_conntrack_max<span class="o">=</span><span class="m">1000000</span>
 </span></code></pre></div>
 <p>These are set in <code>/etc/sysctl.d/99-kubernetes.conf</code> by kubeadm.</p>
-<h3 id="sysctl-configuration-reference">Sysctl Configuration Reference<a class="headerlink" href="#sysctl-configuration-reference" title="Permanent link">&para;</a></h3>
+<h3 id="industry-applications">Industry Applications<a class="headerlink" href="#industry-applications" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Company / Project</th>
+<th>Context</th>
+<th>Technology from this lesson</th>
+<th>Outcome</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Google GKE</td>
+<td>Each GKE node creates one veth pair per pod at scheduling time, connecting it to the cbr0 bridge</td>
+<td>veth pairs + Linux bridge (cbr0) + ip_forward</td>
+<td>Scales to millions of pods across the GKE fleet with no overlay overhead on-node</td>
+</tr>
+<tr>
+<td>Cloudflare</td>
+<td>Edge nodes run thousands of containers on bare-metal Linux, using Linux bridges for intra-host routing</td>
+<td>Linux bridge + veth pairs + ip_forward sysctl</td>
+<td>Achieves sub-microsecond container routing without custom hardware switches</td>
+</tr>
+<tr>
+<td>Docker Desktop</td>
+<td>Every Docker container on Mac and Linux gets a veth pair connected to the docker0 bridge</td>
+<td>veth pair + bridge (docker0)</td>
+<td>Same Linux primitives used in this lesson power 50M+ Docker Desktop installs worldwide</td>
+</tr>
+<tr>
+<td>AWS EKS Fargate</td>
+<td>Each Fargate task receives its own network namespace and veth pair managed by the VPC CNI plugin</td>
+<td>veth pairs + network namespaces + ip_forward</td>
+<td>Provides workload isolation at scale without touching the physical NIC or hypervisor</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="practice">Practice<a class="headerlink" href="#practice" title="Permanent link">&para;</a></h2>
+<h3 id="environment-setup">Environment Setup<a class="headerlink" href="#environment-setup" title="Permanent link">&para;</a></h3>
+<p>All commands in this lesson run on <strong>Linux</strong>. Use two terminals side by side:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Terminal 1 — minikube Linux node</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>minikube<span class="w"> </span>ssh
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1"># Terminal 2 — your Mac (observe differences)</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>ip<span class="w"> </span>addr<span class="w">   </span><span class="c1"># uses iproute2mac wrapper</span>
+</span></code></pre></div>
+<p>Inside <code>minikube ssh</code> you have full Linux networking: <code>ip netns</code>, <code>ip link add veth</code>, <code>bridge</code>, <code>iptables</code>, etc.</p>
+<h3 id="hands-on-lab">Hands-On Lab<a class="headerlink" href="#hands-on-lab" title="Permanent link">&para;</a></h3>
+<p>Reproduce what a CNI plugin does on a single Linux machine.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># 1. Create two "pod" namespaces</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>ip<span class="w"> </span>netns<span class="w"> </span>add<span class="w"> </span>pod-a
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>ip<span class="w"> </span>netns<span class="w"> </span>add<span class="w"> </span>pod-b
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="c1"># 2. Create a bridge to act as the node bridge</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>ip<span class="w"> </span>link<span class="w"> </span>add<span class="w"> </span>br0<span class="w"> </span><span class="nb">type</span><span class="w"> </span>bridge
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>br0<span class="w"> </span>up
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>ip<span class="w"> </span>addr<span class="w"> </span>add<span class="w"> </span><span class="m">10</span>.244.0.1/24<span class="w"> </span>dev<span class="w"> </span>br0
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="c1"># 3. Create veth pairs and wire them up</span>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>ip<span class="w"> </span>link<span class="w"> </span>add<span class="w"> </span>veth-a<span class="w"> </span><span class="nb">type</span><span class="w"> </span>veth<span class="w"> </span>peer<span class="w"> </span>name<span class="w"> </span>veth-a-br
+</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>ip<span class="w"> </span>link<span class="w"> </span>add<span class="w"> </span>veth-b<span class="w"> </span><span class="nb">type</span><span class="w"> </span>veth<span class="w"> </span>peer<span class="w"> </span>name<span class="w"> </span>veth-b-br
+</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>
+</span><span id="__span-8-14"><a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth-a<span class="w"> </span>netns<span class="w"> </span>pod-a
+</span><span id="__span-8-15"><a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth-b<span class="w"> </span>netns<span class="w"> </span>pod-b
+</span><span id="__span-8-16"><a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth-a-br<span class="w"> </span>master<span class="w"> </span>br0
+</span><span id="__span-8-17"><a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth-b-br<span class="w"> </span>master<span class="w"> </span>br0
+</span><span id="__span-8-18"><a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth-a-br<span class="w"> </span>up
+</span><span id="__span-8-19"><a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth-b-br<span class="w"> </span>up
+</span><span id="__span-8-20"><a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a>
+</span><span id="__span-8-21"><a id="__codelineno-8-21" name="__codelineno-8-21" href="#__codelineno-8-21"></a><span class="c1"># 4. Configure IPs inside pods</span>
+</span><span id="__span-8-22"><a id="__codelineno-8-22" name="__codelineno-8-22" href="#__codelineno-8-22"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-a<span class="w"> </span>ip<span class="w"> </span>addr<span class="w"> </span>add<span class="w"> </span><span class="m">10</span>.244.0.10/24<span class="w"> </span>dev<span class="w"> </span>veth-a
+</span><span id="__span-8-23"><a id="__codelineno-8-23" name="__codelineno-8-23" href="#__codelineno-8-23"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-a<span class="w"> </span>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth-a<span class="w"> </span>up
+</span><span id="__span-8-24"><a id="__codelineno-8-24" name="__codelineno-8-24" href="#__codelineno-8-24"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-a<span class="w"> </span>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>lo<span class="w"> </span>up
+</span><span id="__span-8-25"><a id="__codelineno-8-25" name="__codelineno-8-25" href="#__codelineno-8-25"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-a<span class="w"> </span>ip<span class="w"> </span>route<span class="w"> </span>add<span class="w"> </span>default<span class="w"> </span>via<span class="w"> </span><span class="m">10</span>.244.0.1
+</span><span id="__span-8-26"><a id="__codelineno-8-26" name="__codelineno-8-26" href="#__codelineno-8-26"></a>
+</span><span id="__span-8-27"><a id="__codelineno-8-27" name="__codelineno-8-27" href="#__codelineno-8-27"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-b<span class="w"> </span>ip<span class="w"> </span>addr<span class="w"> </span>add<span class="w"> </span><span class="m">10</span>.244.0.11/24<span class="w"> </span>dev<span class="w"> </span>veth-b
+</span><span id="__span-8-28"><a id="__codelineno-8-28" name="__codelineno-8-28" href="#__codelineno-8-28"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-b<span class="w"> </span>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth-b<span class="w"> </span>up
+</span><span id="__span-8-29"><a id="__codelineno-8-29" name="__codelineno-8-29" href="#__codelineno-8-29"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-b<span class="w"> </span>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>lo<span class="w"> </span>up
+</span><span id="__span-8-30"><a id="__codelineno-8-30" name="__codelineno-8-30" href="#__codelineno-8-30"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-b<span class="w"> </span>ip<span class="w"> </span>route<span class="w"> </span>add<span class="w"> </span>default<span class="w"> </span>via<span class="w"> </span><span class="m">10</span>.244.0.1
+</span></code></pre></div>
+<h4 id="step-by-step-observation">Step-by-step Observation<a class="headerlink" href="#step-by-step-observation" title="Permanent link">&para;</a></h4>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Observe bridge MAC learning — run after first ping</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-a<span class="w"> </span>ping<span class="w"> </span>-c1<span class="w"> </span><span class="m">10</span>.244.0.11
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>bridge<span class="w"> </span>fdb<span class="w"> </span>show<span class="w"> </span>dev<span class="w"> </span>veth-a-br
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># → aa:bb:cc:00:01:01 dev veth-a-br master br0 (pod-a's MAC learned)</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="c1"># Watch ARP resolution inside pod-a</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-a<span class="w"> </span>ip<span class="w"> </span>neigh<span class="w"> </span>show
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="c1"># → 10.244.0.1  dev veth-a lladdr 02:42:0a:f4:00:01 REACHABLE</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="c1"># → 10.244.0.11 dev veth-a lladdr aa:bb:cc:00:01:02 REACHABLE</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="c1"># See packets crossing the bridge in real time</span>
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>tcpdump<span class="w"> </span>-i<span class="w"> </span>br0<span class="w"> </span>-n<span class="w"> </span><span class="p">&amp;</span>
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-a<span class="w"> </span>ping<span class="w"> </span>-c3<span class="w"> </span><span class="m">10</span>.244.0.11
+</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="c1"># → ARP request/reply, then ICMP echo/reply visible on br0</span>
+</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>
+</span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="c1"># Confirm routing table inside pod-a</span>
+</span><span id="__span-9-17"><a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-a<span class="w"> </span>ip<span class="w"> </span>route<span class="w"> </span>show
+</span><span id="__span-9-18"><a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a><span class="c1"># → default via 10.244.0.1 dev veth-a</span>
+</span><span id="__span-9-19"><a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a><span class="c1"># → 10.244.0.0/24 dev veth-a proto kernel scope link src 10.244.0.10</span>
+</span><span id="__span-9-20"><a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a>
+</span><span id="__span-9-21"><a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a><span class="c1"># 5. Test pod-a → pod-b</span>
+</span><span id="__span-9-22"><a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-a<span class="w"> </span>ping<span class="w"> </span>-c3<span class="w"> </span><span class="m">10</span>.244.0.11
+</span><span id="__span-9-23"><a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a><span class="c1"># → PING 10.244.0.11: 3 packets transmitted, 3 received, 0% packet loss</span>
+</span></code></pre></div>
+<h4 id="verification">Verification<a class="headerlink" href="#verification" title="Permanent link">&para;</a></h4>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Confirm environment is correct before testing</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>ip<span class="w"> </span>netns<span class="w"> </span>list<span class="w">        </span><span class="c1"># → pod-a  pod-b</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>ip<span class="w"> </span>link<span class="w"> </span>show<span class="w"> </span>br0<span class="w">     </span><span class="c1"># → br0: ... state UP</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>ip<span class="w"> </span>route<span class="w"> </span>show<span class="w">        </span><span class="c1"># → 10.244.0.0/24 dev br0 proto kernel scope link src 10.244.0.1</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>sysctl<span class="w"> </span>net.ipv4.ip_forward<span class="w">  </span><span class="c1"># → net.ipv4.ip_forward = 1</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="c1"># 6. Cleanup</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>ip<span class="w"> </span>netns<span class="w"> </span>del<span class="w"> </span>pod-a
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>ip<span class="w"> </span>netns<span class="w"> </span>del<span class="w"> </span>pod-b
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>ip<span class="w"> </span>link<span class="w"> </span>del<span class="w"> </span>br0
+</span></code></pre></div>
+<h3 id="configuration-reference">Configuration Reference<a class="headerlink" href="#configuration-reference" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -2964,77 +3165,6 @@
 </tr>
 </tbody>
 </table>
-<hr />
-<h2 id="8-hands-on-lab-simulate-a-two-pod-node">8. Hands-On Lab: Simulate a Two-Pod Node<a class="headerlink" href="#8-hands-on-lab-simulate-a-two-pod-node" title="Permanent link">&para;</a></h2>
-<p>Reproduce what a CNI plugin does on a single Linux machine.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># 1. Create two "pod" namespaces</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>ip<span class="w"> </span>netns<span class="w"> </span>add<span class="w"> </span>pod-a
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>ip<span class="w"> </span>netns<span class="w"> </span>add<span class="w"> </span>pod-b
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="c1"># 2. Create a bridge to act as the node bridge</span>
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>ip<span class="w"> </span>link<span class="w"> </span>add<span class="w"> </span>br0<span class="w"> </span><span class="nb">type</span><span class="w"> </span>bridge
-</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>br0<span class="w"> </span>up
-</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>ip<span class="w"> </span>addr<span class="w"> </span>add<span class="w"> </span><span class="m">10</span>.244.0.1/24<span class="w"> </span>dev<span class="w"> </span>br0
-</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>
-</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="c1"># 3. Create veth pairs and wire them up</span>
-</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>ip<span class="w"> </span>link<span class="w"> </span>add<span class="w"> </span>veth-a<span class="w"> </span><span class="nb">type</span><span class="w"> </span>veth<span class="w"> </span>peer<span class="w"> </span>name<span class="w"> </span>veth-a-br
-</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>ip<span class="w"> </span>link<span class="w"> </span>add<span class="w"> </span>veth-b<span class="w"> </span><span class="nb">type</span><span class="w"> </span>veth<span class="w"> </span>peer<span class="w"> </span>name<span class="w"> </span>veth-b-br
-</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>
-</span><span id="__span-8-14"><a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth-a<span class="w"> </span>netns<span class="w"> </span>pod-a
-</span><span id="__span-8-15"><a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth-b<span class="w"> </span>netns<span class="w"> </span>pod-b
-</span><span id="__span-8-16"><a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth-a-br<span class="w"> </span>master<span class="w"> </span>br0
-</span><span id="__span-8-17"><a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth-b-br<span class="w"> </span>master<span class="w"> </span>br0
-</span><span id="__span-8-18"><a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth-a-br<span class="w"> </span>up
-</span><span id="__span-8-19"><a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth-b-br<span class="w"> </span>up
-</span><span id="__span-8-20"><a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a>
-</span><span id="__span-8-21"><a id="__codelineno-8-21" name="__codelineno-8-21" href="#__codelineno-8-21"></a><span class="c1"># 4. Configure IPs inside pods</span>
-</span><span id="__span-8-22"><a id="__codelineno-8-22" name="__codelineno-8-22" href="#__codelineno-8-22"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-a<span class="w"> </span>ip<span class="w"> </span>addr<span class="w"> </span>add<span class="w"> </span><span class="m">10</span>.244.0.10/24<span class="w"> </span>dev<span class="w"> </span>veth-a
-</span><span id="__span-8-23"><a id="__codelineno-8-23" name="__codelineno-8-23" href="#__codelineno-8-23"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-a<span class="w"> </span>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth-a<span class="w"> </span>up
-</span><span id="__span-8-24"><a id="__codelineno-8-24" name="__codelineno-8-24" href="#__codelineno-8-24"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-a<span class="w"> </span>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>lo<span class="w"> </span>up
-</span><span id="__span-8-25"><a id="__codelineno-8-25" name="__codelineno-8-25" href="#__codelineno-8-25"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-a<span class="w"> </span>ip<span class="w"> </span>route<span class="w"> </span>add<span class="w"> </span>default<span class="w"> </span>via<span class="w"> </span><span class="m">10</span>.244.0.1
-</span><span id="__span-8-26"><a id="__codelineno-8-26" name="__codelineno-8-26" href="#__codelineno-8-26"></a>
-</span><span id="__span-8-27"><a id="__codelineno-8-27" name="__codelineno-8-27" href="#__codelineno-8-27"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-b<span class="w"> </span>ip<span class="w"> </span>addr<span class="w"> </span>add<span class="w"> </span><span class="m">10</span>.244.0.11/24<span class="w"> </span>dev<span class="w"> </span>veth-b
-</span><span id="__span-8-28"><a id="__codelineno-8-28" name="__codelineno-8-28" href="#__codelineno-8-28"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-b<span class="w"> </span>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>veth-b<span class="w"> </span>up
-</span><span id="__span-8-29"><a id="__codelineno-8-29" name="__codelineno-8-29" href="#__codelineno-8-29"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-b<span class="w"> </span>ip<span class="w"> </span>link<span class="w"> </span><span class="nb">set</span><span class="w"> </span>lo<span class="w"> </span>up
-</span><span id="__span-8-30"><a id="__codelineno-8-30" name="__codelineno-8-30" href="#__codelineno-8-30"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-b<span class="w"> </span>ip<span class="w"> </span>route<span class="w"> </span>add<span class="w"> </span>default<span class="w"> </span>via<span class="w"> </span><span class="m">10</span>.244.0.1
-</span></code></pre></div>
-<h3 id="step-by-step-observation">Step-by-step Observation<a class="headerlink" href="#step-by-step-observation" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Observe bridge MAC learning — run after first ping</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-a<span class="w"> </span>ping<span class="w"> </span>-c1<span class="w"> </span><span class="m">10</span>.244.0.11
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>bridge<span class="w"> </span>fdb<span class="w"> </span>show<span class="w"> </span>dev<span class="w"> </span>veth-a-br
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># → aa:bb:cc:00:01:01 dev veth-a-br master br0 (pod-a's MAC learned)</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="c1"># Watch ARP resolution inside pod-a</span>
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-a<span class="w"> </span>ip<span class="w"> </span>neigh<span class="w"> </span>show
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="c1"># → 10.244.0.1  dev veth-a lladdr 02:42:0a:f4:00:01 REACHABLE</span>
-</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="c1"># → 10.244.0.11 dev veth-a lladdr aa:bb:cc:00:01:02 REACHABLE</span>
-</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>
-</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="c1"># See packets crossing the bridge in real time</span>
-</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>tcpdump<span class="w"> </span>-i<span class="w"> </span>br0<span class="w"> </span>-n<span class="w"> </span><span class="p">&amp;</span>
-</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-a<span class="w"> </span>ping<span class="w"> </span>-c3<span class="w"> </span><span class="m">10</span>.244.0.11
-</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="c1"># → ARP request/reply, then ICMP echo/reply visible on br0</span>
-</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>
-</span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="c1"># Confirm routing table inside pod-a</span>
-</span><span id="__span-9-17"><a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-a<span class="w"> </span>ip<span class="w"> </span>route<span class="w"> </span>show
-</span><span id="__span-9-18"><a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a><span class="c1"># → default via 10.244.0.1 dev veth-a</span>
-</span><span id="__span-9-19"><a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a><span class="c1"># → 10.244.0.0/24 dev veth-a proto kernel scope link src 10.244.0.10</span>
-</span><span id="__span-9-20"><a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a>
-</span><span id="__span-9-21"><a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a><span class="c1"># 5. Test pod-a → pod-b</span>
-</span><span id="__span-9-22"><a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a>ip<span class="w"> </span>netns<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>pod-a<span class="w"> </span>ping<span class="w"> </span>-c3<span class="w"> </span><span class="m">10</span>.244.0.11
-</span><span id="__span-9-23"><a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a><span class="c1"># → PING 10.244.0.11: 3 packets transmitted, 3 received, 0% packet loss</span>
-</span></code></pre></div>
-<h3 id="verification">Verification<a class="headerlink" href="#verification" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Confirm environment is correct before testing</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>ip<span class="w"> </span>netns<span class="w"> </span>list<span class="w">        </span><span class="c1"># → pod-a  pod-b</span>
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>ip<span class="w"> </span>link<span class="w"> </span>show<span class="w"> </span>br0<span class="w">     </span><span class="c1"># → br0: ... state UP</span>
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>ip<span class="w"> </span>route<span class="w"> </span>show<span class="w">        </span><span class="c1"># → 10.244.0.0/24 dev br0 proto kernel scope link src 10.244.0.1</span>
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>sysctl<span class="w"> </span>net.ipv4.ip_forward<span class="w">  </span><span class="c1"># → net.ipv4.ip_forward = 1</span>
-</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
-</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="c1"># 6. Cleanup</span>
-</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>ip<span class="w"> </span>netns<span class="w"> </span>del<span class="w"> </span>pod-a
-</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>ip<span class="w"> </span>netns<span class="w"> </span>del<span class="w"> </span>pod-b
-</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>ip<span class="w"> </span>link<span class="w"> </span>del<span class="w"> </span>br0
-</span></code></pre></div>
 <hr />
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <table>
