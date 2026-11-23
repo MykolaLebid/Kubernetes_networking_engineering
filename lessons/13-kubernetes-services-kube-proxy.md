@@ -4,24 +4,12 @@
 
 > **Goal:** Trace a ClusterIP packet through iptables DNAT chains, choose between iptables and IPVS modes, and diagnose service connectivity failures at the packet level.
 
----
 
-## Practice Setup
-
-```bash
-# Terminal 1 — minikube Linux node
-minikube ssh
-sudo iptables -t nat -L KUBE-SERVICES | head -20
-sudo iptables -t nat -L KUBE-NODEPORTS 2>/dev/null | head -10
-ipvsadm -Ln 2>/dev/null | head -20  # if IPVS mode
-
-# Terminal 2 — Mac (kubectl)
-kubectl get svc -A
-kubectl get endpointslices -A | head -10
-kubectl get cm -n kube-system kube-proxy -o yaml | grep mode
-```
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. The Service Problem
 
@@ -33,25 +21,28 @@ Pods have ephemeral IPs that change on restart. Services provide a stable virtua
 ```mermaid
 flowchart LR
     subgraph Clients
-        PA[Pod A\n10.244.1.5]
-        EXT[External client]
+        PA["frontend pod 10.244.1.5:3000"]
+        EXT["external client 203.0.113.1"]
     end
-    subgraph SVC["Service (ClusterIP 10.96.42.10:80)"]
-        KP[kube-proxy\nprograms iptables / IPVS]
+    subgraph SVC["Service ClusterIP 10.96.42.10:80"]
+        KP["kube-proxy (iptables/IPVS) node1"]
+        CHAIN["KUBE-SVC-XXXX load-balance chain"]
     end
     subgraph Backends
-        P1[Pod replica 1\n10.244.0.5:8080]
-        P2[Pod replica 2\n10.244.1.3:8080]
-        P3[Pod replica 3\n10.244.2.1:8080]
+        P1["web-pod-1 10.244.0.5:8080"]
+        P2["web-pod-2 10.244.1.3:8080"]
+        P3["web-pod-3 10.244.2.1:8080"]
     end
-    PA -->|dst: 10.96.42.10:80| KP
-    KP -->|DNAT round-robin| P1
-    KP --> P2
-    KP --> P3
-    EXT -->|NodePort :30080| KP
+    PA --"TCP ClusterIP :80"--> KP
+    KP --> CHAIN
+    CHAIN --"DNAT :8080 33%"--> P1
+    CHAIN --"DNAT :8080 33%"--> P2
+    CHAIN --"DNAT :8080 34%"--> P3
+    EXT --"TCP NodePort :30080"--> KP
 ```
 
 > **See also:** [Lesson 14 — CoreDNS](14-coredns-service-discovery.md) for how the service name resolves to 10.96.42.10.
+
 
 ---
 
@@ -158,16 +149,17 @@ EndpointSlices cap at 100 endpoints per slice. At scale this dramatically reduce
 
 ```mermaid
 flowchart TD
-    PKT[Pod packet\ndst=10.96.42.10:80] --> PREROUTING[PREROUTING / OUTPUT\nnat table]
-    PREROUTING --> KS[KUBE-SERVICES chain]
-    KS -->|match 10.96.42.10:80| KSVC[KUBE-SVC-XXXXHASH\nload balance chain]
-    KSVC -->|33% random| SEP1[KUBE-SEP-AAA\nDNAT → 10.244.0.5:8080]
-    KSVC -->|33% random| SEP2[KUBE-SEP-BBB\nDNAT → 10.244.1.3:8080]
-    KSVC -->|33% remaining| SEP3[KUBE-SEP-CCC\nDNAT → 10.244.2.1:8080]
-    SEP1 --> ROUTE[Route to destination node]
+    PKT["web-client pod dst=10.96.42.10:80 TCP SYN"] --> PREROUTING["PREROUTING / OUTPUT hook nat table"]
+    PREROUTING --> KS["KUBE-SERVICES chain match dst IP:port"]
+    KS --"match ClusterIP 10.96.42.10:80"--> KSVC["KUBE-SVC-XXXXHASH load-balance chain"]
+    KSVC --"probability 0.33333"--> SEP1["KUBE-SEP-AAA DNAT to web-pod-1 10.244.0.5:8080"]
+    KSVC --"probability 0.50000"--> SEP2["KUBE-SEP-BBB DNAT to web-pod-2 10.244.1.3:8080"]
+    KSVC --"probability 1.00000"--> SEP3["KUBE-SEP-CCC DNAT to web-pod-3 10.244.2.1:8080"]
+    SEP1 --> ROUTE["kernel routing table lookup next-hop"]
     SEP2 --> ROUTE
     SEP3 --> ROUTE
-    ROUTE --> POST[POSTROUTING MASQUERADE\nfor cross-node traffic]
+    ROUTE --"cross-node flannel/vxlan encap"--> POST["POSTROUTING MASQUERADE src=nodeIP for cross-node"]
+    POST --> NIC["eth0 egress to destination node"]
 ```
 
 ```bash
@@ -342,6 +334,110 @@ annotations:
   service.beta.kubernetes.io/azure-load-balancer-internal: "true"
 ```
 
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| Shopify | 1M+ services on a monorepo-scale Kubernetes platform | Migrated from iptables to IPVS mode kube-proxy | Eliminated O(N) rule scan; sub-millisecond service lookup latency at scale |
+| LinkedIn | High-churn microservices platform with thousands of services | IPVS kube-proxy with least-connection scheduler | Reduced CPU overhead of iptables rule processing; maintained sub-millisecond service latency |
+| AWS EKS | Cloud-native Kubernetes workloads for enterprise customers | NLB-backed LoadBalancer services with `externalTrafficPolicy: Local` | Direct pod routing preserves client source IPs; elastic scaling without kube-proxy as bottleneck |
+| Airbnb | Multi-AZ Kubernetes platform serving global traffic | `trafficDistribution: PreferClose` with zone-aware topology constraints | Reduced cross-AZ data transfer costs; improved p99 service latency for regional users |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — minikube Linux node
+minikube ssh
+sudo iptables -t nat -L KUBE-SERVICES | head -20
+sudo iptables -t nat -L KUBE-NODEPORTS 2>/dev/null | head -10
+ipvsadm -Ln 2>/dev/null | head -20  # if IPVS mode
+
+# Terminal 2 — Mac (kubectl)
+kubectl get svc -A
+kubectl get endpointslices -A | head -10
+kubectl get cm -n kube-system kube-proxy -o yaml | grep mode
+```
+
+### Hands-On Lab
+
+**Step 1 — Create a ClusterIP service and trace its iptables chain:**
+
+```bash
+# Deploy a test workload with 3 replicas
+kubectl create deployment web --image=nginx --replicas=3
+kubectl expose deployment web --port=80 --target-port=80
+
+# Get the assigned ClusterIP
+kubectl get svc web
+# NAME   TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE
+# web    ClusterIP   10.96.42.10    <none>        80/TCP    10s
+
+# On the node — find the KUBE-SVC chain for this ClusterIP
+minikube ssh
+sudo iptables -t nat -L KUBE-SERVICES -n | grep 10.96.42.10
+# KUBE-SVC-XXXX  tcp  --  0.0.0.0/0  10.96.42.10  tcp dpt:80
+
+# Follow the chain: view per-endpoint probabilistic rules
+sudo iptables -t nat -L KUBE-SVC-XXXX -n
+# KUBE-SEP-AAAA  all  statistic mode random probability 0.33333
+# KUBE-SEP-BBBB  all  statistic mode random probability 0.50000
+# KUBE-SEP-CCCC  all  (remaining traffic)
+
+# Verify the DNAT target for each endpoint chain
+sudo iptables -t nat -L KUBE-SEP-AAAA -n
+# DNAT  tcp  --  to:10.244.0.5:80
+```
+
+**Step 2 — Verify EndpointSlices and test connectivity:**
+
+```bash
+# View EndpointSlices (modern API — 1 slice per 100 endpoints)
+kubectl get endpointslices -l kubernetes.io/service-name=web
+kubectl get endpointslice web-xxxxx -o yaml | grep -A5 "conditions"
+# conditions:
+#   ready: true
+#   serving: true
+#   terminating: false
+
+# Test ClusterIP reachability from a debug pod
+kubectl run -it --rm debug --image=nicolaka/netshoot -- \
+  curl -s http://10.96.42.10/
+# Expect: nginx welcome page
+```
+
+**Step 3 — Inspect IPVS mode (if enabled) or switch to it:**
+
+```bash
+# Check current mode
+kubectl get cm -n kube-system kube-proxy -o yaml | grep mode
+
+# If IPVS: view the kernel virtual server table (O(1) hash lookup)
+ipvsadm -L -n
+# TCP  10.96.42.10:80 rr
+#   -> 10.244.0.5:80    Masq    1      0          0
+#   -> 10.244.1.3:80    Masq    1      0          0
+
+# IPVS keeps ClusterIPs on a dummy interface
+ip addr show kube-ipvs0 | head -10
+```
+
+### Configuration Reference
+
+| Parameter | Default | Effect | When to Change |
+|-----------|---------|--------|----------------|
+| `type: ClusterIP` | Default | Virtual IP reachable only inside cluster | Change to `NodePort` for direct node access or `LoadBalancer` for cloud LB |
+| `type: NodePort` | — | Opens a port (30000-32767) on every node's IP | Dev/test environments or bare metal without MetalLB |
+| `type: LoadBalancer` | — | Provisions cloud LB or MetalLB VIP | Production external traffic in cloud or bare metal with MetalLB |
+| `externalTrafficPolicy: Local` | Cluster | Preserves client source IP; routes only to local node pods | Ingress-facing services where real client IPs are needed in access logs |
+| `sessionAffinity: ClientIP` | None | Routes same source IP to same pod for the timeout window | Stateful applications that require session persistence |
+| `trafficDistribution: PreferClose` | — | Routes to same-zone pods when available (K8s 1.27+) | Minimize cross-AZ bandwidth costs in multi-zone clusters |
+| `clusterIP: None` | — | Headless service — DNS returns pod IPs directly | StatefulSets or client-side load balancing scenarios |
+| kube-proxy `mode: ipvs` | iptables | O(1) hash table lookup instead of O(N) chain scan | Clusters with >1000 services or high endpoint churn |
+
 ---
 
 ## Troubleshooting
@@ -454,4 +550,4 @@ annotations:
 
 ---
 
-**Next:** [Lesson 14 — CoreDNS and Service Discovery](14-coredns-service-discovery.md)
+**← Previous:** [Lesson 12 — Cilium CNI and eBPF Dataplane](12-cilium-cni-ebpf.md)   |   **Next:** [Lesson 14 — CoreDNS and Service Discovery](14-coredns-service-discovery.md)

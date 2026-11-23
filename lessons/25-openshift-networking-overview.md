@@ -4,47 +4,29 @@
 
 > **Goal:** Understand how OpenShift's Cluster Network Operator manages OVN-Kubernetes, explain how OpenShift namespace isolation differs from vanilla Kubernetes, and use `oc` commands to inspect and troubleshoot network configuration.
 
----
 
-## Practice Setup
-
-```bash
-# Terminal 1 — OpenShift CLI (oc)
-oc get network.operator cluster -o yaml | grep -A10 defaultNetwork
-# expect: type: OVNKubernetes, clusterNetwork, serviceNetwork fields
-
-oc get pods -n openshift-network-operator
-# expect: network-operator pod Running
-
-oc get clusternetwork 2>/dev/null
-# only present in legacy OpenShiftSDN clusters
-
-# Terminal 2 — oc
-oc get pods -n openshift-ovn-kubernetes | head -10
-# expect: ovnkube-node DaemonSet pods per node, ovnkube-master pods
-
-oc get hostsubnet 2>/dev/null || echo "OVN-Kubernetes mode (no hostsubnet)"
-# hostsubnet only exists in OpenShiftSDN legacy mode
-```
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. OpenShift vs Vanilla Kubernetes Networking
 
 ```mermaid
 flowchart LR
     subgraph Vanilla["Vanilla Kubernetes"]
-        v_cni["CNI: User Choice\n(Calico/Cilium/Flannel)"]
-        v_ing["Ingress: Ingress API\n(nginx/traefik/etc)"]
-        v_np["NetworkPolicy: Optional\n(no default isolation)"]
-        v_eg["Egress: via CNI\n(no built-in EgressIP)"]
+        v_cni["CNI: User Choice (Calico/Cilium/Flannel)"]
+        v_ing["Ingress: Ingress API (nginx/traefik)"]
+        v_np["NetworkPolicy: Optional (no default isolation)"]
+        v_eg["Egress: via CNI (no built-in EgressIP)"]
     end
 
     subgraph OCP["OpenShift"]
-        o_cni["CNI: OVN-Kubernetes\n(default, managed by CNO)"]
-        o_ing["Ingress: Route CRD\n+ HAProxy Router"]
-        o_np["NetworkPolicy: Enforced\n(namespace isolation default)"]
-        o_eg["Egress: EgressIP + EgressFirewall\n(CRDs)"]
+        o_cni["CNI: OVN-Kubernetes (default, managed by CNO)"]
+        o_ing["Ingress: Route CRD + HAProxy Router"]
+        o_np["NetworkPolicy: Enforced (namespace isolation default)"]
+        o_eg["Egress: EgressIP + EgressFirewall CRDs"]
     end
 
     style Vanilla fill:#e8f4fd,stroke:#2196F3
@@ -74,18 +56,18 @@ OpenShift manages its network configuration through the **Cluster Network Operat
 ```mermaid
 flowchart TD
     Admin["oc edit network.operator.openshift.io/cluster"]
-    CNO["Cluster Network Operator\n(openshift-network-operator)"]
-    OVN_DS["ovnkube-node DaemonSet\n(openshift-ovn-kubernetes)"]
-    OVN_Master["ovnkube-master Deployment\n(NB DB + SB DB + ovn-northd)"]
-    OVS["OVS (ovs-vswitchd)\nbr-int bridge per node"]
-    OVN_CTRL["ovn-controller\n(translates logical → physical flows)"]
+    CNO["Cluster Network Operator (openshift-network-operator)"]
+    OVN_DS["ovnkube-node DaemonSet (openshift-ovn-kubernetes)"]
+    OVN_Master["ovnkube-master Deployment (NB DB + SB DB + ovn-northd)"]
+    OVS["OVS ovs-vswitchd -- br-int bridge per node"]
+    OVN_CTRL["ovn-controller (translates logical to physical flows)"]
 
     Admin --> CNO
-    CNO -- "manages" --> OVN_DS
-    CNO -- "manages" --> OVN_Master
+    CNO --"manages"--> OVN_DS
+    CNO --"manages"--> OVN_Master
     OVN_DS --> OVS
     OVN_DS --> OVN_CTRL
-    OVN_Master -- "NB→SB sync" --> OVN_CTRL
+    OVN_Master --"NB to SB sync via OVSDB :6641"--> OVN_CTRL
 
     style Admin fill:#fff3e0,stroke:#FF9800
     style CNO fill:#e8f4fd,stroke:#2196F3
@@ -102,8 +84,8 @@ sequenceDiagram
     participant OVS as OVS br-int (node)
 
     Admin->>CNO: Edit network.operator CR (e.g. change MTU)
-    CNO->>OVN_N: Update NorthBound DB logical topology
-    OVN_N->>OVN_C: Compile logical flows → SouthBound DB
+    CNO->>OVN_N: Update NorthBound DB logical topology via OVSDB :6641
+    OVN_N->>OVN_C: Compile logical flows to SouthBound DB via OVSDB :6642
     OVN_C->>OVS: Program OpenFlow rules on br-int
     OVS-->>Admin: New MTU active on all nodes
     Note over CNO,OVS: Never edit OVS or OVN directly — CNO will overwrite
@@ -329,6 +311,80 @@ oc adm must-gather --image=registry.redhat.io/openshift4/ose-must-gather -- \
 # produces /must-gather/network/ with OVN NB/SB DB dumps and flow tables
 ```
 
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| Deutsche Telekom | 5G core NFV workloads on OpenShift | OVN-Kubernetes + CNO-managed network config | Virtualized network functions (VNFs) with tenant namespace isolation |
+| SAP BTP | Multi-tenant PaaS platform on OpenShift | Namespace isolation + CNO + OVN-Kubernetes | Automated per-tenant network segmentation across 50+ regions |
+| US Army (DoD) | IL-5 classified workloads on OpenShift Container Platform | OpenShift default namespace isolation + SCCs | Meets DoD IL-5 network isolation requirements without custom CNI |
+| Red Hat / Telcos | NFVI deployments (5G RAN, core) | OpenShift + OVN-Kubernetes + SR-IOV | Kubernetes-native VNF hosting replacing proprietary NFVI stacks |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — OpenShift CLI (oc)
+oc get network.operator cluster -o yaml | grep -A10 defaultNetwork
+# expect: type: OVNKubernetes, clusterNetwork, serviceNetwork fields
+
+oc get pods -n openshift-network-operator
+# expect: network-operator pod Running
+
+oc get clusternetwork 2>/dev/null
+# only present in legacy OpenShiftSDN clusters
+
+# Terminal 2 — oc
+oc get pods -n openshift-ovn-kubernetes | head -10
+# expect: ovnkube-node DaemonSet pods per node, ovnkube-master pods
+
+oc get hostsubnet 2>/dev/null || echo "OVN-Kubernetes mode (no hostsubnet)"
+# hostsubnet only exists in OpenShiftSDN legacy mode
+```
+
+### Hands-On Lab
+
+```bash
+# Step 1 — verify cluster network type and CIDRs
+oc get network.config.openshift.io cluster -o yaml
+# expect: networkType: OVNKubernetes, clusterNetwork 10.128.0.0/14, serviceNetwork 172.30.0.0/16
+
+# Step 2 — confirm CNO is healthy
+oc get clusteroperator network
+# expect: Available=True, Progressing=False, Degraded=False
+
+# Step 3 — check per-node pod CIDR allocations
+oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.podCIDRs}{"\n"}{end}'
+# expect: each node shows its /23 subnet
+
+# Step 4 — verify auto-created NetworkPolicies in a namespace
+oc get networkpolicy -n default
+# expect: allow-from-openshift-ingress, allow-from-openshift-monitoring, allow-same-namespace
+
+# Step 5 — run connectivity checks
+oc get podnetworkconnectivitycheck -n openshift-network-diagnostics | head -20
+# expect: all conditions show NetworkCheckSuccess
+
+# Step 6 — collect network diagnostics bundle
+oc adm must-gather --image=registry.redhat.io/openshift4/ose-must-gather -- \
+  /usr/bin/gather_network_logs
+# produces /must-gather/network/ with OVN NB/SB DB dumps and flow tables
+```
+
+### Configuration Reference
+
+| Parameter | Default | Effect | When to change |
+|-----------|---------|--------|----------------|
+| `spec.defaultNetwork.type` | `OVNKubernetes` | Active CNI plugin | Set at install time only — migration requires maintenance window |
+| `spec.clusterNetwork[].cidr` | `10.128.0.0/14` | Pod IP CIDR | Set at install time — cannot change post-install |
+| `spec.clusterNetwork[].hostPrefix` | `23` | Subnet size per node | Smaller = more nodes; larger = more pods per node |
+| `spec.serviceNetwork` | `172.30.0.0/16` | ClusterIP range | Set at install time only |
+| `spec.defaultNetwork.ovnKubernetesConfig.mtu` | `1400` (Geneve) | Pod network MTU | Lower if physical MTU < 1450 (e.g. VPN overhead) |
+| `spec.defaultNetwork.ovnKubernetesConfig.genevePort` | `6081` | UDP tunnel port | Change if 6081 is blocked |
+
 ---
 
 ## Troubleshooting
@@ -352,6 +408,7 @@ oc adm top nodes                                     # node resource pressure?
 ```
 
 > **See also:** [Lesson 24 — Network Observability](24-network-observability-troubleshooting.md) for general packet-level debugging methodology. [Lesson 23 — Security Hardening](23-network-security-hardening.md) for NetworkPolicy hardening on top of OpenShift's defaults.
+
 
 ---
 
@@ -453,4 +510,4 @@ oc adm top nodes                                     # node resource pressure?
 
 ---
 
-**Next:** [Lesson 26 — OVN-Kubernetes: OpenShift's Default CNI](26-ovn-kubernetes.md)
+**← Previous:** [Lesson 24 — Network Observability and Troubleshooting](24-network-observability-troubleshooting.md)   |   **Next:** [Lesson 26 — OVN-Kubernetes: OpenShift's Default CNI](26-ovn-kubernetes.md)

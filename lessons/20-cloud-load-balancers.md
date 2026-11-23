@@ -6,64 +6,31 @@
 
 > **Goal:** Provision and configure cloud load balancers on AWS, GCP, and Azure, choose between NLB and ALB target types, set externalTrafficPolicy correctly, and diagnose CCM provisioning failures.
 
----
 
-## Practice Setup
 
-```bash
-# Terminal 1 — Mac (kubectl)
-kubectl get svc -A --field-selector spec.type=LoadBalancer
-kubectl describe svc <your-lb-svc> | grep -E "LoadBalancer|Ingress|Annotations"
-
-# Terminal 2 — cloud CLI (optional)
-aws elb describe-load-balancers 2>/dev/null | jq '.LoadBalancerDescriptions[].LoadBalancerName' || \
-  echo "Configure AWS CLI or use GCP/Azure equivalent"
-```
-
-Observation commands — run after creating a LoadBalancer service to watch the provisioning lifecycle:
-
-```bash
-# Watch service until EXTERNAL-IP is assigned
-kubectl get svc web -w
-# Expect: EXTERNAL-IP: <pending> → 203.0.113.100 (takes 30-120 seconds)
-
-# Watch CCM events on the Service object
-kubectl describe svc web
-# Look for Events:
-#   Normal  EnsuredLoadBalancer  Successfully ensured load balancer
-#   Warning FailedToEnsure       ...  ← examine this on failure
-
-# Stream CCM logs (shows cloud API calls)
-kubectl logs -n kube-system -l k8s-app=cloud-controller-manager -f
-
-# AWS: watch NLB target group registration in real time
-aws elbv2 describe-target-health \
-  --target-group-arn $(aws elbv2 describe-target-groups \
-    --query 'TargetGroups[0].TargetGroupArn' --output text) \
-  --query 'TargetHealthDescriptions[*].{Target:Target.Id,Health:TargetHealth.State}'
-```
-
-> **See also:** [Lesson 19 — MetalLB and kube-vip](19-metallb-kube-vip.md) for the bare-metal equivalent of cloud LoadBalancer provisioning.
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. How Cloud LBs Are Provisioned
 
 ```mermaid
 flowchart TD
-    SA["kubectl apply Service\ntype: LoadBalancer"]
-    KCM["kube-controller-manager\n(service controller)"]
-    CCM["Cloud Controller Manager\n(cloud-specific plugin)"]
-    CAPI["Cloud Provider API\n(AWS / GCP / Azure)"]
-    LB["Cloud Load Balancer\n(NLB / ALB / GCE LB / Azure SLB)"]
-    SVC["Service.status.loadBalancer.ingress\nupdated with EXTERNAL-IP"]
+    SA["kubectl apply Service type: LoadBalancer"]
+    KCM["kube-controller-manager service-controller v1.28"]
+    CCM["Cloud Controller Manager aws-cloud-controller-manager or cloud-provider-gcp"]
+    CAPI["Cloud Provider API AWS ELBv2 / GCP Compute / Azure ARM"]
+    LB["Cloud Load Balancer AWS NLB / GCP Passthrough NLB / Azure Standard LB"]
+    SVC["Service.status.loadBalancer.ingress[0].hostname or IP EXTERNAL-IP visible via kubectl"]
 
     SA --> KCM
-    KCM --> CCM
-    CCM --> CAPI
-    CAPI --> LB
-    LB --> CCM
-    CCM --> SVC
+    KCM --"EnsureLoadBalancer() call"--> CCM
+    CCM --"CreateLoadBalancer API call"--> CAPI
+    CAPI --"provision + return DNS/IP"--> LB
+    LB --"return endpoint"--> CCM
+    CCM --"patch Service status"--> SVC
 
     style LB fill:#cce,stroke:#66c
     style SVC fill:#cec,stroke:#6c6
@@ -74,18 +41,18 @@ The CCM provisioning lifecycle:
 ```mermaid
 sequenceDiagram
     participant K as kubectl / API Server
-    participant KCM as kube-controller-manager
-    participant CCM as Cloud Controller Manager
-    participant Cloud as Cloud Provider API
-    participant LB as Cloud Load Balancer
+    participant KCM as kube-controller-manager service-controller
+    participant CCM as Cloud Controller Manager (aws-cloud-controller-manager)
+    participant Cloud as AWS ELBv2 API us-east-1
+    participant LB as AWS NLB (internet-facing)
 
-    K->>KCM: Service type=LoadBalancer created
-    KCM->>CCM: EnsureLoadBalancer() call
-    CCM->>Cloud: Create/update LB, target group, listener rules
-    Cloud-->>CCM: LB provisioned — DNS name / IP returned
-    CCM->>K: Patch Service.status.loadBalancer.ingress
-    K-->>K: EXTERNAL-IP visible via kubectl get svc
-    Note over LB,KCM: Health check probes begin (NodePort or pod IP)
+    K->>KCM: Service type=LoadBalancer created app: web
+    KCM->>CCM: EnsureLoadBalancer() call with service spec
+    CCM->>Cloud: CreateLoadBalancer + CreateTargetGroup + RegisterTargets
+    Cloud-->>CCM: NLB provisioned DNS: k8s-web-abc123.elb.amazonaws.com
+    CCM->>K: Patch Service.status.loadBalancer.ingress hostname
+    K-->>K: EXTERNAL-IP visible via kubectl get svc (30-120 s)
+    Note over LB,KCM: Health check probes begin on NodePort :30080 or pod IP :8080
 ```
 
 ```bash
@@ -327,6 +294,79 @@ kubectl get pods -o wide -l app=web   # see which nodes have pods
 
 ---
 
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| AWS / large EKS workloads | Production SaaS platforms requiring TCP load balancing at 1 M+ connections/second | AWS NLB with `target-type: ip` and `preserve_client_ip.enabled=true`; cross-zone enabled | Direct pod-IP routing eliminates NodePort hop; real client IPs reach pods for auth and logging |
+| Shopify (GKE) | Black Friday traffic peaks 10x normal load across global GKE clusters | GCP Passthrough NLB with NEGs (Network Endpoint Groups) routing directly to pod IPs | Zero-hop load balancing; autoscaling adds pods and NEGs update within seconds without LB reconfiguration |
+| Zalando (AWS EKS) | Blue-green and canary deployments for microservices across EU regions | AWS ALB with weighted target groups (10%/90% split) managed by ALB Controller + Ingress `alb.ingress.kubernetes.io/actions` | Traffic shifts without DNS changes; LB health checks gate rollout automatically |
+| Booking.com (Azure AKS) | Internal microservice traffic between AKS clusters in the same VNET | Azure Standard SLB with `azure-load-balancer-internal: true` and subnet routing | Services reachable on private IPs without exposing to internet; Azure VNet routes handle cross-AZ traffic |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — Mac (kubectl)
+kubectl get svc -A --field-selector spec.type=LoadBalancer
+kubectl describe svc <your-lb-svc> | grep -E "LoadBalancer|Ingress|Annotations"
+
+# Terminal 2 — cloud CLI (optional)
+aws elb describe-load-balancers 2>/dev/null | jq '.LoadBalancerDescriptions[].LoadBalancerName' || \
+  echo "Configure AWS CLI or use GCP/Azure equivalent"
+```
+
+Observation commands — run after creating a LoadBalancer service to watch the provisioning lifecycle:
+
+```bash
+# Watch service until EXTERNAL-IP is assigned
+kubectl get svc web -w
+# Expect: EXTERNAL-IP: <pending> → 203.0.113.100 (takes 30-120 seconds)
+
+# Watch CCM events on the Service object
+kubectl describe svc web
+# Look for Events:
+#   Normal  EnsuredLoadBalancer  Successfully ensured load balancer
+#   Warning FailedToEnsure       ...  ← examine this on failure
+
+# Stream CCM logs (shows cloud API calls)
+kubectl logs -n kube-system -l k8s-app=cloud-controller-manager -f
+
+# AWS: watch NLB target group registration in real time
+aws elbv2 describe-target-health \
+  --target-group-arn $(aws elbv2 describe-target-groups \
+    --query 'TargetGroups[0].TargetGroupArn' --output text) \
+  --query 'TargetHealthDescriptions[*].{Target:Target.Id,Health:TargetHealth.State}'
+```
+
+> **See also:** [Lesson 19 — MetalLB and kube-vip](19-metallb-kube-vip.md) for the bare-metal equivalent of cloud LoadBalancer provisioning.
+
+### Hands-On Lab
+
+Work through each provider section to understand annotation-driven provisioning:
+
+1. Create a basic `type: LoadBalancer` Service and watch `EXTERNAL-IP` assigned (Section 1 provisioning flow)
+2. Add AWS NLB annotations (Section 2): switch from `instance` to `ip` target type and verify client IP preservation
+3. Create an internal LB for a backend service (Section 2/3/4) and confirm it gets a private IP
+4. Enable cross-zone load balancing and check that traffic distributes across AZs with uneven pod counts
+5. Set `externalTrafficPolicy: Local` (Section 6) and confirm pod-less nodes are removed from LB targets
+6. Test `externalTrafficPolicy: Cluster` to see SNAT behavior in pod access logs
+
+### Configuration Reference
+
+Key parameter tables are embedded in the Theory sections above:
+
+| Section | Table |
+|---------|-------|
+| Section 2 — AWS | Key AWS Annotations: `aws-load-balancer-type`, `nlb-target-type`, `scheme`, `cross-zone`, `preserve_client_ip` |
+| Section 5 — Comparison | Cross-Provider Comparison: AWS NLB vs GCP NLB vs Azure SLB features |
+| Section 6 — ExternalTrafficPolicy | Policy behavior: client IP preservation vs traffic balance |
+
+---
+
 ## Troubleshooting
 
 | Symptom | Likely Cause | Diagnostic Command | Fix |
@@ -436,4 +476,4 @@ kubectl get pods -o wide -l app=web   # see which nodes have pods
 
 ---
 
-**Next:** [Lesson 21 — Service Mesh with Istio](21-service-mesh-istio.md)
+**← Previous:** [Lesson 19 — Load Balancing on Bare Metal: MetalLB and kube-vip](19-metallb-kube-vip.md)   |   **Next:** [Lesson 21 — Service Mesh with Istio](21-service-mesh-istio.md)

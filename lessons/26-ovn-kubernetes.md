@@ -6,52 +6,39 @@
 
 > **Goal:** Inspect the OVN/OVS control and data planes on a live OpenShift cluster, trace a packet from source pod to destination pod, and explain how NetworkPolicy is enforced without iptables.
 
+
+
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
+
 ---
 
-## Practice Setup
-
-```bash
-# Terminal 1 — verify OVN-Kubernetes is running
-oc get pods -n openshift-ovn-kubernetes -o wide
-# Expect: ovnkube-node on every node, ovnkube-master on control-plane nodes
-
-# Terminal 2 — open a node debug shell (keep open throughout)
-oc debug node/<worker-node-name>
-# Inside: chroot /host
-
-# Terminal 3 — exec into ovnkube-master for northbound commands
-MASTER=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-master \
-  -o jsonpath='{.items[0].metadata.name}')
-echo "Master pod: $MASTER"
-```
+## Theory
 
 > **See also:** [Lesson 03 — iptables and Netfilter](03-iptables-and-netfilter.md) for why OVN replaces iptables entirely.
-
----
 
 ## 1. Architecture
 
 ```mermaid
 flowchart TD
     subgraph Control["Control Plane (master nodes)"]
-        NB["OVN Northbound DB\nLogical switches, routers, ACLs, LBs"]
-        NORTHD["ovn-northd\n(translates logical → physical)"]
-        SB["OVN Southbound DB\nChassis bindings, flows, BFD"]
+        NB["OVN NorthBound DB (nbdb) -- logical switches, routers, ACLs, LBs"]
+        NORTHD["ovn-northd (logical to physical compiler)"]
+        SB["OVN SouthBound DB (sbdb) -- chassis bindings, flows, BFD"]
     end
     subgraph Node1["Worker Node 1"]
-        OC1["ovn-controller\n(reads SB, programs OVS)"]
-        OVS1["OVS br-int\n(kernel flow tables)"]
-        POD1["Pod A\nveth → OVS port"]
+        OC1["ovn-controller (reads SB, programs OVS flows)"]
+        OVS1["OVS br-int (kernel OpenFlow table)"]
+        POD1["pod-a 10.128.0.5 -- veth to OVS port"]
     end
     subgraph Node2["Worker Node 2"]
-        OC2["ovn-controller"]
-        OVS2["OVS br-int"]
-        POD2["Pod B\nveth → OVS port"]
+        OC2["ovn-controller (reads SB, programs OVS flows)"]
+        OVS2["OVS br-int (kernel OpenFlow table)"]
+        POD2["pod-b 10.128.2.5 -- veth to OVS port"]
     end
-    NB --> NORTHD --> SB
-    SB --> OC1 --> OVS1 --- POD1
-    SB --> OC2 --> OVS2 --- POD2
-    OVS1 -- "Geneve tunnel\nport 6081" --> OVS2
+    NB --"OVSDB :6641"--> NORTHD --> SB
+    SB --"OVSDB :6642"--> OC1 --> OVS1 --- POD1
+    SB --"OVSDB :6642"--> OC2 --> OVS2 --- POD2
+    OVS1 --"Geneve UDP :6081"--> OVS2
 ```
 
 **Components per worker node:**
@@ -307,6 +294,81 @@ oc exec -n openshift-ovn-kubernetes ovnkube-node-xxxxx -- \
 | OpenShift default | Yes | Optional | Optional |
 | Kernel dependency | OVS module | iptables / kmod | eBPF verifier |
 
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| Red Hat OpenShift 4.x | Default CNI for all OpenShift 4 clusters | OVN-Kubernetes (NB DB / SB DB / ovn-northd / ovs-vswitchd) | ACL-based NetworkPolicy without iptables; Geneve UDP :6081 tunnels |
+| IBM Cloud ROKS | Red Hat OpenShift on IBM Cloud (managed) | OVN-Kubernetes as the platform CNI | Consistent OVN control plane across IBM Cloud multi-zone clusters |
+| OpenShift Virtualization (KubeVirt) | Running VMs alongside containers in OpenShift | OVN-Kubernetes as reference CNI + SR-IOV | VM-to-pod networking using the same OVN logical switches as containers |
+| Telco NFV operators | Virtualized 5G core on OpenShift | OVN-Kubernetes + DPDK/SR-IOV offload | NFVI-grade throughput with OVN logical network control plane |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — verify OVN-Kubernetes is running
+oc get pods -n openshift-ovn-kubernetes -o wide
+# Expect: ovnkube-node on every node, ovnkube-master on control-plane nodes
+
+# Terminal 2 — open a node debug shell (keep open throughout)
+oc debug node/<worker-node-name>
+# Inside: chroot /host
+
+# Terminal 3 — exec into ovnkube-master for northbound commands
+MASTER=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-master \
+  -o jsonpath='{.items[0].metadata.name}')
+echo "Master pod: $MASTER"
+```
+
+### Hands-On Lab
+
+```bash
+# Step 1 — inspect the OVS bridge on a node
+# (from oc debug node → chroot /host)
+ovs-vsctl show
+# expect: Bridge "br-int" with pod veth ports and tunnel ports
+
+# Step 2 — list logical switches and routers
+oc exec -n openshift-ovn-kubernetes $MASTER -- ovn-nbctl ls-list
+oc exec -n openshift-ovn-kubernetes $MASTER -- ovn-nbctl lr-list
+# expect: ovn_cluster_router and per-node GR_worker-N routers
+
+# Step 3 — inspect NetworkPolicy ACLs
+oc exec -n openshift-ovn-kubernetes $MASTER -- \
+  ovn-nbctl acl-list <ls-name> | head -20
+# expect: allow-related and drop ACLs corresponding to NetworkPolicy objects
+
+# Step 4 — simulate a packet (no actual traffic)
+oc exec -n openshift-ovn-kubernetes $MASTER -- \
+  ovn-trace <ls-name> \
+  'inport=="pod-a-port"; ip4; ip4.src=10.128.0.5; ip4.dst=10.128.1.5; tcp; tcp.dst=8080'
+# expect: "output to pod-b-port" (allow) or "Policy drop" (deny)
+
+# Step 5 — verify Geneve tunnel is active
+ip link show type geneve     # Geneve tunnel interfaces
+ss -ulnp | grep 6081         # UDP :6081 listening
+
+# Step 6 — OVS packet trace (live dataplane)
+oc debug node/<node> -- chroot /host \
+  ovs-appctl ofproto/trace br-int \
+  "in_port=1,ip,ip_src=10.128.0.5,ip_dst=10.128.1.5,tcp,tcp_dst=8080"
+```
+
+### Configuration Reference
+
+| Parameter | Default | Effect | When to change |
+|-----------|---------|--------|---------------|
+| `gatewayConfig.routingViaHost` | `false` (shared) | Routes egress via node NIC vs master | Set `true` for local gateway in production |
+| `ipsecConfig.mode` | `Disabled` | Encrypts Geneve tunnels with IPsec ESP | Enable for compliance (PCI, HIPAA) |
+| `mtu` | auto-detected | Overlay MTU (subtract Geneve overhead ~50B) | Lower if jumbo frames unavailable |
+| `hybridOverlayConfig.enabled` | `false` | Allows Windows nodes using VXLAN hybrid | Enable for mixed Linux/Windows clusters |
+| `v4InternalSubnet` | `100.64.0.0/16` | Transit subnet for OVN join switch | Change only if 100.64.x conflicts |
+| `egressIPConfig.reachabilityTotalTimeoutSeconds` | `1` | Time to detect EgressIP node failure | Lower for faster HA failover |
+
 ---
 
 ## Troubleshooting
@@ -452,4 +514,4 @@ oc logs -n openshift-ovn-kubernetes $MASTER -c northd | tail -50
 
 ---
 
-**Next:** [Lesson 27 — OpenShift Routes and HAProxy Router](27-openshift-routes-haproxy.md)
+**← Previous:** [Lesson 25 — OpenShift Networking Overview](25-openshift-networking-overview.md)   |   **Next:** [Lesson 27 — OpenShift Routes and HAProxy Router](27-openshift-routes-haproxy.md)

@@ -4,24 +4,12 @@
 
 > **Goal:** Diagnose any Kubernetes network failure — from pod unreachability to DNS timeouts — using a structured L1-to-L7 methodology and tools including Hubble, netshoot, tcpdump, and Prometheus metrics.
 
----
 
-## Practice Setup
-
-```bash
-# Terminal 1 — minikube Linux node
-minikube ssh
-ss -s           # socket summary — total established/closed counts
-ss -tlnp        # listening TCP sockets with process names
-conntrack -L 2>/dev/null | head -10  # conntrack table — expect: NAT entries
-
-# Terminal 2 — Mac (kubectl + hubble)
-hubble observe --last 20 2>/dev/null || echo "hubble not running — try: cilium hubble enable"
-kubectl run netshoot --image=nicolaka/netshoot --rm -it --restart=Never -- bash
-# expect: bash prompt inside netshoot — all network debug tools available
-```
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. Systematic Troubleshooting Methodology
 
@@ -29,12 +17,12 @@ Work from the bottom of the stack up:
 
 ```mermaid
 flowchart TD
-    L1["L1/L2: Physical / Link\nNIC up? Interface up? veth wired?"]
-    L3["L3: IP\nRoute correct? ip_forward on? MTU ok?"]
-    L4["L4: TCP/UDP\nconntrack full? iptables blocking?"]
-    L7["L7: Application\nDNS resolving? TLS cert valid? HTTP 200?"]
-    K8S["Kubernetes\nService exists? Endpoint healthy? NetworkPolicy denying?"]
-    CNI["CNI\nPod IP assigned? veth wired? IPAM exhausted?"]
+    L1["L1/L2: Physical / Link — NIC up? veth wired? Interface up?"]
+    L3["L3: IP — Route correct? ip_forward on? MTU ok?"]
+    L4["L4: TCP/UDP — conntrack full? iptables blocking?"]
+    L7["L7: Application — DNS resolving? TLS cert valid? HTTP 200?"]
+    K8S["Kubernetes — Service exists? Endpoint healthy? NetworkPolicy denying?"]
+    CNI["CNI — Pod IP assigned? veth wired? IPAM exhausted?"]
 
     L1 --> L3 --> L4 --> L7 --> K8S --> CNI
 
@@ -51,19 +39,19 @@ flowchart TD
 ```mermaid
 sequenceDiagram
     participant Eng as Engineer
-    participant Node as Node
-    participant CNI as CNI (Cilium/Calico)
-    participant K8S as Kubernetes API
-    participant App as Application
+    participant Node as Linux Node (minikube ssh)
+    participant CNI as cilium / calicoctl
+    participant K8S as kubectl / kube-apiserver
+    participant App as netshoot / curl
 
-    Eng->>Node: ip link / ss / ping gateway
+    Eng->>Node: ip link / ss -tlnp / ping gateway
     Node-->>Eng: L2/L3 OK or FAIL
     Eng->>CNI: cilium status / calicoctl node status
-    CNI-->>Eng: CNI OK or FAIL
+    CNI-->>Eng: CNI healthy or FAIL (BGP/VXLAN down)
     Eng->>K8S: kubectl get ep / netpol / svc
     K8S-->>Eng: Service+Endpoint present or missing
-    Eng->>App: nslookup / curl -v
-    App-->>Eng: DNS resolved / HTTP status
+    Eng->>App: nslookup / curl -v http://svc:port
+    App-->>Eng: DNS resolved / HTTP status code
     Note over Eng,App: Stop at first layer that fails — fix before proceeding up
 ```
 
@@ -388,6 +376,81 @@ rate(kubeproxy_sync_proxy_rules_duration_seconds_bucket[5m])
 # expect: < 100ms p99; spikes correlate with iptables rule churn
 ```
 
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| Datadog | eBPF-based network monitoring for 10,000+ customer K8s clusters | Hubble / eBPF flow telemetry + Prometheus metrics | Real-time per-pod network visibility without sidecar overhead |
+| AWS (EKS) | Network forensics and incident response | VPC Flow Logs + CloudWatch + netshoot | Post-incident packet-level analysis for security investigations |
+| Google (GKE) | Real-time service topology for GKE customers | Hubble (Cilium) flow exporter + service map UI | Automated dependency mapping across thousands of services |
+| LinkedIn | Distributed tracing across 1,000+ microservices | eBPF probes + custom conntrack metrics | Sub-millisecond latency anomaly detection without application instrumentation |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — minikube Linux node
+minikube ssh
+ss -s           # socket summary — total established/closed counts
+ss -tlnp        # listening TCP sockets with process names
+conntrack -L 2>/dev/null | head -10  # conntrack table — expect: NAT entries
+
+# Terminal 2 — Mac (kubectl + hubble)
+hubble observe --last 20 2>/dev/null || echo "hubble not running — try: cilium hubble enable"
+kubectl run netshoot --image=nicolaka/netshoot --rm -it --restart=Never -- bash
+# expect: bash prompt inside netshoot — all network debug tools available
+```
+
+### Hands-On Lab
+
+```bash
+# SYMPTOM: Pod A cannot reach Pod B — systematic diagnosis
+
+# Step 1: Can Pod A reach its own gateway?
+kubectl exec -it pod-a -- ping -c3 $(ip route | grep default | awk '{print $3}')
+# expect: 0% packet loss
+
+# Step 2: Can Pod A reach Pod B's IP directly?
+POD_B_IP=$(kubectl get pod pod-b -o jsonpath='{.status.podIP}')
+kubectl exec -it pod-a -- ping -c3 $POD_B_IP
+
+# Step 3: Trace Cilium policy decision
+cilium policy trace --src-pod default/pod-a --dst-pod default/pod-b --dport 80
+# expect: "Final verdict: allowed" or specific deny reason
+
+# Step 4: Check DNS resolution
+kubectl exec -it pod-a -- nslookup kubernetes.default.svc.cluster.local
+# expect: returns ClusterIP
+
+# Step 5: Check conntrack table usage (5-second DNS timeout root cause)
+dmesg | grep "nf_conntrack: table full"
+cat /proc/sys/net/netfilter/nf_conntrack_count
+# expect: count < 80% of nf_conntrack_max
+
+# Step 6: MTU fragmentation check
+kubectl exec -it pod-a -- ping -M do -s 1422 $POD_B_IP
+# If "Message too long" → MTU mismatch; set CNI MTU to 1450 for VXLAN
+
+# Step 7: Packet capture on veth
+# From the node — find pod veth
+ip link show | grep -i cali
+tcpdump -i cali1234abcd -n -w /tmp/pod-a.pcap
+kubectl cp pod-a:/tmp/capture.pcap ./pod-a.pcap
+```
+
+### Configuration Reference
+
+| Metric | PromQL | What it shows |
+|--------|--------|---------------|
+| Total drop rate | `rate(cilium_drop_count_total[5m])` | Policy drops per second |
+| Drop by reason | `sum by (reason) (rate(cilium_drop_count_total[5m]))` | Why traffic is dropped |
+| iptables rule count | `felix_iptables_rules_total` | Calico iptables rule count |
+| conntrack entries | `node_nf_conntrack_entries` | Current conntrack table usage |
+| DNS error rate | `rate(coredns_dns_responses_total{rcode!="NOERROR"}[5m])` | CoreDNS failures |
+
 ---
 
 ## Troubleshooting
@@ -474,6 +537,7 @@ You can now trace a packet from a pod's application socket all the way to its de
 
 > **See also:** [Lesson 23 — Network Security Hardening](23-network-security-hardening.md) for Hubble verdict filtering to build security policies. [Lesson 21 — Istio](21-service-mesh-istio.md) for `istioctl proxy-config` and Envoy access log troubleshooting.
 
+
 ---
 
 ## Check Your Understanding
@@ -519,3 +583,7 @@ You can now trace a packet from a pod's application socket all the way to its de
 ---
 
 *End of Kubernetes Network Engineering — Network Foundations Course*
+
+---
+
+**← Previous:** [Lesson 23 — Network Security Hardening](23-network-security-hardening.md)   |   **Next:** [Lesson 25 — OpenShift Networking Overview](25-openshift-networking-overview.md)

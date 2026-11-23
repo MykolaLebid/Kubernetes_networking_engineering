@@ -6,75 +6,13 @@
 
 > **Goal:** Deploy an NGINX or Traefik ingress controller, configure host-based and path-based routing with TLS termination via cert-manager, and diagnose 502/503/504 errors in the routing chain.
 
----
 
-## Practice Setup
 
-```bash
-# Terminal 1 — Mac (kubectl + minikube tunnel)
-kubectl get ingress -A
-kubectl get pods -n ingress-nginx 2>/dev/null || kubectl get pods -n kube-system | grep ingress
-
-# To expose an Ingress locally (bare metal simulation):
-minikube tunnel   # run in a dedicated terminal, requires sudo
-
-# Terminal 2 — Mac
-kubectl get svc -n ingress-nginx -o wide 2>/dev/null
-curl -H "Host: myapp.local" http://$(minikube ip)/
-```
-
-Observation commands — run after deploying NGINX Ingress to see routing live:
-
-```bash
-# Watch the NGINX controller pod as Ingress objects are applied
-kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller -f &
-
-# Deploy sample backends
-kubectl create deployment web --image=nginx --port=80
-kubectl expose deployment web --port=80
-kubectl create deployment api --image=hashicorp/http-echo --port=5678 \
-  -- /http-echo -text="api response"
-kubectl expose deployment api --port=5678
-
-# Apply and inspect routing
-kubectl apply -f - <<EOF
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: demo
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-spec:
-  ingressClassName: nginx
-  rules:
-  - host: demo.local
-    http:
-      paths:
-      - path: /api
-        pathType: Prefix
-        backend:
-          service:
-            name: api
-            port:
-              number: 5678
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: web
-            port:
-              number: 80
-EOF
-
-kubectl describe ingress demo                       # check rules and backend status
-kubectl get endpoints web api                       # confirm pods are ready
-curl -H "Host: demo.local" http://$(minikube ip)/  # expect: nginx HTML
-curl -H "Host: demo.local" http://$(minikube ip)/api  # expect: "api response"
-```
-
-> **See also:** [Lesson 19 — MetalLB and kube-vip](19-metallb-kube-vip.md) for assigning the Ingress controller a real EXTERNAL-IP on bare metal.
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. The Ingress Architecture
 
@@ -82,22 +20,26 @@ NodePort and LoadBalancer services give you L4 load balancing — they know TCP/
 
 ```mermaid
 flowchart LR
-    Client["External Client"]
-    LB["Cloud LB or MetalLB VIP\n(Service: LoadBalancer / NodePort)"]
-    IC["Ingress Controller Pod\nNGINX / Traefik / Envoy / HAProxy"]
-    API["Kubernetes API\n(watches Ingress objects)"]
-    SVC1["api-service :8080"]
-    SVC2["frontend-service :80"]
-    P1["api pods"]
-    P2["frontend pods"]
+    Client["external client browser/curl"]
+    LB["cloud LB or MetalLB VIP :80/:443 Service LoadBalancer"]
+    IC["ingress-nginx controller pod :80/:443 namespace ingress-nginx"]
+    API["Kubernetes API server :6443 watches Ingress objects"]
+    SVC1["api-service :8080 ClusterIP"]
+    SVC2["frontend-service :80 ClusterIP"]
+    P1["api-pod-1 :8080"]
+    P2["api-pod-2 :8080"]
+    P3["frontend-pod :80"]
+    TLS["cert-manager auto-renews TLS cert"]
 
-    Client --> LB
-    LB --> IC
-    IC -->|"Host: web.example.com\npath: /api"| SVC1
-    IC -->|"Host: web.example.com\npath: /"| SVC2
-    SVC1 --> P1
-    SVC2 --> P2
-    API -.->|"watch + sync config"| IC
+    Client --"HTTPS :443"--> LB
+    LB --"TCP :443 L4 forward"--> IC
+    IC --"Host: web.example.com path: /api"--> SVC1
+    IC --"Host: web.example.com path: /"--> SVC2
+    SVC1 --"ClusterIP DNAT"--> P1
+    SVC1 --"ClusterIP DNAT"--> P2
+    SVC2 --"ClusterIP DNAT"--> P3
+    API -."watch+sync Ingress rules".-> IC
+    TLS -."inject TLS secret".-> IC
 ```
 
 The Ingress controller is itself a Kubernetes application (Deployment + Service). It watches Ingress resources and programs its proxy configuration dynamically.
@@ -167,21 +109,25 @@ The request flow through the Ingress controller:
 
 ```mermaid
 sequenceDiagram
-    participant C as Client
-    participant LB as Cloud LB / MetalLB
-    participant IC as Ingress Controller
-    participant K8s as Kubernetes API
-    participant SVC as Backend Service
+    participant C as browser client
+    participant LB as Cloud LB / MetalLB :443
+    participant IC as ingress-nginx controller pod
+    participant K8s as Kubernetes API (Ingress watch)
+    participant SVC as api-service :8080 ClusterIP
+    participant P as api-pod-1 :8080
 
-    K8s-->>IC: watch Ingress objects (continuous)
-    IC-->>IC: regenerate nginx.conf from Ingress rules
+    K8s-->>IC: Ingress update — new rule host=web.example.com path=/api
+    IC-->>IC: regenerate nginx.conf upstream block api-service:8080
 
-    C->>LB: HTTP GET /api (Host: web.example.com)
-    LB->>IC: forward to controller pod (port 80/443)
-    IC->>IC: match rule: host=web.example.com, path prefix /api
-    IC->>SVC: proxy_pass to api-service:8080
-    SVC-->>IC: 200 OK + response body
-    IC-->>C: 200 OK (adds X-Request-ID, removes internal headers)
+    C->>LB: HTTPS GET /api/v1/items (Host: web.example.com)
+    LB->>IC: TCP :443 forward (SNI: web.example.com)
+    IC->>IC: TLS termination with cert-manager certificate
+    IC->>IC: match rule: host=web.example.com prefix /api → api-service:8080
+    IC->>SVC: HTTP proxy_pass to api-service:8080 (X-Forwarded-For: client-ip)
+    SVC->>P: ClusterIP DNAT to api-pod-1:8080
+    P-->>SVC: HTTP 200 OK + JSON body
+    SVC-->>IC: 200 OK response
+    IC-->>C: 200 OK (adds X-Request-ID; strips internal headers)
 ```
 
 ---
@@ -404,6 +350,194 @@ metadata:
     appgw.ingress.kubernetes.io/ssl-redirect: "true"
 ```
 
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| Cloudflare | Internal Kubernetes platform for distributed edge services | NGINX Ingress Controller with custom rate-limit and auth annotations | Centralized L7 routing for internal services without individual service-level proxies; zero per-service TLS config |
+| Zalando (fashion e-commerce) | AWS-hosted Kubernetes serving millions of requests/day | AWS ALB Ingress Controller (AWS Load Balancer Controller) for path-based routing | Native AWS ALB integration; path-level traffic shaping between microservices without maintaining NGINX pods |
+| GitHub | github.com global load balancing infrastructure | HAProxy-based ingress for github.com with custom health checks and routing | Sub-10ms routing decisions at scale; fine-grained backend health probing integrated with Kubernetes endpoints |
+| Traefik Labs (open source maintainer) | Reference deployment for edge routing in Kubernetes | Traefik IngressRoute CRDs with Let's Encrypt auto-TLS via cert-manager | Zero-touch TLS certificate lifecycle; dynamic routing config from Kubernetes API without NGINX reload delays |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — Mac (kubectl + minikube tunnel)
+kubectl get ingress -A
+kubectl get pods -n ingress-nginx 2>/dev/null || kubectl get pods -n kube-system | grep ingress
+
+# To expose an Ingress locally (bare metal simulation):
+minikube tunnel   # run in a dedicated terminal, requires sudo
+
+# Terminal 2 — Mac
+kubectl get svc -n ingress-nginx -o wide 2>/dev/null
+curl -H "Host: myapp.local" http://$(minikube ip)/
+```
+
+Observation commands — run after deploying NGINX Ingress to see routing live:
+
+```bash
+# Watch the NGINX controller pod as Ingress objects are applied
+kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller -f &
+
+# Deploy sample backends
+kubectl create deployment web --image=nginx --port=80
+kubectl expose deployment web --port=80
+kubectl create deployment api --image=hashicorp/http-echo --port=5678 \
+  -- /http-echo -text="api response"
+kubectl expose deployment api --port=5678
+
+# Apply and inspect routing
+kubectl apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demo
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: demo.local
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: api
+            port:
+              number: 5678
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: web
+            port:
+              number: 80
+EOF
+
+kubectl describe ingress demo                       # check rules and backend status
+kubectl get endpoints web api                       # confirm pods are ready
+curl -H "Host: demo.local" http://$(minikube ip)/  # expect: nginx HTML
+curl -H "Host: demo.local" http://$(minikube ip)/api  # expect: "api response"
+```
+
+> **See also:** [Lesson 19 — MetalLB and kube-vip](19-metallb-kube-vip.md) for assigning the Ingress controller a real EXTERNAL-IP on bare metal.
+
+### Hands-On Lab
+
+**Step 1 — Install NGINX Ingress Controller and verify:**
+
+```bash
+# Install via Helm
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm install ingress-nginx ingress-nginx/ingress-nginx \
+  --namespace ingress-nginx \
+  --create-namespace \
+  --set controller.service.type=LoadBalancer
+
+# Verify controller is running and has an external IP
+kubectl get pods -n ingress-nginx
+kubectl get svc -n ingress-nginx ingress-nginx-controller
+# NAME                       TYPE           CLUSTER-IP      EXTERNAL-IP     PORT(S)
+# ingress-nginx-controller   LoadBalancer   10.96.10.1      192.168.49.2    80:31080/TCP,443:31443/TCP
+
+# Confirm IngressClass is registered
+kubectl get ingressclass
+# NAME    CONTROLLER                             PARAMETERS   AGE
+# nginx   k8s.io/ingress-nginx                  <none>       1m
+```
+
+**Step 2 — Create host-based and path-based routing:**
+
+```bash
+# Deploy web and api backends (see Environment Setup above)
+# Apply an Ingress with host-based routing and path prefix matching
+kubectl apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: web.example.com
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: api
+            port:
+              number: 5678
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: web
+            port:
+              number: 80
+EOF
+
+# Test routing with Host header
+INGRESS_IP=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+curl -H "Host: web.example.com" http://${INGRESS_IP}/       # expect: nginx HTML
+curl -H "Host: web.example.com" http://${INGRESS_IP}/api    # expect: "api response"
+```
+
+**Step 3 — Inspect the generated nginx.conf:**
+
+```bash
+# View the full NGINX config generated from all Ingress rules
+CONTROLLER_POD=$(kubectl get pod -n ingress-nginx -l app.kubernetes.io/component=controller -o name | head -1)
+kubectl exec -n ingress-nginx ${CONTROLLER_POD} -- nginx -T | grep -A20 "server_name web.example.com"
+
+# Tail access logs to see routing in action
+kubectl logs -n ingress-nginx ${CONTROLLER_POD} --tail=20 -f
+```
+
+**Step 4 — Add TLS with cert-manager:**
+
+```bash
+# Install cert-manager
+helm repo add jetstack https://charts.jetstack.io
+helm install cert-manager jetstack/cert-manager \
+  --namespace cert-manager \
+  --create-namespace \
+  --set installCRDs=true
+
+# Check certificate status after adding TLS to your Ingress
+kubectl get certificate -A
+kubectl describe certificate web-tls
+
+# Verify the TLS certificate from the command line
+openssl s_client -connect web.example.com:443 -servername web.example.com < /dev/null 2>/dev/null | \
+  openssl x509 -noout -subject -dates
+```
+
+### Configuration Reference
+
+| Parameter | Default | Effect | When to Change |
+|-----------|---------|--------|----------------|
+| `ingressClassName` | Cluster default IngressClass | Selects which controller processes this Ingress | Always set explicitly when multiple controllers are installed |
+| `pathType: Prefix` | — | Matches path and all sub-paths | Use `Exact` for precise path matching with no sub-path bleed |
+| `pathType: Exact` | — | Matches only the exact path string | Strict API endpoints where sub-paths should 404 |
+| `tls.secretName` | — | Secret containing `tls.crt` and `tls.key` | Required for HTTPS; pair with cert-manager for auto-renewal |
+| `nginx.ingress.kubernetes.io/rewrite-target` | (no rewrite) | Rewrites URL before forwarding to backend | Strip path prefix before sending to backend service |
+| `nginx.ingress.kubernetes.io/proxy-read-timeout` | 60 s | Max time to wait for backend response | Increase for slow backends; decrease to fail fast |
+| `nginx.ingress.kubernetes.io/limit-rps` | (none) | Per-source-IP requests per second rate limit | Apply to all public-facing endpoints |
+| `nginx.ingress.kubernetes.io/affinity` | (none) | Sticky sessions via cookie | Use when backend has in-memory session state |
+| `nginx.ingress.kubernetes.io/proxy-body-size` | 1m | Maximum request body size | Increase to `100m` or `0` (unlimited) for file upload endpoints |
+| controller `kind: DaemonSet` | Deployment | Runs NGINX pod on every node | Use on bare metal with HostPort so every node accepts traffic |
+
 ---
 
 ## Troubleshooting
@@ -516,4 +650,4 @@ metadata:
 
 ---
 
-**Next:** [Lesson 18 — Gateway API: Next-Generation Ingress](18-gateway-api.md)
+**← Previous:** [Lesson 16 — Network Policies: Microsegmentation](16-network-policies.md)   |   **Next:** [Lesson 18 — Gateway API: Next-Generation Ingress](18-gateway-api.md)

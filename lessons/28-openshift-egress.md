@@ -6,55 +6,39 @@
 
 > **Goal:** Assign a stable egress IP to a namespace so external firewall rules remain valid across pod rescheduling, and restrict outbound destinations per namespace using EgressFirewall with CIDR and DNS-based rules.
 
+
+
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
+
 ---
 
-## Practice Setup
-
-```bash
-# Terminal 1 — check existing egress resources
-oc get egressip -o wide 2>/dev/null
-oc get egressfirewall -A 2>/dev/null
-
-# Terminal 2 — check which nodes are egress-assignable
-oc get nodes -o custom-columns=\
-'NAME:.metadata.name,EGRESS:.metadata.labels.k8s\.ovn\.org/egress-assignable'
-# NAME        EGRESS
-# worker-1    <present>   <- assignable
-# worker-2    <none>      <- not assignable yet
-
-# Terminal 3 — confirm OVN-Kubernetes is the network type
-oc get network.config.openshift.io cluster \
-  -o jsonpath='{.status.networkType}'
-# OVNKubernetes
-```
+## Theory
 
 > **See also:** [Lesson 26 — OVN-Kubernetes](26-ovn-kubernetes.md) for how OVN ACLs underpin both EgressIP and EgressFirewall.
 > **See also:** [Lesson 16 — Network Policies](16-network-policies.md) for controlling ingress traffic.
-
----
 
 ## 1. The Egress Problem
 
 ```mermaid
 flowchart LR
     subgraph Without["Without EgressIP"]
-        P1A["billing-pod\n(on worker-1)\nsrc: 192.168.1.10"]
-        P1B["billing-pod\n(on worker-2)\nsrc: 192.168.1.11"]
-        FW["External DB\nFirewall\nwhitelist: ???"]
+        P1A["billing-pod (on worker-1) src: 192.168.1.10"]
+        P1B["billing-pod (on worker-2) src: 192.168.1.11"]
+        FW["External DB Firewall whitelist: ???"]
     end
-    P1A -- "SNAT to node IP\n192.168.1.10" --> FW
-    P1B -- "SNAT to node IP\n192.168.1.11" --> FW
-    note1["Pod reschedules\n→ source IP changes\n→ firewall rules break"]
+    P1A --"SNAT to node IP 192.168.1.10"--> FW
+    P1B --"SNAT to node IP 192.168.1.11"--> FW
+    note1["Pod reschedules -- source IP changes -- firewall rules break"]
 ```
 
 ```mermaid
 flowchart LR
     subgraph With["With EgressIP"]
-        P2A["billing-pod\n(on any node)"]
-        EIP["EgressIP: 192.168.1.100\nassigned to worker-1\n(moves on node failure)"]
-        FW2["External DB\nFirewall\nwhitelist: 192.168.1.100 ✓"]
+        P2A["billing-pod (on any node)"]
+        EIP["EgressIP 192.168.1.100 assigned to worker-1 (moves on node failure)"]
+        FW2["External DB Firewall whitelist: 192.168.1.100 OK"]
     end
-    P2A -- "SNAT to EgressIP\n192.168.1.100 always" --> EIP --> FW2
+    P2A --"SNAT to EgressIP 192.168.1.100 always"--> EIP --"fixed src IP"--> FW2
 ```
 
 **Core principle:** EgressIP decouples outbound source IP from the node the pod runs on. The IP floats between eligible nodes using OVN SNAT rules.
@@ -117,15 +101,15 @@ oc exec -n billing billing-pod -- curl -s ifconfig.me
 sequenceDiagram
     participant K8s as Kubernetes API
     participant OVN as OVN-Kubernetes Controller
-    participant NB as OVN Northbound DB
-    participant Node as Worker Node\n(ovn-controller)
+    participant NB as OVN Northbound DB (OVSDB :6641)
+    participant Node as Worker Node (ovn-controller)
 
     K8s->>OVN: EgressIP created event
-    OVN->>OVN: Select eligible nodes\n(egress-assignable label)
-    OVN->>Node: Add secondary IP to node NIC\n(e.g. 192.168.1.100 on eth0)
-    OVN->>NB: Add SNAT rule:\npods in namespace → 192.168.1.100
+    OVN->>OVN: Select eligible nodes (egress-assignable label)
+    OVN->>Node: Add secondary IP to node NIC (e.g. 192.168.1.100 on eth0)
+    OVN->>NB: Add SNAT rule -- pods in namespace to 192.168.1.100
     NB->>Node: ovn-controller programs OVS SNAT flow
-    Note over Node: All egress from billing namespace\nnow SNATs to 192.168.1.100
+    Note over Node: All egress from billing namespace now SNATs to 192.168.1.100
 ```
 
 ---
@@ -308,6 +292,91 @@ oc get egressrouter -A 2>/dev/null
 # Prefer EgressIP for stable source IP + EgressFirewall for destination control
 ```
 
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| Telcos (billing systems) | Regulatory compliance — fixed source IP for call data record APIs | EgressIP per namespace for billing-processor pods | Stable 192.168.x.x source regardless of pod rescheduling; firewall whitelist never changes |
+| SAP BTP | Restrict pod egress to approved API endpoints only | EgressFirewall with CIDR + DNS-based allow rules | Only approved SaaS endpoints reachable from tenant namespaces; all other egress blocked |
+| Financial institutions (PCI) | Payment gateway fixed-IP whitelisting | EgressIP + EgressFirewall on payment-processor namespace | PCI DSS requirement for fixed source IP to acquirer gateway met without static pods |
+| Healthcare (HIPAA) | PHI workload egress to on-prem EHR system | EgressIP (stable src) + EgressFirewall (CIDR allow for EHR subnet) | HIPAA audit: every PHI egress flow from known fixed IPs to whitelisted CIDR only |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — check existing egress resources
+oc get egressip -o wide 2>/dev/null
+oc get egressfirewall -A 2>/dev/null
+
+# Terminal 2 — check which nodes are egress-assignable
+oc get nodes -o custom-columns=\
+'NAME:.metadata.name,EGRESS:.metadata.labels.k8s\.ovn\.org/egress-assignable'
+# NAME        EGRESS
+# worker-1    <present>   <- assignable
+# worker-2    <none>      <- not assignable yet
+
+# Terminal 3 — confirm OVN-Kubernetes is the network type
+oc get network.config.openshift.io cluster \
+  -o jsonpath='{.status.networkType}'
+# OVNKubernetes
+```
+
+### Hands-On Lab
+
+```bash
+# Step 1 — label worker nodes as EgressIP candidates
+oc label node worker-1 k8s.ovn.org/egress-assignable=""
+oc label node worker-2 k8s.ovn.org/egress-assignable=""
+oc get nodes -l k8s.ovn.org/egress-assignable
+
+# Step 2 — create and apply EgressIP resource
+oc apply -f egress-ip.yaml   # EgressIP with 2 IPs for HA
+oc get egressip billing-egress -o yaml
+# expect: status.items shows each IP assigned to a different node
+
+# Step 3 — label namespace and verify source IP
+oc label namespace billing egress=billing
+oc exec -n billing billing-pod -- curl -s ifconfig.me
+# expect: 192.168.1.100 (EgressIP, not the node IP)
+
+# Step 4 — test EgressIP HA failover
+oc adm cordon worker-1
+# wait ~1 second for OVN BFD to detect failure
+oc get egressip billing-egress -o jsonpath='{.status.items}' | jq .
+# expect: 192.168.1.100 reassigned to worker-2
+
+# Step 5 — apply EgressFirewall and test allow/deny
+oc apply -f egress-firewall.yaml
+oc exec -n production app-pod -- curl -m5 https://api.example.com    # allowed
+oc exec -n production app-pod -- curl -m5 https://google.com
+# expect: timeout — blocked by Deny-all rule
+
+# Step 6 — view OVN ACLs generated from EgressFirewall
+oc exec -n openshift-ovn-kubernetes $MASTER -- \
+  ovn-nbctl find ACL external_ids:egressFirewall=production | head -30
+
+# Step 7 — verify OVN SNAT rules for EgressIP
+oc exec -n openshift-ovn-kubernetes $MASTER -- \
+  ovn-nbctl find NAT external_ip=192.168.1.100 | head -20
+
+# Restore
+oc adm uncordon worker-1
+```
+
+### Configuration Reference
+
+| Parameter | Values | Effect | When to change |
+|-----------|--------|--------|---------------|
+| `spec.egress[].type` | `Allow` / `Deny` | Permit or block matching traffic | First match wins — order rules carefully |
+| `spec.egress[].to.cidrSelector` | CIDR string | Match by destination IP range | Use for RFC1918 or known IP blocks |
+| `spec.egress[].to.dnsName` | FQDN or `*.example.com` | Match by DNS name (OVN resolves it) | Use for SaaS APIs with dynamic IPs |
+| `spec.egress[].ports[].protocol` | `TCP` / `UDP` / `SCTP` | Protocol filter per rule | Omit to match all protocols |
+| `spec.egress[].ports[].port` | 1–65535 | Port filter per rule | Combine with CIDR for precise control |
+
 ---
 
 ## Troubleshooting
@@ -446,4 +515,4 @@ oc logs -n openshift-ovn-kubernetes ovnkube-node-xxxxx -c ovn-controller \
 
 ---
 
-**Next:** [Lesson 29 — AWS EKS Networking Deep Dive](29-aws-eks-networking.md)
+**← Previous:** [Lesson 27 — OpenShift Routes and HAProxy Router](27-openshift-routes-haproxy.md)   |   **Next:** [Lesson 29 — AWS EKS Networking Deep Dive](29-aws-eks-networking.md)

@@ -4,49 +4,33 @@
 
 > **Goal:** Connect two Kubernetes clusters with Cilium Cluster Mesh or Submariner and reach services across cluster boundaries using the MCS API.
 
----
 
-## Practice Setup
-
-```bash
-# Terminal 1 — Mac (kubectl with multiple contexts)
-kubectl config get-contexts
-# expect: list with cluster-1 and cluster-2 entries
-
-kubectl config use-context <cluster-1>
-kubectl get pods -A | head -10
-
-# Terminal 2 — Mac (second cluster context)
-kubectl config use-context <cluster-2>
-cilium clustermesh status 2>/dev/null || echo "Cluster Mesh not enabled on this cluster"
-kubectl get serviceimports -A 2>/dev/null || echo "MCS API not installed"
-
-# Verify cross-cluster DNS (MCS)
-kubectl exec -it pod -- nslookup web.default.svc.clusterset.local 2>/dev/null || echo "MCS DNS not configured"
-```
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. Multi-Cluster Patterns
 
 ```mermaid
 flowchart LR
-    subgraph Flat["Flat Network"]
-        c1a["Cluster A\nPods routable"]
-        c1b["Cluster B\nPods routable"]
-        c1a <-- "direct pod IP" --> c1b
+    subgraph Flat["Flat Network (same VPC / BGP fabric)"]
+        c1a["Cluster A pods 10.0.0.0/16"]
+        c1b["Cluster B pods 10.1.0.0/16"]
+        c1a <--"direct pod IP BGP routes"--> c1b
     end
 
-    subgraph GW["Gateway-Based"]
-        c2a["Cluster A"] --> gwa["Egress\nGateway"]
-        gwa -- "encrypted tunnel" --> gwb["Ingress\nGateway"]
+    subgraph GW["Gateway-Based (different VPCs)"]
+        c2a["Cluster A"] --> gwa["Istio East-West Gateway :15443"]
+        gwa --"mTLS HBONE :15443 encrypted tunnel"--> gwb["Istio East-West Gateway :15443"]
         gwb --> c2b["Cluster B"]
     end
 
-    subgraph Mesh["Cluster Mesh (Cilium)"]
-        c3a["Cluster A\neBPF + etcd"]
-        c3b["Cluster B\neBPF + etcd"]
-        c3a <-- "shared identity\nglobal service" --> c3b
+    subgraph Mesh["Cilium Cluster Mesh"]
+        c3a["Cluster A cilium-mesh eBPF + clustermesh-apiserver :2379"]
+        c3b["Cluster B cilium-mesh eBPF + clustermesh-apiserver :2379"]
+        c3a <--"shared identity global service WireGuard optional"--> c3b
     end
 
     style Flat fill:#e8f4fd,stroke:#2196F3
@@ -70,18 +54,18 @@ The Kubernetes Multi-Cluster Services API (SIG-Multicluster KEP-1645) provides a
 
 ```mermaid
 sequenceDiagram
-    participant CA as Cluster A
-    participant Ctrl as MCS Controller
+    participant CA as Cluster A kubectl
+    participant Ctrl as MCS Controller (mcs-api-controller)
     participant CB as Cluster B
-    participant DNS as DNS (clusterset.local)
+    participant DNS as CoreDNS clusterset.local
 
-    CA->>CA: Create ServiceExport "web"
-    CA->>Ctrl: Notify: web is exported
-    Ctrl->>CB: Create ServiceImport "web"
-    CB->>DNS: Register web.default.svc.clusterset.local
-    CB->>CA: DNS query for web.default.svc.clusterset.local
-    CA-->>CB: Returns ClusterSetIP
-    CB->>CA: Traffic via ClusterSetIP
+    CA->>CA: kubectl apply ServiceExport name:web ns:default
+    CA->>Ctrl: Notify: web.default is exported from cluster-a
+    Ctrl->>CB: Create ServiceImport name:web ns:default type:ClusterSetIP
+    CB->>DNS: Register web.default.svc.clusterset.local -> ClusterSetIP
+    CB->>CA: DNS query web.default.svc.clusterset.local
+    CA-->>CB: Returns ClusterSetIP (virtual cross-cluster VIP)
+    CB->>CA: Traffic via ClusterSetIP TCP :80
 ```
 
 ```yaml
@@ -128,18 +112,18 @@ Cilium's Cluster Mesh connects clusters so pods can communicate using their clus
 
 ```mermaid
 flowchart LR
-    subgraph ClusterA["Cluster A"]
-        cilA["Cilium Agent"]
-        etcdA["etcd / KVStore"]
+    subgraph ClusterA["Cluster A (us-east-1)"]
+        cilA["Cilium Agent v1.15 eBPF dataplane"]
+        etcdA["clustermesh-apiserver :2379 TLS mutual auth"]
         cilA --> etcdA
     end
-    subgraph ClusterB["Cluster B"]
-        cilB["Cilium Agent"]
-        etcdB["etcd / KVStore"]
+    subgraph ClusterB["Cluster B (eu-west-1)"]
+        cilB["Cilium Agent v1.15 eBPF dataplane"]
+        etcdB["clustermesh-apiserver :2379 TLS mutual auth"]
         cilB --> etcdB
     end
-    etcdA <-- "clustermesh-apiserver\nTLS mutual auth" --> etcdB
-    cilA -- "eBPF policy + routing" --> cilB
+    etcdA <--"mTLS :2379 KV sync endpoint sharing"--> etcdB
+    cilA --"eBPF policy + WireGuard tunnel (optional)"--> cilB
 
     style ClusterA fill:#e8f5e9,stroke:#4CAF50
     style ClusterB fill:#e8f5e9,stroke:#4CAF50
@@ -249,23 +233,23 @@ Submariner provides direct pod-to-pod connectivity between clusters using encryp
 
 ```mermaid
 flowchart LR
-    subgraph ClusterA["Cluster A"]
-        podA["Pod A\n10.244.1.5"]
-        gwA["Gateway Node\n(subctl)"]
+    subgraph ClusterA["Cluster A (10.244.1.0/24)"]
+        podA["Pod A 10.244.1.5 app:frontend"]
+        gwA["Gateway Node subctl agent IPsec/WireGuard"]
         podA --> gwA
     end
     subgraph Broker["Broker Cluster"]
-        broker["Broker CRD\n(discovery)"]
+        broker["Broker CRD submariner.io endpoint discovery registry"]
     end
-    subgraph ClusterB["Cluster B"]
-        gwB["Gateway Node\n(subctl)"]
-        podB["Pod B\n10.244.2.7"]
+    subgraph ClusterB["Cluster B (10.244.2.0/24)"]
+        gwB["Gateway Node subctl agent IPsec/WireGuard"]
+        podB["Pod B 10.244.2.7 app:backend"]
         gwB --> podB
     end
 
-    gwA -- "IPsec/WireGuard\nencrypted tunnel" --> gwB
-    gwA <-- "register endpoints" --> broker
-    gwB <-- "register endpoints" --> broker
+    gwA --"IPsec ESP or WireGuard UDP :4500 encrypted tunnel"--> gwB
+    gwA <--"register endpoints UDP :4800"--> broker
+    gwB <--"register endpoints UDP :4800"--> broker
 
     style ClusterA fill:#f3e5f5,stroke:#9C27B0
     style ClusterB fill:#f3e5f5,stroke:#9C27B0
@@ -382,6 +366,61 @@ Solution 3: Re-IP pods (if possible)
 
 ---
 
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| Spotify | Multi-cluster pod scheduling to balance GPU/CPU workloads across AWS regions | Admiralty virtual-node scheduler + MCS API ServiceExport/ServiceImport for cross-cluster DNS | Pods transparently scheduled to clusters with available capacity; services resolve cross-cluster via clusterset.local |
+| Google (Anthos) | 100+ GKE clusters across on-prem and cloud managed as a single fleet | Anthos Service Mesh (Istio multi-primary) + GKE Hub multi-cluster ingress + MCS controller | Single-pane control plane; mTLS between clusters with shared root CA; MultiClusterIngress routes to nearest healthy backend |
+| Netflix | Multi-region active-active deployments across AWS us-east-1, eu-west-1, ap-southeast-1 | Spinnaker for orchestration + Istio federation + VPC Lattice for service-level routing (replacing VPC Peering) | Zero-downtime regional failover; traffic shifts within seconds via VirtualService weight updates during incidents |
+| Red Hat OpenShift Submariner | On-prem + cloud hybrid clusters with overlapping pod CIDRs from independent team deployments | Submariner with `--globalnet` mode; IPsec tunnels between gateway nodes; Lighthouse DNS for clusterset.local | Clusters with identical 10.244.0.0/16 pod CIDRs coexist; cross-cluster traffic uses Globalnet SNATed global IPs |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — Mac (kubectl with multiple contexts)
+kubectl config get-contexts
+# expect: list with cluster-1 and cluster-2 entries
+
+kubectl config use-context <cluster-1>
+kubectl get pods -A | head -10
+
+# Terminal 2 — Mac (second cluster context)
+kubectl config use-context <cluster-2>
+cilium clustermesh status 2>/dev/null || echo "Cluster Mesh not enabled on this cluster"
+kubectl get serviceimports -A 2>/dev/null || echo "MCS API not installed"
+
+# Verify cross-cluster DNS (MCS)
+kubectl exec -it pod -- nslookup web.default.svc.clusterset.local 2>/dev/null || echo "MCS DNS not configured"
+```
+
+### Hands-On Lab
+
+Work through the Theory sections to build a multi-cluster connectivity setup:
+
+1. Set up two kubeconfig contexts (two separate clusters or two minikube instances) — verify `kubectl config get-contexts`
+2. Create a `ServiceExport` on cluster A and verify the MCS controller creates a `ServiceImport` on cluster B (Section 2)
+3. Enable Cilium Cluster Mesh on both clusters (Section 3): run `cilium clustermesh enable` and `cilium clustermesh connect`
+4. Annotate a Service with `service.cilium.io/global: "true"` and verify DNS resolves cross-cluster
+5. Set `service.cilium.io/affinity: "local"` and test that traffic prefers the local cluster's endpoints
+6. Install Submariner (Section 5): deploy broker, join two clusters, run `subctl verify` to confirm connectivity
+7. Test overlapping CIDR scenario (Section 8): join with `--globalnet` and verify cross-cluster pod routing works
+
+### Configuration Reference
+
+Key parameter tables are embedded in the Theory sections above:
+
+| Section | Table |
+|---------|-------|
+| Section 2 — MCS API | MCS API Parameter Reference: `ServiceImport.spec.type`, `clusterset.local` DNS domain |
+| Section 3 — Cilium Cluster Mesh | Cilium Cluster Mesh Parameter Reference: `service.cilium.io/global`, `shared`, `affinity` annotations |
+
+---
+
 ## Troubleshooting
 
 | Symptom | Likely Cause | Diagnostic Command | Fix |
@@ -416,6 +455,7 @@ subctl diagnose all   # comprehensive health check
 ```
 
 > **See also:** [Lesson 21 — Istio](21-service-mesh-istio.md) for Istio multi-cluster east-west gateway configuration. [Lesson 23 — Network Security Hardening](23-network-security-hardening.md) for encrypting cross-cluster tunnels.
+
 
 ---
 
@@ -515,4 +555,4 @@ subctl diagnose all   # comprehensive health check
 
 ---
 
-**Next:** [Lesson 23 — Network Security Hardening](23-network-security-hardening.md)
+**← Previous:** [Lesson 21 — Service Mesh with Istio](21-service-mesh-istio.md)   |   **Next:** [Lesson 23 — Network Security Hardening](23-network-security-hardening.md)

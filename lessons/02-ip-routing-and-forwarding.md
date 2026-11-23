@@ -4,19 +4,12 @@
 
 > **Goal:** Trace a packet's exact path through the Linux routing subsystem and explain why CNI plugins choose between static routes, BGP, and VXLAN based on the underlying network topology.
 
----
 
-## Practice Setup
-
-```bash
-# Run all commands inside minikube
-minikube ssh
-
-# View live pod routes — these are real Calico-programmed routes
-ip route show
-```
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. How Linux Routes a Packet
 
@@ -24,18 +17,21 @@ When a process sends a packet, the kernel performs a **longest-prefix match (LPM
 
 ```mermaid
 flowchart TD
-    A[Packet arrives at kernel] --> B{ip rule list\npriority 0: check local table}
-    B -->|Match| C[Deliver locally\nINPUT hook]
-    B -->|No match| D{priority 32766:\ncheck main table LPM}
-    D -->|Match found| E[Resolve next-hop MAC\nvia ARP / neighbor table]
-    D -->|No match| F{priority 32767:\ncheck default table}
-    F -->|Default route 0.0.0.0/0| E
-    F -->|No default| G[ICMP unreachable\npacket dropped]
-    E --> H[Hand to outbound\ninterface driver]
+    A["Packet arrives at kernel"] --> B{"ip rule list priority 0: check local table"}
+    B -->|Match| C["Deliver locally INPUT hook"]
+    B -->|No match| D{"priority 32766: check main table LPM"}
+    D -->|Match found| E["Resolve next-hop MAC via ARP/neighbor table"]
+    D -->|No match| F{"priority 32767: check default table"}
+    F -->|"Default route 0.0.0.0/0"| E
+    F -->|No default| G["ICMP unreachable packet dropped"]
+    E --> H["Hand to outbound interface driver"]
+    E --> I["conntrack state NEW/ESTABLISHED"]
+    I --> H
 
     style A fill:#4a6fa5,color:#fff
     style G fill:#a53232,color:#fff
     style H fill:#2d5a27,color:#fff
+    style I fill:#4a6fa5,color:#fff
 ```
 
 ```bash
@@ -48,17 +44,23 @@ ip route get 10.244.1.5
 
 ```mermaid
 sequenceDiagram
-    participant K as Kernel
-    participant RT as Routing Tables
-    participant ARP as ARP/Neighbor
-    participant NIC as Outbound NIC
+    participant K as Kernel IP stack
+    participant RT as Routing Tables (main/local)
+    participant POL as Policy Rules (ip rule)
+    participant ARP as ARP/Neighbor cache
+    participant CT as conntrack
+    participant NIC as Outbound NIC (eth0)
 
-    K->>RT: LPM lookup for dst=10.244.1.5
+    K->>POL: Evaluate ip rule list (priority 0 local, 32766 main)
+    POL-->>K: Use main table for dst=10.244.1.5
+    K->>RT: LPM lookup dst=10.244.1.5
     RT-->>K: Next hop = 192.168.1.20 via eth0
+    K->>CT: Create NEW conntrack entry src:dst:proto
+    CT-->>K: Assigned conntrack id
     K->>ARP: Resolve MAC for 192.168.1.20
     ARP-->>K: MAC = aa:bb:cc:11:22:33
-    K->>NIC: Transmit frame with outer MAC + IP packet
-    Note over NIC: If ip_forward=0, transit packets<br/>are silently dropped here
+    K->>NIC: Transmit frame outer MAC + IP packet
+    Note over NIC: ip_forward=0 drops transit packets silently
 ```
 
 ---
@@ -128,20 +130,6 @@ sysctl --system
 
 Without this, pods on node A cannot reach pods on node B even if routes exist — the node will silently drop transit packets.
 
-### Routing Kernel Parameter Reference
-
-| Parameter | Default | Effect | When to change |
-|-----------|---------|--------|----------------|
-| `net.ipv4.ip_forward` | `0` | Enables IP packet forwarding between interfaces | Must be `1` on every K8s node |
-| `net.ipv6.conf.all.forwarding` | `0` | Same for IPv6 | Required for IPv6 or dual-stack clusters |
-| `net.ipv4.fib_multipath_hash_policy` | `0` (L3) | ECMP hash uses L3 header only (src/dst IP) | Set to `1` (L4) for per-flow load-balancing in K8s |
-| `net.ipv4.conf.all.rp_filter` | `1` (strict) | Drops packets with unexpected source interface | Set to `2` (loose) or `0` for Calico/asymmetric routes |
-| `net.ipv4.conf.all.accept_redirects` | `1` | Accepts ICMP redirects that could change routing | Set to `0` on Kubernetes nodes to prevent redirect attacks |
-| `net.ipv4.ip_local_port_range` | `32768 60999` | Ephemeral source port range for outbound connections | Widen to `1024 65535` on high-throughput nodes |
-| `net.ipv4.tcp_fin_timeout` | `60` | Time sockets linger in FIN_WAIT_2 state | Reduce to `15` on nodes with many short-lived connections |
-
----
-
 ## 5. Routing in Different CNI Modes
 
 ### Flannel host-gw (pure L3, no overlay)
@@ -179,6 +167,7 @@ cilium bpf tunnel list   # empty in native routing mode
 ```
 
 > **See also:** [Lesson 05 — VXLAN and Overlay Networks](05-vxlan-and-overlay-networks.md) for the alternative when nodes are not L2-adjacent and overlay encapsulation is used instead of static routes.
+
 
 ---
 
@@ -247,7 +236,30 @@ netstat -s | grep -i "forwarded\|route"
 
 ---
 
-## 9. Hands-On Lab: Cross-Namespace Routing
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| AWS VPC | Each EC2 hypervisor runs a Linux routing table per instance; pod routes are injected via secondary ENI IPs | Linux routing table + LPM + ip_forward | Native pod-to-pod routing without overlay at VPC scale; AWS VPC CNI uses this directly |
+| Cloudflare | Uses ECMP routing for anycast IP distribution across 300+ PoPs worldwide | ECMP nexthop routing + L4 hash policy | Traffic from any client IP reaches the nearest healthy PoP with per-flow load balancing |
+| Netflix Open Connect | BGP route reflectors with iBGP propagate CDN routes across data center fabrics | BGP route injection + Linux routing table | Low-latency content delivery by selecting optimal CDN appliance via ip route selection |
+| Calico CNI | Each Kubernetes node runs BIRD which injects per-pod /32 host routes into the Linux routing table | Host routes /32 + LPM precedence over /24 | Per-pod routing without ARP flooding; ECMP across nodes for load balanced services |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Run all commands inside minikube
+minikube ssh
+
+# View live pod routes — these are real Calico-programmed routes
+ip route show
+```
+
+### Hands-On Lab
 
 Simulate two nodes routing pods to each other (no overlay, pure L3).
 
@@ -284,7 +296,7 @@ ip netns exec node2 ip route add 10.244.0.0/24 via 192.168.1.10
 sysctl -w net.ipv4.ip_forward=1
 ```
 
-### Step-by-step Observation
+#### Step-by-step Observation
 
 ```bash
 # Verify routing tables in each "node"
@@ -309,7 +321,7 @@ watch -n1 "netstat -s | grep 'forwarded\|dropped'"
 # → 3 outgoing packets forwarded
 ```
 
-### Verification
+#### Verification
 
 ```bash
 # Confirm routes are present and ip_forward is on
@@ -322,6 +334,18 @@ sysctl net.ipv4.ip_forward
 ip netns del node1
 ip netns del node2
 ```
+
+### Configuration Reference
+
+| Parameter | Default | Effect | When to change |
+|-----------|---------|--------|----------------|
+| `net.ipv4.ip_forward` | `0` | Enables IP packet forwarding between interfaces | Must be `1` on every K8s node |
+| `net.ipv6.conf.all.forwarding` | `0` | Same for IPv6 | Required for IPv6 or dual-stack clusters |
+| `net.ipv4.fib_multipath_hash_policy` | `0` (L3) | ECMP hash uses L3 header only (src/dst IP) | Set to `1` (L4) for per-flow load-balancing in K8s |
+| `net.ipv4.conf.all.rp_filter` | `1` (strict) | Drops packets with unexpected source interface | Set to `2` (loose) or `0` for Calico/asymmetric routes |
+| `net.ipv4.conf.all.accept_redirects` | `1` | Accepts ICMP redirects that could change routing | Set to `0` on Kubernetes nodes to prevent redirect attacks |
+| `net.ipv4.ip_local_port_range` | `32768 60999` | Ephemeral source port range for outbound connections | Widen to `1024 65535` on high-throughput nodes |
+| `net.ipv4.tcp_fin_timeout` | `60` | Time sockets linger in FIN_WAIT_2 state | Reduce to `15` on nodes with many short-lived connections |
 
 ---
 
@@ -435,4 +459,4 @@ ip netns del node2
 
 ---
 
-**Next:** [Lesson 03 — iptables and Netfilter Architecture](03-iptables-and-netfilter.md)
+**← Previous:** [Lesson 01 — Linux Networking Fundamentals](01-linux-networking-fundamentals.md)   |   **Next:** [Lesson 03 — iptables and Netfilter Architecture](03-iptables-and-netfilter.md)

@@ -6,46 +6,13 @@
 
 > **Goal:** Configure MetalLB in L2 and BGP modes to provide LoadBalancer services on bare-metal clusters, compare with kube-vip for control-plane HA, and diagnose ARP and BGP announcement failures.
 
----
 
-## Practice Setup
 
-```bash
-# Terminal 1 — Mac (kubectl)
-kubectl get pods -n metallb-system 2>/dev/null || echo "MetalLB not installed"
-kubectl get ipaddresspools,l2advertisements -n metallb-system 2>/dev/null
-kubectl get svc -A --field-selector spec.type=LoadBalancer
-
-# Terminal 2 — minikube Linux node (inspect ARP for L2 mode)
-minikube ssh
-arp -n | head -20
-ip neigh show
-```
-
-Observation commands — run after installing MetalLB and creating a LoadBalancer service:
-
-```bash
-# Watch MetalLB speaker announcements in real time
-kubectl logs -n metallb-system -l app.kubernetes.io/component=speaker -f &
-
-# Create a test LoadBalancer service
-kubectl create deployment web --image=nginx --replicas=2
-kubectl expose deployment web --type=LoadBalancer --port=80
-
-# Watch the service get an EXTERNAL-IP assigned from the pool
-kubectl get svc web -w
-# Expect: EXTERNAL-IP changes from <pending> to 192.168.100.xxx
-
-# From outside the cluster, verify ARP resolution (L2 mode)
-# arping -I eth0 192.168.100.100   # should respond from the elected speaker node
-
-# Check which node is currently serving the VIP
-kubectl get events -n metallb-system | grep -i announcing
-```
-
-> **See also:** [Lesson 06 — BGP Fundamentals](06-bgp-fundamentals.md) for BGP session setup and ECMP concepts used by MetalLB BGP mode.
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. The Bare Metal LB Problem
 
@@ -60,19 +27,19 @@ The Cloud Controller Manager (CCM) provisions cloud LBs. On bare metal, you need
 
 ```mermaid
 flowchart LR
-    subgraph cloud["Cloud Cluster"]
-        SVC1["Service\ntype: LoadBalancer"]
-        CCM["Cloud Controller Manager"]
-        CLB["Cloud LB\n(AWS NLB / GCP / Azure)"]
+    subgraph cloud["Cloud Cluster (EKS / GKE / AKS)"]
+        SVC1["Service type: LoadBalancer app: web"]
+        CCM["Cloud Controller Manager aws-cloud-provider v1.28"]
+        CLB["AWS NLB / GCP Passthrough NLB / Azure SLB external IP assigned"]
     end
-    subgraph bare["Bare Metal Cluster"]
-        SVC2["Service\ntype: LoadBalancer"]
-        MLB["MetalLB / kube-vip"]
-        VIP["VIP (ARP/BGP)\n192.168.100.100"]
+    subgraph bare["Bare Metal Cluster (on-prem / BTP)"]
+        SVC2["Service type: LoadBalancer app: web"]
+        MLB["MetalLB v0.14 controller + speaker DaemonSet"]
+        VIP["VIP 192.168.100.100 ARP reply (L2) or BGP /32 route"]
     end
 
-    SVC1 -->|"triggers provisioning"| CCM --> CLB
-    SVC2 -->|"triggers provisioning"| MLB --> VIP
+    SVC1 --"EnsureLoadBalancer() call"--> CCM --"cloud API provision"--> CLB
+    SVC2 --"EnsureLoadBalancer() call"--> MLB --"ARP or BGP announce :179"--> VIP
 
     style CLB fill:#cce,stroke:#66c
     style VIP fill:#cec,stroke:#6c6
@@ -106,22 +73,22 @@ The speaker pod on the node holding the VIP responds to ARP requests for that IP
 
 ```mermaid
 sequenceDiagram
-    participant Router as Upstream Router
-    participant Node1 as Node 1 (elected speaker)
-    participant Node2 as Node 2
-    participant Spk as MetalLB Speaker (Node 1)
-    participant Pod as Backend Pod
+    participant Router as Upstream Router / ToR Switch
+    participant Node1 as Node 1 worker-1 (elected speaker)
+    participant Node2 as Node 2 worker-2
+    participant Spk as MetalLB Speaker v0.14 (Node 1)
+    participant Pod as Backend Pod app:web
 
-    Note over Spk: Leader election: Node 1 wins for 192.168.100.100
+    Note over Spk: Leader election: worker-1 wins VIP 192.168.100.100
 
     Router->>Node1: ARP request: who has 192.168.100.100?
-    Spk-->>Router: ARP reply: 192.168.100.100 is at <node1-MAC>
-    Router->>Node1: TCP packet to 192.168.100.100:80
-    Node1->>Pod: forward via kube-proxy (may DNAT to Node 2 pod)
+    Spk-->>Router: ARP reply: 192.168.100.100 is at <worker-1-MAC> gratuitous ARP
+    Router->>Node1: TCP :80 to 192.168.100.100
+    Node1->>Pod: forward via kube-proxy DNAT (may cross to Node 2 pod)
 
-    Note over Node1,Node2: On node failure:
-    Spk-->>Router: gratuitous ARP from Node 2 (new leader)
-    Note over Router: Router updates ARP cache (~10 s)
+    Note over Node1,Node2: On node failure: leader re-election
+    Spk-->>Router: gratuitous ARP from Node 2 worker-2 (new leader)
+    Note over Router: Router updates ARP cache within ~10 s
 ```
 
 ```yaml
@@ -322,6 +289,78 @@ spec:
 
 ---
 
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| SAP BTP bare-metal nodes | On-premise BTP infrastructure nodes need LoadBalancer IPs without cloud CCM | MetalLB L2 mode on bare-metal nodes; BGP mode on data-center racks with ToR switch peering | LoadBalancer services get real IPs from a managed pool without cloud provider dependency |
+| Equinix Metal customers | Bare-metal cloud workloads require anycast VIPs for high-availability services | MetalLB BGP mode peering with Equinix Metal's BGP infrastructure; ECMP across all nodes | Traffic distributed across all announcing nodes; sub-second failover via BFD on BGP sessions |
+| Talos Linux clusters | Immutable bare-metal OS requiring HA control-plane API server without external LB | kube-vip VRRP mode providing a floating VIP for the kube-apiserver before the cluster is bootstrapped | Multi-master control plane works without any external load balancer hardware or cloud CCM |
+| Home Assistant OS | Home automation clusters on Raspberry Pi / NUC hardware needing local service exposure | MetalLB L2 mode on a home LAN; services get local IPs from a 192.168.x.x pool | Kubernetes services accessible on the home network at stable IPs without router configuration |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — Mac (kubectl)
+kubectl get pods -n metallb-system 2>/dev/null || echo "MetalLB not installed"
+kubectl get ipaddresspools,l2advertisements -n metallb-system 2>/dev/null
+kubectl get svc -A --field-selector spec.type=LoadBalancer
+
+# Terminal 2 — minikube Linux node (inspect ARP for L2 mode)
+minikube ssh
+arp -n | head -20
+ip neigh show
+```
+
+Observation commands — run after installing MetalLB and creating a LoadBalancer service:
+
+```bash
+# Watch MetalLB speaker announcements in real time
+kubectl logs -n metallb-system -l app.kubernetes.io/component=speaker -f &
+
+# Create a test LoadBalancer service
+kubectl create deployment web --image=nginx --replicas=2
+kubectl expose deployment web --type=LoadBalancer --port=80
+
+# Watch the service get an EXTERNAL-IP assigned from the pool
+kubectl get svc web -w
+# Expect: EXTERNAL-IP changes from <pending> to 192.168.100.xxx
+
+# From outside the cluster, verify ARP resolution (L2 mode)
+# arping -I eth0 192.168.100.100   # should respond from the elected speaker node
+
+# Check which node is currently serving the VIP
+kubectl get events -n metallb-system | grep -i announcing
+```
+
+> **See also:** [Lesson 06 — BGP Fundamentals](06-bgp-fundamentals.md) for BGP session setup and ECMP concepts used by MetalLB BGP mode.
+
+### Hands-On Lab
+
+Work through the Theory sections to build a fully functional bare-metal LoadBalancer setup:
+
+1. Install MetalLB via Helm (Section 2) and verify controller + speaker pods are `Running`
+2. Create an `IPAddressPool` and `L2Advertisement` (Section 3); expose a deployment and watch `EXTERNAL-IP` assigned
+3. Test ARP announcement: run `arping -I eth0 <VIP>` from outside the cluster and confirm speaker node responds
+4. Switch to BGP mode (Section 4): configure `BGPPeer` to point at your router (or a mock with `gobgp`) and verify session
+5. Add a `BFDProfile` (Section 8) and check sub-second failover by cordoning the elected speaker node
+6. Install kube-vip (Section 6) and compare VIP failover behavior to MetalLB L2 mode
+
+### Configuration Reference
+
+Key parameter tables are embedded in the Theory sections above:
+
+| Section | Table |
+|---------|-------|
+| Section 4 — BGP Mode | Key BGP/Pool Parameters: `myASN`, `peerASN`, `holdTime`, `aggregationLength`, `bfdProfile` |
+| Section 6 — kube-vip | kube-vip vs MetalLB feature comparison table |
+
+---
+
 ## Troubleshooting
 
 | Symptom | Likely Cause | Diagnostic Command | Fix |
@@ -429,4 +468,4 @@ spec:
 
 ---
 
-**Next:** [Lesson 20 — Cloud Provider Load Balancers](20-cloud-load-balancers.md)
+**← Previous:** [Lesson 18 — Gateway API: Next-Generation Ingress](18-gateway-api.md)   |   **Next:** [Lesson 20 — Cloud Provider Load Balancers](20-cloud-load-balancers.md)

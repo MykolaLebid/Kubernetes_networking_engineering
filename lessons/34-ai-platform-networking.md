@@ -6,24 +6,13 @@
 
 > **Goal:** Design and operate the network stack for GPU-intensive AI training clusters — including SR-IOV, RDMA via Multus, rail-optimized topology, NCCL tuning, and lossless RoCE configuration with PFC and ECN.
 
----
 
-## Practice Setup
 
-```bash
-# Terminal 1 — check GPU and RDMA resources on minikube node
-minikube ssh
-ls /dev/infiniband/ 2>/dev/null || echo "No IB devices (expected in minikube)"
-lspci | grep -i "mellanox\|infiniband\|ConnectX" 2>/dev/null || echo "No RDMA NICs"
-
-# Terminal 2 — Mac (kubectl)
-kubectl get nodes -o json | jq '.items[].status.allocatable | with_entries(select(.key | test("nvidia|rdma|hugepages")))'
-kubectl get pods -n nvidia-operator 2>/dev/null || echo "NVIDIA Operator not installed"
-```
-
-> **Note:** Most labs in this lesson require real GPU/RDMA hardware. Use the commands to understand the patterns; the architecture diagrams are the core learning objective here.
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. Why Standard Kubernetes Networking Fails for AI
 
@@ -58,36 +47,38 @@ The standard design for GPU clusters. Each GPU in a server has its own NIC conne
 ```mermaid
 flowchart TD
     subgraph Spine["Spine Switches (400 GbE uplinks)"]
-        S1[Spine-1]
-        S2[Spine-2]
-        S3[Spine-3]
-        S4[Spine-4]
+        S1["Spine-1 (400 GbE)"]
+        S2["Spine-2 (400 GbE)"]
+        S3["Spine-3 (400 GbE)"]
+        S4["Spine-4 (400 GbE)"]
     end
     subgraph Rails["Leaf / ToR Switches — one per GPU rail"]
-        R0[Rail-0\nToR-0]
-        R1[Rail-1\nToR-1]
-        R2[Rail-2\nToR-2]
-        R3[Rail-3\nToR-3]
+        R0["Rail-0 ToR-0 (400 GbE PFC+ECN)"]
+        R1["Rail-1 ToR-1 (400 GbE PFC+ECN)"]
+        R2["Rail-2 ToR-2 (400 GbE PFC+ECN)"]
+        R3["Rail-3 ToR-3 (400 GbE PFC+ECN)"]
     end
-    subgraph ServerA["GPU Server A (DGX H100)"]
-        G0[GPU0+NIC0]
-        G1[GPU1+NIC1]
-        G2[GPU2+NIC2]
-        G3[GPU3+NIC3]
-        NVL[NVLink mesh\n900 GB/s all-to-all]
+    subgraph ServerA["GPU Server A (DGX H100 SXM5)"]
+        subgraph NVSwitchFabric["NVSwitch Fabric (3x NVSwitch)"]
+            NVS["NVSwitch (900 GB/s all-to-all)"]
+        end
+        G0["GPU0 H100 80GB + ConnectX-7 NIC0 RoCE v2 UDP :4791"]
+        G1["GPU1 H100 80GB + ConnectX-7 NIC1 RoCE v2 UDP :4791"]
+        G2["GPU2 H100 80GB + ConnectX-7 NIC2 RoCE v2 UDP :4791"]
+        G3["GPU3 H100 80GB + ConnectX-7 NIC3 RoCE v2 UDP :4791"]
+        G0 --"NVLink 900 GB/s"--> NVS
+        G1 --"NVLink 900 GB/s"--> NVS
+        G2 --"NVLink 900 GB/s"--> NVS
+        G3 --"NVLink 900 GB/s"--> NVS
     end
-    S1 --- R0
-    S2 --- R1
-    S3 --- R2
-    S4 --- R3
-    R0 --- G0
-    R1 --- G1
-    R2 --- G2
-    R3 --- G3
-    G0 --- NVL
-    G1 --- NVL
-    G2 --- NVL
-    G3 --- NVL
+    S1 --"400 GbE uplink"--> R0
+    S2 --"400 GbE uplink"--> R1
+    S3 --"400 GbE uplink"--> R2
+    S4 --"400 GbE uplink"--> R3
+    R0 --"400 GbE RoCE v2"--> G0
+    R1 --"400 GbE RoCE v2"--> G1
+    R2 --"400 GbE RoCE v2"--> G2
+    R3 --"400 GbE RoCE v2"--> G3
 ```
 
 Each NIC connects to a **different** ToR switch (rail). AllReduce between servers: each GPU uses its own NIC, so no congestion on a single switch. Bisection bandwidth = 8 × 400 Gbps = 3.2 Tbps per server (non-blocking).
@@ -138,34 +129,34 @@ RDMA:
 
 ```mermaid
 flowchart LR
-    subgraph Pod["Training Pod"]
-        ETH[eth0\nCNI standard\n10.244.x.x]
-        NET1[net1\nSR-IOV VF\n192.168.100.x]
-        GPU[GPU\nnvidia.com/gpu: 1]
-        NET1 -->|GPUDirect RDMA\nbypasses CPU+RAM| GPU
+    subgraph Pod["Training Pod (gpu-training-0)"]
+        ETH["eth0 CNI primary 10.244.x.x management"]
+        NET1["net1 SR-IOV VF 192.168.100.x RDMA data plane"]
+        GPU["GPU H100 80GB HBM3 (nvidia.com/gpu: 1)"]
+        NET1 --"GPUDirect RDMA RoCE v2 UDP :4791 bypasses CPU+RAM"--> GPU
     end
-    subgraph Node["GPU Node"]
-        PF[Physical NIC\nConnectX-7\n400 GbE]
-        VF0[VF0]
-        VF1[VF1]
-        VF2[VF2]
-        PF --> VF0
-        PF --> VF1
-        PF --> VF2
+    subgraph Node["GPU Node (p4d.24xlarge)"]
+        PF["Physical NIC ConnectX-7 400 GbE (ens4f0)"]
+        VF0["VF0 → pod-0"]
+        VF1["VF1 → pod-1"]
+        VF2["VF2 → pod-2"]
+        PF --"SR-IOV partition"--> VF0
+        PF --"SR-IOV partition"--> VF1
+        PF --"SR-IOV partition"--> VF2
         VF0 --> NET1
     end
     subgraph Ops["Kubernetes Operators"]
-        NFD[Node Feature\nDiscovery]
-        GPUOp[GPU Operator\ndriver + device-plugin\n+ DCGM metrics]
-        NetOp[Network Operator\nOFED + SR-IOV\n+ RDMA plugin]
+        NFD["Node Feature Discovery (pci-15b3.present=true)"]
+        GPUOp["NVIDIA GPU Operator driver + device-plugin + DCGM metrics"]
+        NetOp["NVIDIA Network Operator OFED + SR-IOV + RDMA plugin"]
     end
-    subgraph Fabric["Network Fabric"]
-        ToR[ToR Switch\nRail-0\nPFC+ECN enabled]
-        Spine[Spine Switch]
-        ToR --> Spine
+    subgraph Fabric["Network Fabric (rail-optimized)"]
+        ToR["ToR Switch Rail-0 400 GbE PFC priority-3 ECN enabled"]
+        Spine["Spine Switch 400 GbE ECMP"]
+        ToR --"400 GbE uplink ECMP"--> Spine
     end
-    PF --> ToR
-    ETH -->|management\nkubelet/DNS/kubectl| Node
+    PF --"RoCE v2 UDP :4791"--> ToR
+    ETH --"TCP :443 kubelet DNS kubectl"--> Node
     NFD --> GPUOp
     NFD --> NetOp
 ```
@@ -176,10 +167,10 @@ flowchart LR
 
 ```mermaid
 sequenceDiagram
-    participant S as Scheduler\n(Volcano gang)
-    participant P0 as Pod-0\nGPU0 Node-A
-    participant P1 as Pod-1\nGPU1 Node-B
-    participant NCCL as NCCL\nlibrary
+    participant S as Volcano Scheduler (gang scheduling)
+    participant P0 as Pod-0 GPU0 Node-A
+    participant P1 as Pod-1 GPU1 Node-B
+    participant NCCL as NCCL library (libncclso)
 
     S->>P0: schedule (all 8 pods start together)
     S->>P1: schedule (gang scheduling)
@@ -190,8 +181,8 @@ sequenceDiagram
     NCCL->>P0: assign ring roles
     NCCL->>P1: assign ring roles
     loop Every training step
-        P0->>P1: send gradient shard via net1 (RDMA VF)\nGPUDirect: GPU memory → NIC → wire
-        P1->>P0: send gradient shard via net1 (RDMA VF)
+    P0->>P1: send gradient shard via net1 SR-IOV VF GPUDirect RDMA RoCE v2 UDP :4791
+    P1->>P0: send gradient shard via net1 SR-IOV VF GPUDirect RDMA RoCE v2 UDP :4791
         Note over P0,P1: AllReduce completes when all shards aggregated
     end
     P0->>P0: update model weights
@@ -330,20 +321,20 @@ kubectl exec -it gpu-training-0 -- ibv_rc_pingpong -d mlx5_0 -g 0
 
 ```mermaid
 flowchart TD
-    NFD[Node Feature Discovery\nlabels: pci-10de.present=true\nnvidia.com/gpu.product=H100] --> GPUOp
+    NFD["Node Feature Discovery labels: pci-10de.present=true nvidia.com/gpu.product=H100"] --> GPUOp
     NFD --> NetOp
     subgraph GPUOp["NVIDIA GPU Operator"]
-        DRV[nvidia-driver\nkernel module]
-        CTK[nvidia-container-toolkit\nruntime hook]
-        DP[nvidia-device-plugin\nk8s resource: nvidia.com/gpu]
-        DCGM[dcgm-exporter\nGPU metrics → Prometheus]
-        GFD[gpu-feature-discovery\nlabels: memory, model, MIG config]
+        DRV["nvidia-driver (kernel module)"]
+        CTK["nvidia-container-toolkit (runtime hook)"]
+        DP["nvidia-device-plugin (k8s resource: nvidia.com/gpu)"]
+        DCGM["dcgm-exporter GPU metrics to Prometheus"]
+        GFD["gpu-feature-discovery labels: memory model MIG config"]
     end
     subgraph NetOp["NVIDIA Network Operator"]
-        OFED[Mellanox OFED drivers\nConnectX NIC drivers]
-        RDMA[rdma-shared-device-plugin\nk8s resource: rdma/rdma]
-        SRIOV[SR-IOV device plugin]
-        WA[Secondary network IPAM\nwhereabouts]
+        OFED["Mellanox OFED drivers ConnectX NIC drivers"]
+        RDMA["rdma-shared-device-plugin k8s resource: rdma/rdma"]
+        SRIOV["SR-IOV device plugin VF provisioner"]
+        WA["Secondary network IPAM (whereabouts)"]
     end
 ```
 
@@ -685,34 +676,35 @@ ethtool -A ens4f0   # check pause frames
 cat /sys/class/net/ens4f0/ecn_enable   # 1 = ECN enabled
 ```
 
----
+### Industry Applications
 
-## 17. Key Configuration Reference
-
-### SR-IOV and RDMA Parameters
-
-| Parameter | Default | Effect | When to change |
-|-----------|---------|--------|----------------|
-| `numVfs` in SriovNetworkNodePolicy | 0 | Number of VFs to create on the PF | Set to 1 per GPU (8 for 8-GPU servers) |
-| `deviceType` | `netdevice` | `vfio-pci` for DPDK/userspace; `netdevice` for kernel + RDMA | Use `netdevice` for RDMA; `vfio-pci` for DPDK only |
-| `isRdma` | `false` | Expose RDMA resource alongside VF | Always true for AI training workloads |
-| `hugepages-2Mi` limit | (none) | Pre-allocates huge pages for RDMA pinned memory | Required for RDMA; set to 2–8 Gi per pod |
-| `NCCL_IB_DISABLE` env | (auto) | `0` forces IB/RoCE; `1` forces TCP | Force `0` to prevent NCCL falling back to slow TCP |
-| `NCCL_NET_GDR_LEVEL` | `0` | `5` enables GPUDirect RDMA (GPU mem directly to NIC) | Set `5` on nodes with nvidia-peermem loaded |
-| `NCCL_SOCKET_IFNAME` | (auto) | Interface for NCCL rendezvous (use management eth0, not RDMA) | Always set explicitly on dual-NIC pods |
-
-### PFC/ECN Switch Configuration Reference
-
-| Parameter | Recommended Value | Effect | Risk if wrong |
-|-----------|------------------|--------|--------------|
-| PFC priority | 3 (CoS 3 = RDMA) | Marks RDMA traffic class as no-drop | Wrong priority = PFC not protecting RDMA flows |
-| ECN threshold | 150–200 KB | Buffer fill level that triggers ECN marking | Too low = excessive CNPs; too high = too many drops |
-| DCQCN alpha | 0.0625 | Rate reduction factor per congestion event | Too high = oscillation; too low = slow convergence |
-| MTU (jumbo frames) | 9000 bytes | Reduces header overhead for large RDMA messages | Must match end-to-end: NIC, switch, and remote NIC |
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| AWS (p4d.24xlarge) | GPT-scale LLM training for Amazon Bedrock | 400 Gbps EFA (Elastic Fabric Adapter) with 8x A100 GPUs | 400 Gbps per node inter-node bandwidth enables training 175B-param models in days |
+| Meta AI Research SuperCluster (RSC) | 16000-GPU cluster for LLaMA training | RoCE v2 on 400G Ethernet with PFC+ECN, NVSwitch within server | Sub-2 μs latency AllReduce across racks; 36 Tbps bisection bandwidth |
+| Google TPU Pod | JAX/XLA distributed training (Gemini) | ICI (Inter-Chip Interconnect) fabric at 4800 Gbps per chip | Custom silicon interconnect eliminates Ethernet bottleneck entirely for ultra-scale jobs |
+| Stability AI | Stable Diffusion and SDXL training | H100 DGX clusters with rail-optimized topology and Volcano gang scheduling | Eliminated training stalls from partial pod starts; 40% utilization improvement |
 
 ---
 
-## 18. Hands-On Practice
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — check GPU and RDMA resources on minikube node
+minikube ssh
+ls /dev/infiniband/ 2>/dev/null || echo "No IB devices (expected in minikube)"
+lspci | grep -i "mellanox\|infiniband\|ConnectX" 2>/dev/null || echo "No RDMA NICs"
+
+# Terminal 2 — Mac (kubectl)
+kubectl get nodes -o json | jq '.items[].status.allocatable | with_entries(select(.key | test("nvidia|rdma|hugepages")))'
+kubectl get pods -n nvidia-operator 2>/dev/null || echo "NVIDIA Operator not installed"
+```
+
+> **Note:** Most labs in this lesson require real GPU/RDMA hardware. Use the commands to understand the patterns; the architecture diagrams are the core learning objective here.
+
+### Hands-On Lab
 
 ```bash
 # 1. Check allocatable GPU and RDMA resources per node
@@ -772,6 +764,29 @@ kubectl debug node/<gpu-node> -it --image=nicolaka/netshoot -- \
 ```
 
 > **See also:** [Lesson 07 — Bare Metal Network Infrastructure](07-bare-metal-network-infrastructure.md) for ToR switch configuration and ECMP fabric design that underpins rail-optimized GPU clusters.
+
+### Configuration Reference
+
+#### SR-IOV and RDMA Parameters
+
+| Parameter | Default | Effect | When to change |
+|-----------|---------|--------|----------------|
+| `numVfs` in SriovNetworkNodePolicy | 0 | Number of VFs to create on the PF | Set to 1 per GPU (8 for 8-GPU servers) |
+| `deviceType` | `netdevice` | `vfio-pci` for DPDK/userspace; `netdevice` for kernel + RDMA | Use `netdevice` for RDMA; `vfio-pci` for DPDK only |
+| `isRdma` | `false` | Expose RDMA resource alongside VF | Always true for AI training workloads |
+| `hugepages-2Mi` limit | (none) | Pre-allocates huge pages for RDMA pinned memory | Required for RDMA; set to 2–8 Gi per pod |
+| `NCCL_IB_DISABLE` env | (auto) | `0` forces IB/RoCE; `1` forces TCP | Force `0` to prevent NCCL falling back to slow TCP |
+| `NCCL_NET_GDR_LEVEL` | `0` | `5` enables GPUDirect RDMA (GPU mem directly to NIC) | Set `5` on nodes with nvidia-peermem loaded |
+| `NCCL_SOCKET_IFNAME` | (auto) | Interface for NCCL rendezvous (use management eth0, not RDMA) | Always set explicitly on dual-NIC pods |
+
+#### PFC/ECN Switch Configuration
+
+| Parameter | Recommended Value | Effect | Risk if wrong |
+|-----------|------------------|--------|--------------|
+| PFC priority | 3 (CoS 3 = RDMA) | Marks RDMA traffic class as no-drop | Wrong priority = PFC not protecting RDMA flows |
+| ECN threshold | 150–200 KB | Buffer fill level that triggers ECN marking | Too low = excessive CNPs; too high = too many drops |
+| DCQCN alpha | 0.0625 | Rate reduction factor per congestion event | Too high = oscillation; too low = slow convergence |
+| MTU (jumbo frames) | 9000 bytes | Reduces header overhead for large RDMA messages | Must match end-to-end: NIC, switch, and remote NIC |
 
 ---
 
@@ -894,4 +909,4 @@ kubectl debug node/<gpu-node> -it --image=nicolaka/netshoot -- \
 
 ---
 
-**Next:** This is the final lesson. Return to [README](../README.md) to review the full learning path.
+**← Previous:** [Lesson 33 — ArgoCD and GitOps for Network Configuration](33-argocd-gitops.md)

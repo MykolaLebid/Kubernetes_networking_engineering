@@ -6,25 +6,13 @@
 
 > **Goal:** Design and validate a spine-leaf Kubernetes cluster network with LACP bonding, VLAN segmentation, jumbo frames, and MetalLB load balancing so production bare-metal pods achieve wire-speed native routing.
 
----
 
-## Practice Setup
 
-```bash
-# Terminal 1 — minikube Linux node
-minikube ssh
-ip link show bonding_masters 2>/dev/null || echo "No bonding on this node"
-bridge vlan show 2>/dev/null
-ip link show type vlan
-
-# Terminal 2 — Mac (kubectl)
-kubectl get nodes -o wide
-kubectl describe node minikube | grep -A5 "Addresses\|Capacity"
-```
-
-> **See also:** [Lesson 06 — BGP Fundamentals](06-bgp-fundamentals.md) for configuring the BGP sessions between nodes and ToR switches in this topology.
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. Physical Network Topology
 
@@ -32,48 +20,60 @@ kubectl describe node minikube | grep -A5 "Addresses\|Capacity"
 
 ```mermaid
 flowchart TD
-    INT[Internet / Uplink]
-    CORE[Core Switch]
-    TOR[ToR Switch<br/>10/25 GbE access ports]
-    N1[Node 1]
-    N2[Node 2]
-    N3[Node 3]
-    N4[Node 4]
+    INT["Internet / Uplink BGP/OSPF"]
+    CORE["Core Switch Layer 3"]
+    TOR["ToR Switch 10/25 GbE access ports"]
+    MGMT["OOB Mgmt Switch IPMI/BMC VLAN 10"]
+    N1["Node 1 bond0 LACP"]
+    N2["Node 2 bond0 LACP"]
+    N3["Node 3 bond0 LACP"]
+    N4["Node 4 bond0 LACP"]
 
-    INT --> CORE --> TOR
-    TOR --> N1
-    TOR --> N2
-    TOR --> N3
-    TOR --> N4
+    INT --"100 GbE uplink"--> CORE
+    CORE --"25 GbE trunk"--> TOR
+    CORE --"1 GbE"--> MGMT
+    TOR --"25 GbE VLAN 20"--> N1
+    TOR --"25 GbE VLAN 20"--> N2
+    TOR --"25 GbE VLAN 20"--> N3
+    TOR --"25 GbE VLAN 20"--> N4
+    MGMT --"1 GbE VLAN 10"--> N1
+    MGMT --"1 GbE VLAN 10"--> N2
+
+    style INT fill:#4a6fa5,color:#fff
+    style TOR fill:#2d5a27,color:#fff
+    style MGMT fill:#6b6b2a,color:#fff
 ```
 
 ### Spine-Leaf (production, 20–1000+ nodes)
 
 ```mermaid
 flowchart TD
-    S1[Spine 1<br/>100 GbE uplinks]
-    S2[Spine 2<br/>100 GbE uplinks]
-    L1[Leaf 1<br/>25 GbE to nodes]
-    L2[Leaf 2]
-    L3[Leaf 3]
-    L4[Leaf 4]
-    NG1[Node Group 1]
-    NG2[Node Group 2]
-    NG3[Node Group 3]
-    NG4[Node Group 4]
+    S1["Spine 1 100 GbE uplinks"]
+    S2["Spine 2 100 GbE uplinks"]
+    L1["Leaf 1 25 GbE to nodes"]
+    L2["Leaf 2 25 GbE to nodes"]
+    L3["Leaf 3 25 GbE to nodes"]
+    L4["Leaf 4 25 GbE to nodes"]
+    NG1["Node Group 1 pods 10.244.0.0/24"]
+    NG2["Node Group 2 pods 10.244.1.0/24"]
+    NG3["Node Group 3 pods 10.244.2.0/24"]
+    NG4["Node Group 4 pods 10.244.3.0/24"]
 
-    S1 --- L1
-    S1 --- L2
-    S1 --- L3
-    S1 --- L4
-    S2 --- L1
-    S2 --- L2
-    S2 --- L3
-    S2 --- L4
-    L1 --> NG1
-    L2 --> NG2
-    L3 --> NG3
-    L4 --> NG4
+    S1 --"100 GbE eBGP :179"--> L1
+    S1 --"100 GbE eBGP :179"--> L2
+    S1 --"100 GbE eBGP :179"--> L3
+    S1 --"100 GbE eBGP :179"--> L4
+    S2 --"100 GbE eBGP :179"--> L1
+    S2 --"100 GbE eBGP :179"--> L2
+    S2 --"100 GbE eBGP :179"--> L3
+    S2 --"100 GbE eBGP :179"--> L4
+    L1 --"25 GbE LACP bond"--> NG1
+    L2 --"25 GbE LACP bond"--> NG2
+    L3 --"25 GbE LACP bond"--> NG3
+    L4 --"25 GbE LACP bond"--> NG4
+
+    style S1 fill:#4a6fa5,color:#fff
+    style S2 fill:#4a6fa5,color:#fff
 ```
 
 Each Leaf uplinks to every Spine (full mesh). Nodes connect only to their Leaf. Provides predictable latency and no STP convergence issues.
@@ -95,17 +95,21 @@ Each Leaf uplinks to every Spine (full mesh). Nodes connect only to their Leaf. 
 ```mermaid
 sequenceDiagram
     participant Wire as Physical Wire
-    participant NIC as NIC (eth0/eth1)
-    participant Bond as bond0 (LACP)
-    participant VLAN as eth0.20 (VLAN)
-    participant Kernel as IP Stack
-    participant Pod as Pod veth
+    participant NIC as NIC eth0/eth1 25GbE
+    participant Bond as bond0 LACP 802.3ad
+    participant VLAN as eth0.20 VLAN tag 20
+    participant Kernel as IP Stack ip_forward=1
+    participant CT as conntrack table
+    participant Pod as Pod veth caliXXXX
 
-    Wire->>NIC: Frame arrives
-    NIC->>Bond: LACP selects active slave
-    Bond->>VLAN: 802.1Q tag stripped
-    VLAN->>Kernel: IP routing lookup
-    Kernel->>Pod: forward via veth pair
+    Wire->>NIC: Ethernet frame arrives 25 GbE
+    NIC->>Bond: LACP selects active slave by layer3+4 hash
+    Bond->>VLAN: 802.1Q tag stripped (VLAN 20)
+    VLAN->>Kernel: IP routing lookup LPM dst=10.244.x.x
+    Kernel->>CT: conntrack state lookup NEW/ESTABLISHED
+    CT-->>Kernel: conntrack entry matched or created
+    Kernel->>Pod: forward via veth pair DNAT if service
+    Note over Pod: Pod sees src/dst IP, MTU 9000
 ```
 
 ### Single NIC (dev/small)
@@ -133,16 +137,6 @@ cat /proc/net/bonding/bond0 | grep -E "802.3ad|LACP|Partner"
 ```
 
 Switch side: configure the ports as a port-channel / LAG with LACP mode active.
-
-### LACP Configuration Reference
-
-| Parameter | Value | Effect | When to change |
-|-----------|-------|--------|----------------|
-| `mode` | `802.3ad` | Active LACP negotiation | Use `active-backup` if switch does not support LACP |
-| `lacp-rate` | `fast` | 1s LACP PDUs (vs 30s slow) | Always use `fast` for faster failover |
-| `mii-monitor-interval` | `100` (ms) | Link state polling interval | 50ms for critical nodes |
-| `xmit-hash-policy` | `layer3+4` | Hashing for load distribution | `layer3+4` for IP/port-based distribution |
-| `min-links` | `1` | Min active slaves before bond goes down | Set to `2` for strict HA |
 
 ### SR-IOV (High Performance)
 SR-IOV partitions a physical NIC into Virtual Functions (VFs), each passed directly into a pod or VM.
@@ -408,6 +402,140 @@ rdma stat show
 
 ---
 
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| SAP BTP bare metal | SAP Business Technology Platform runs Kubernetes on bare-metal nodes in Equinix and SAP-owned data centers with strict network isolation requirements | Spine-leaf topology + LACP bonding + VLAN segmentation (management/data/storage) | Deterministic latency, full VLAN isolation between tenant clusters, zero cloud dependency for data-residency compliance |
+| Equinix Metal (bare-metal cloud) | Equinix Metal provisions bare-metal servers with BGP-enabled ToR switches; customers run any Kubernetes distribution directly on physical hardware | eBGP with ToR + MetalLB BGP mode + jumbo frames MTU 9000 | Full BGP route advertisement from day 1; MetalLB advertises service VIPs to Equinix edge routers for global reachability |
+| Rackspace managed Kubernetes | Rackspace deploys bare-metal Kubernetes clusters with LACP bonds to dedicated ToR switches, using MetalLB L2 for simple customer deployments and BGP for enterprise-tier | LACP 802.3ad + VLAN per-tenant + MetalLB L2/BGP | Multi-tenant network isolation; MetalLB mode selection per cluster tier; unified IP management via IPAM integration |
+| On-premises GPU clusters (AI/ML) | GPU training clusters require InfiniBand or RoCE with jumbo frames for collective operations (NCCL, MPI); Kubernetes pod scheduling must co-locate with RDMA NICs | SR-IOV VFs passed to pods + MTU 9000 + Multus secondary interfaces | Near-native InfiniBand bandwidth inside Kubernetes pods; collective allreduce at line rate across GPU nodes |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — minikube Linux node
+minikube ssh
+ip link show bonding_masters 2>/dev/null || echo "No bonding on this node"
+bridge vlan show 2>/dev/null
+ip link show type vlan
+
+# Terminal 2 — Mac (kubectl)
+kubectl get nodes -o wide
+kubectl describe node minikube | grep -A5 "Addresses\|Capacity"
+```
+
+> **See also:** [Lesson 06 — BGP Fundamentals](06-bgp-fundamentals.md) for configuring the BGP sessions between nodes and ToR switches in this topology.
+
+### Hands-On Lab
+
+Inspect node network configuration, simulate VLAN setup, and deploy MetalLB.
+
+```bash
+# --- Terminal 1 (minikube ssh) ---
+
+# Check NIC details and link state
+ethtool eth0 | grep -E "Speed|Duplex|Link"
+ethtool -i eth0 | grep driver
+
+# Simulate LACP bond (minikube has single NIC; observe the commands)
+ip link add bond0 type bond mode 802.3ad 2>/dev/null || echo "bond0 already exists"
+cat /proc/net/bonding/bond0 2>/dev/null || echo "No bond on minikube (expected)"
+
+# Create a VLAN interface (simulate VLAN 20 — Kubernetes data)
+ip link add link eth0 name eth0.20 type vlan id 20
+ip link set eth0.20 up
+ip addr add 192.168.20.100/24 dev eth0.20
+ip link show eth0.20
+
+# Test jumbo frames (minikube uses 1500 by default; test the concept)
+ip link show eth0 | grep mtu
+ping -M do -s 1472 -c3 $(ip route show default | awk '{print $3}')
+# 1472 + 28 header = 1500 — should succeed on MTU 1500
+
+# Clean up
+ip addr del 192.168.20.100/24 dev eth0.20
+ip link del eth0.20
+
+# --- Terminal 2 (Mac) ---
+
+# Deploy MetalLB
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.8/config/manifests/metallb-native.yaml
+kubectl wait -n metallb-system deployment/controller --for=condition=Available --timeout=90s
+```
+
+#### Step-by-step Observation
+
+```bash
+# --- Terminal 2 (Mac) ---
+
+# Configure MetalLB L2 mode with an IP pool
+cat <<EOF | kubectl apply -f -
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: example-pool
+  namespace: metallb-system
+spec:
+  addresses:
+    - 192.168.49.200-192.168.49.210
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: example
+  namespace: metallb-system
+EOF
+
+# Create a service with LoadBalancer type
+kubectl create deployment nginx --image=nginx
+kubectl expose deployment nginx --port=80 --type=LoadBalancer
+
+# Watch for EXTERNAL-IP assignment from MetalLB pool
+kubectl get service nginx --watch
+# → Should show EXTERNAL-IP from 192.168.49.200-210 range
+
+# View MetalLB speaker logs (shows ARP announcement)
+kubectl logs -n metallb-system -l component=speaker --tail=20
+```
+
+#### Verification
+
+```bash
+# MetalLB controller and speakers must be running
+kubectl get pods -n metallb-system
+# All pods must be Running
+
+# Service must have an EXTERNAL-IP
+kubectl get service nginx | grep -v pending
+# → EXTERNAL-IP should not be <pending>
+
+# Test reachability (from minikube node)
+minikube ssh -- curl -s -o /dev/null -w "%{http_code}" http://$(kubectl get svc nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+# → 200
+
+# Clean up
+kubectl delete deployment nginx
+kubectl delete service nginx
+kubectl delete -f https://raw.githubusercontent.com/metallb/metallb/v0.14.8/config/manifests/metallb-native.yaml
+```
+
+### Configuration Reference
+
+| Parameter | Value | Effect | When to change |
+|-----------|-------|--------|----------------|
+| `mode` | `802.3ad` | Active LACP negotiation | Use `active-backup` if switch does not support LACP |
+| `lacp-rate` | `fast` | 1s LACP PDUs (vs 30s slow) | Always use `fast` for faster failover |
+| `mii-monitor-interval` | `100` (ms) | Link state polling interval | 50ms for critical nodes |
+| `xmit-hash-policy` | `layer3+4` | Hashing for load distribution | `layer3+4` for IP/port-based distribution |
+| `min-links` | `1` | Min active slaves before bond goes down | Set to `2` for strict HA |
+
+---
+
 ## Troubleshooting
 
 | Symptom | Likely Cause | Diagnostic Command | Fix |
@@ -519,4 +647,4 @@ rdma stat show
 
 ---
 
-**Next:** [Lesson 08 — Cloud Provider Networking Basics](08-cloud-provider-networking.md)
+**← Previous:** [Lesson 06 — BGP Fundamentals for Kubernetes](06-bgp-fundamentals.md)   |   **Next:** [Lesson 08 — Cloud Provider Networking Basics](08-cloud-provider-networking.md)

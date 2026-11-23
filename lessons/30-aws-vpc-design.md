@@ -6,52 +6,34 @@
 
 > **Goal:** Design a production VPC for EKS — size subnets correctly for pod density, apply the required EKS subnet tags, attach a secondary CIDR to avoid RFC1918 exhaustion, and configure VPC endpoints so pods never traverse a NAT Gateway to reach ECR or S3.
 
----
 
-## Practice Setup
 
-```bash
-# Terminal 1 — verify AWS CLI and EKS access
-aws sts get-caller-identity
-aws ec2 describe-vpcs \
-  --query 'Vpcs[*].{ID:VpcId,CIDR:CidrBlock,Secondary:CidrBlockAssociationSet[*].CidrBlock}' \
-  --output table
-
-# Terminal 2 — check EKS-tagged subnets
-aws ec2 describe-subnets \
-  --query 'Subnets[?Tags[?Key==`kubernetes.io/role/elb`]].[SubnetId,CidrBlock,AvailabilityZone]' \
-  --output table 2>/dev/null || echo "Configure AWS CLI first"
-
-# Terminal 3 — check VPC endpoints
-aws ec2 describe-vpc-endpoints \
-  --query 'VpcEndpoints[*].{Type:VpcEndpointType,Service:ServiceName,State:State}' \
-  --output table 2>/dev/null
-```
-
-> **See also:** [Lesson 29 — AWS EKS Networking](29-aws-eks-networking.md) for ENI/IP limits that drive subnet sizing.
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. Why VPC Design Matters for EKS
 
 ```mermaid
 flowchart TD
     subgraph Problem["Common mistakes"]
-        S1["/24 subnet per AZ\n(254 IPs)"]
-        S2["No subnet tags\n(LBs fail to provision)"]
-        S3["Single VPC CIDR\n(exhausted by pods)"]
-        S4["No VPC endpoints\n(NAT costs $0.045/GB)"]
+        S1["/24 subnet per AZ (254 IPs)"]
+        S2["No subnet tags (LBs fail to provision)"]
+        S3["Single VPC CIDR (exhausted by pods)"]
+        S4["No VPC endpoints (NAT costs $0.045/GB)"]
     end
     subgraph Solution["Correct design"]
-        T1["/22 or larger\n(1022+ IPs per AZ)"]
-        T2["kubernetes.io/role/* tags\non all subnets"]
-        T3["Secondary CIDR 100.64.0.0/16\nfor pod IPs"]
-        T4["Interface endpoints\nfor ECR, STS, EC2"]
+        T1["/22 or larger (1022+ IPs per AZ)"]
+        T2["kubernetes.io/role/* tags on all subnets"]
+        T3["Secondary CIDR 100.64.0.0/16 for pod IPs"]
+        T4["Interface endpoints for ECR STS EC2"]
     end
-    S1 --> T1
-    S2 --> T2
-    S3 --> T3
-    S4 --> T4
+    S1 --"upgrade"--> T1
+    S2 --"fix"--> T2
+    S3 --"expand"--> T3
+    S4 --"add"--> T4
 ```
 
 **Root cause of most EKS network failures:** subnets exhausted, missing tags, or missing VPC endpoints.
@@ -91,31 +73,31 @@ print(f'AWS usable: {n.num_addresses - 5}')
 
 ```mermaid
 flowchart TD
-    subgraph VPC["VPC 10.0.0.0/16 + 100.64.0.0/16 (secondary)"]
+    subgraph VPC["VPC 10.0.0.0/16 + 100.64.0.0/16 (secondary CIDR)"]
         subgraph AZ_A["us-east-1a"]
-            PUB_A["Public Subnet\n10.0.0.0/24 (254 IPs)\nNAT GW, ALB nodes"]
-            PRIV_A["Private Subnet — Nodes\n10.0.10.0/22 (1022 IPs)\nWorker nodes + pod IPs"]
-            POD_A["Pod Subnet (optional)\n100.64.0.0/18\nPod IPs from secondary CIDR"]
+            PUB_A["Public Subnet 10.0.0.0/24 (254 IPs) NAT GW ALB nodes"]
+            PRIV_A["Private Subnet Nodes 10.0.10.0/22 (1022 IPs) Worker nodes + pod IPs"]
+            POD_A["Pod Subnet (optional) 100.64.0.0/18 Pod IPs from secondary CIDR"]
         end
         subgraph AZ_B["us-east-1b"]
-            PUB_B["Public Subnet\n10.0.1.0/24"]
-            PRIV_B["Private Subnet\n10.0.14.0/22"]
-            POD_B["Pod Subnet\n100.64.64.0/18"]
+            PUB_B["Public Subnet 10.0.1.0/24"]
+            PRIV_B["Private Subnet 10.0.14.0/22"]
+            POD_B["Pod Subnet 100.64.64.0/18"]
         end
         subgraph AZ_C["us-east-1c"]
-            PUB_C["Public Subnet\n10.0.2.0/24"]
-            PRIV_C["Private Subnet\n10.0.18.0/22"]
-            POD_C["Pod Subnet\n100.64.128.0/18"]
+            PUB_C["Public Subnet 10.0.2.0/24"]
+            PRIV_C["Private Subnet 10.0.18.0/22"]
+            POD_C["Pod Subnet 100.64.128.0/18"]
         end
         IGW["Internet Gateway"]
-        NATGW["NAT Gateway\n(one per AZ)"]
-        EP["VPC Endpoints\nECR, S3, STS, EC2"]
+        NATGW["NAT Gateway (one per AZ)"]
+        EP["VPC Endpoints ECR S3 STS EC2"]
     end
-    IGW --> PUB_A
-    PUB_A --> NATGW --> PRIV_A
-    EP -.-> PRIV_A
-    EP -.-> PRIV_B
-    EP -.-> PRIV_C
+    IGW --"TCP :80 :443"--> PUB_A
+    PUB_A --"SNAT TCP :443"--> NATGW --"egress"--> PRIV_A
+    EP --"PrivateLink HTTPS :443"--> PRIV_A
+    EP --"PrivateLink HTTPS :443"--> PRIV_B
+    EP --"PrivateLink HTTPS :443"--> PRIV_C
 ```
 
 ---
@@ -240,14 +222,14 @@ kubectl get node $NODE -o jsonpath='{.metadata.labels.topology\.kubernetes\.io/z
 ```mermaid
 flowchart LR
     subgraph SGs["Security Group Layers"]
-        CLUSTERSG["Cluster SG\n(control-plane ↔ nodes)\nAuto-created by EKS"]
-        NODESG["Node SG\n(node ↔ node traffic)\nAuto-created by EKS"]
-        PODSG["Pod SG\n(SecurityGroupPolicy)\nYou create this"]
-        LBSG["LB SG\n(ALB/NLB → nodes)\nCreated by LB Controller"]
+        CLUSTERSG["Cluster SG (control-plane to nodes) Auto-created by EKS"]
+        NODESG["Node SG (node to node traffic) Auto-created by EKS"]
+        PODSG["Pod SG (SecurityGroupPolicy) You create this"]
+        LBSG["LB SG (ALB/NLB to nodes) Created by LB Controller"]
     end
-    CLUSTERSG --> NODESG
-    NODESG --> PODSG
-    LBSG --> NODESG
+    CLUSTERSG --"TCP :10250 kubelet"--> NODESG
+    NODESG --"TCP :any pod port"--> PODSG
+    LBSG --"TCP :30000-32767 NodePort"--> NODESG
 ```
 
 ```bash
@@ -334,7 +316,7 @@ sequenceDiagram
     participant DEV as Developer
     participant VPN as VPN / Direct Connect
     participant PRIV as Private Subnet
-    participant EKS as EKS API Server\n(private endpoint)
+    participant EKS as EKS API Server (private endpoint)
     participant EC2 as EC2 Worker Nodes
 
     DEV->>VPN: Connect to corporate VPN
@@ -424,7 +406,78 @@ aws logs filter-log-events \
 
 ---
 
-## 12. Subnet Sizing Reference
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| Airbnb | Global lodging marketplace on AWS | /22 per AZ for 1000+ pod IPs per node type | Eliminated subnet exhaustion incidents during peak booking seasons |
+| Yelp | Business review platform across 3 AWS regions | Transit Gateway connecting 50+ VPCs | Replaced 1225 VPC peering connections with a single TGW hub-and-spoke |
+| Expedia | Travel booking platform | AWS PrivateLink for cross-account microservice communication | Zero-data-transfer NAT costs for internal service-to-service calls |
+| Datadog | SaaS observability platform on EKS | Secondary CIDR 100.64.0.0/16 for pod subnet isolation | Separated pod IPs from node IPs avoiding RFC1918 exhaustion with on-prem overlap |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — verify AWS CLI and EKS access
+aws sts get-caller-identity
+aws ec2 describe-vpcs \
+  --query 'Vpcs[*].{ID:VpcId,CIDR:CidrBlock,Secondary:CidrBlockAssociationSet[*].CidrBlock}' \
+  --output table
+
+# Terminal 2 — check EKS-tagged subnets
+aws ec2 describe-subnets \
+  --query 'Subnets[?Tags[?Key==`kubernetes.io/role/elb`]].[SubnetId,CidrBlock,AvailabilityZone]' \
+  --output table 2>/dev/null || echo "Configure AWS CLI first"
+
+# Terminal 3 — check VPC endpoints
+aws ec2 describe-vpc-endpoints \
+  --query 'VpcEndpoints[*].{Type:VpcEndpointType,Service:ServiceName,State:State}' \
+  --output table 2>/dev/null
+```
+
+> **See also:** [Lesson 29 — AWS EKS Networking](29-aws-eks-networking.md) for ENI/IP limits that drive subnet sizing.
+
+### Hands-On Lab
+
+```bash
+# 1. Check available IPs in each EKS-tagged subnet
+aws ec2 describe-subnets \
+  --filters "Name=tag:kubernetes.io/cluster/my-cluster,Values=shared" \
+  --query 'Subnets[*].{ID:SubnetId,AZ:AvailabilityZone,Free:AvailableIpAddressCount,CIDR:CidrBlock}' \
+  --output table
+
+# 2. Tag private subnets for internal NLBs
+aws ec2 create-tags \
+  --resources subnet-private-1a subnet-private-1b subnet-private-1c \
+  --tags \
+    Key=kubernetes.io/cluster/my-cluster,Value=shared \
+    Key=kubernetes.io/role/internal-elb,Value=1
+
+# 3. Add secondary CIDR to VPC for pod density
+aws ec2 associate-vpc-cidr-block \
+  --vpc-id vpc-xxxxx \
+  --cidr-block 100.64.0.0/16
+aws ec2 describe-vpcs --vpc-ids vpc-xxxxx \
+  --query 'Vpcs[0].CidrBlockAssociationSet'
+
+# 4. Create S3 Gateway endpoint (free — avoids NAT charges for ECR image pulls)
+aws ec2 create-vpc-endpoint \
+  --vpc-id vpc-xxxxx \
+  --service-name com.amazonaws.us-east-1.s3 \
+  --route-table-ids rtb-private-1a rtb-private-1b rtb-private-1c
+
+# 5. Verify all required VPC endpoints are present
+aws ec2 describe-vpc-endpoints \
+  --filters "Name=vpc-id,Values=vpc-xxxxx" \
+  --query 'VpcEndpoints[*].{Service:ServiceName,State:State}' \
+  --output table
+```
+
+### Configuration Reference
 
 | Cluster Size | Nodes per AZ | Pods per Node | Recommended Subnet | IPs Available |
 |-------------|-------------|--------------|-------------------|--------------|
@@ -434,7 +487,16 @@ aws logs filter-log-events \
 | XL | 50 | 58 (m5.xlarge) | /21 | 2043 |
 | Cluster with prefix delegation | 50 | 110+ | /20 | 4091 |
 
-**Rule of thumb:** At least /22 per AZ for any production EKS cluster. Add secondary CIDR if you anticipate > 500 pods per AZ.
+**Required VPC Endpoints:**
+
+| Endpoint | Type | Why needed |
+|----------|------|-----------|
+| `com.amazonaws.<region>.ecr.api` | Interface | Authenticate ECR image pulls |
+| `com.amazonaws.<region>.ecr.dkr` | Interface | Pull image layers from ECR |
+| `com.amazonaws.<region>.s3` | Gateway (free) | Pull image layers (ECR uses S3 backend) |
+| `com.amazonaws.<region>.sts` | Interface | IRSA token exchange |
+| `com.amazonaws.<region>.ec2` | Interface | VPC CNI calls EC2 API |
+| `com.amazonaws.<region>.elasticloadbalancing` | Interface | AWS Load Balancer Controller |
 
 ---
 
@@ -580,4 +642,4 @@ aws logs filter-log-events \
 
 ---
 
-**Next:** [Lesson 31 — AWS Load Balancer Controller Deep Dive](31-aws-load-balancer-controller.md)
+**← Previous:** [Lesson 29 — AWS EKS Networking Deep Dive](29-aws-eks-networking.md)   |   **Next:** [Lesson 31 — AWS Load Balancer Controller Deep Dive](31-aws-load-balancer-controller.md)

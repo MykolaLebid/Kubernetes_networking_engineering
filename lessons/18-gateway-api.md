@@ -6,45 +6,13 @@
 
 > **Goal:** Build a multi-role traffic management system using GatewayClass, Gateway, and HTTPRoute resources, implement canary deployments with weighted traffic splitting, and migrate workloads from Ingress to Gateway API.
 
----
 
-## Practice Setup
 
-```bash
-# Terminal 1 — Mac (kubectl)
-# Check if Gateway API CRDs are installed
-kubectl api-resources | grep -E "gateway|httproute|grpcroute|tcproute"
-kubectl get gatewayclass 2>/dev/null || echo "Gateway API not installed — run: kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/standard-install.yaml"
-
-# Terminal 2 — Mac
-kubectl get gateway,httproute -A 2>/dev/null
-```
-
-Observation commands — run after creating a Gateway and HTTPRoute:
-
-```bash
-# Install Gateway API CRDs if not present
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml
-
-# Watch Gateway and HTTPRoute status conditions as they are applied
-kubectl get gateway -A -w &
-kubectl get httproute -A -w &
-
-# After creating resources (Sections 3-5), check status:
-kubectl describe gateway prod-gateway -n infra
-# Look for: "Programmed: True" and "ResolvedRefs: True" conditions
-
-kubectl describe httproute web-route -n default
-# Look for: "Accepted: True" and "ResolvedRefs: True" conditions
-
-# Test weighted traffic split (Section 5)
-for i in $(seq 1 20); do curl -s -H "Host: web.example.com" http://<gateway-ip>/ | grep -o 'v[12]'; done
-# Expect roughly 18 × v1 and 2 × v2 (90/10 split)
-```
-
-> **See also:** [Lesson 17 — Ingress Controllers](17-ingress-controllers.md) for the Ingress API that Gateway API supersedes.
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. Why Gateway API Replaces Ingress
 
@@ -66,14 +34,22 @@ The Gateway API uses a three-layer role model — infrastructure teams own the t
 
 ```mermaid
 flowchart TD
-    GC["GatewayClass (cluster-scoped)\nowned by: controller (NGINX, Istio, Envoy)\ndefines: which implementation handles Gateways"]
-    GW["Gateway (namespace-scoped)\nowned by: infrastructure team\ndefines: listeners, ports, protocols, TLS, allowed routes"]
-    HR["HTTPRoute / TCPRoute / GRPCRoute (namespace-scoped)\nowned by: application team\ndefines: routing rules → backend Services"]
-    SVC["Service → Pods"]
+    GC["GatewayClass: nginx (cluster-scoped) controller: k8s.io/nginx-gateway-fabric owned: infra team"]
+    GW["Gateway: prod-gateway (ns: infra) listeners: :80 HTTP + :443 HTTPS allowedRoutes: Selector"]
+    HR["HTTPRoute: web-route (ns: default) matches: host+path+headers backendRefs: api-service:8080"]
+    SVC["Service: api-service :8080 -> Pods app:api version:v1/v2"]
+    CERT["Secret: web-tls-cert (ns: infra) TLS certificate via cert-manager"]
 
-    GC --> GW
-    GW --> HR
-    HR --> SVC
+    GC --"creates + programs Envoy data-plane"--> GW
+    GW --"accepts routes matching allowedRoutes"--> HR
+    HR --"routes HTTP/HTTPS requests"--> SVC
+    GW --"terminates TLS :443"--> CERT
+
+    style GC fill:#e3f2fd,stroke:#1565c0
+    style GW fill:#e8f5e9,stroke:#2e7d32
+    style HR fill:#fff3e0,stroke:#e65100
+    style SVC fill:#f3e5f5,stroke:#6a1b9a
+    style CERT fill:#fce4ec,stroke:#880e4f
 ```
 
 The request path at runtime:
@@ -81,18 +57,18 @@ The request path at runtime:
 ```mermaid
 sequenceDiagram
     participant C as Client
-    participant GW as Gateway (listener :443)
-    participant K8s as Kubernetes API
-    participant HR as HTTPRoute rules
-    participant SVC as Backend Service
+    participant GW as Gateway prod-gateway :443 (nginx-gateway-fabric)
+    participant K8s as Kubernetes API Server
+    participant HR as HTTPRoute web-route
+    participant SVC as Service api-service :8080
 
-    K8s-->>GW: watch GatewayClass + Gateway + HTTPRoute (continuous)
-    GW-->>GW: program data-plane (Envoy / NGINX)
+    K8s-->>GW: watch GatewayClass + Gateway + HTTPRoute via xDS gRPC :18000
+    GW-->>GW: program Envoy listeners + virtual hosts (nginx-gateway-fabric)
 
-    C->>GW: HTTPS GET /api (Host: web.example.com)
-    GW->>HR: evaluate route rules (host + path + headers)
-    HR-->>GW: matched rule → backendRef: api-service:8080 weight:100
-    GW->>SVC: forward request
+    C->>GW: HTTPS GET /api Host: web.example.com TLS :443
+    GW->>HR: evaluate route rules host + path + headers
+    HR-->>GW: matched: backendRef api-service:8080 weight:100
+    GW->>SVC: forward HTTP/1.1 :8080
     SVC-->>C: 200 OK
 ```
 
@@ -379,6 +355,81 @@ kubectl get ingress,httproute
 
 ---
 
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| Google / GKE | Multi-tenant ingress for 1000+ internal engineering teams on shared clusters | GatewayClass per controller (gke-l7-global-external-managed); per-team HTTPRoutes with allowedRoutes: Selector | Infra team controls listeners and TLS; app teams self-service routing without touching infrastructure |
+| Linkerd service mesh | GAMMA mesh routing specification — routing inside a service mesh, not just at ingress | HTTPRoute applied to east-west mesh traffic between services using the same Gateway API objects | Standard Gateway API objects work for both ingress and service-mesh east-west routing without separate CRDs |
+| Cilium | Native ingress layer replacing Ingress objects, backed by eBPF-accelerated Envoy gateway | GatewayClass backed by Cilium's Envoy data plane; HTTPRoute replaces all Ingress annotations | Unified routing model across ingress and mesh without a separate Ingress controller deployment |
+| Kong Konnect | Enterprise API gateway managing thousands of API routes with security policies | GatewayClass + HTTPRoute + KongPlugin extension points for rate-limiting, authentication, and logging | Security and routing policies expressed as standard Kubernetes objects with vendor-specific extensions |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — Mac (kubectl)
+# Check if Gateway API CRDs are installed
+kubectl api-resources | grep -E "gateway|httproute|grpcroute|tcproute"
+kubectl get gatewayclass 2>/dev/null || echo "Gateway API not installed — run: kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/standard-install.yaml"
+
+# Terminal 2 — Mac
+kubectl get gateway,httproute -A 2>/dev/null
+```
+
+Observation commands — run after creating a Gateway and HTTPRoute:
+
+```bash
+# Install Gateway API CRDs if not present
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml
+
+# Watch Gateway and HTTPRoute status conditions as they are applied
+kubectl get gateway -A -w &
+kubectl get httproute -A -w &
+
+# After creating resources (Sections 3-5), check status:
+kubectl describe gateway prod-gateway -n infra
+# Look for: "Programmed: True" and "ResolvedRefs: True" conditions
+
+kubectl describe httproute web-route -n default
+# Look for: "Accepted: True" and "ResolvedRefs: True" conditions
+
+# Test weighted traffic split (Section 5)
+for i in $(seq 1 20); do curl -s -H "Host: web.example.com" http://<gateway-ip>/ | grep -o 'v[12]'; done
+# Expect roughly 18 × v1 and 2 × v2 (90/10 split)
+```
+
+> **See also:** [Lesson 17 — Ingress Controllers](17-ingress-controllers.md) for the Ingress API that Gateway API supersedes.
+
+### Hands-On Lab
+
+Work through the Theory sections in order to build a complete Gateway API setup:
+
+1. Install NGINX Gateway Fabric (Section 3) and verify GatewayClass shows `Accepted: True`
+2. Apply `prod-gateway` manifest (Section 4) and confirm `Programmed: True` in status conditions
+3. Apply `web-route` HTTPRoute (Section 5) and test path routing + 90/10 weighted traffic split
+4. Add filters to the HTTPRoute (Section 6): header modification, URL rewrite, and request mirroring
+5. Apply a TCPRoute or GRPCRoute (Section 7) for a non-HTTP workload on a separate listener
+6. Create a cross-namespace HTTPRoute + ReferenceGrant pair (Section 8) and verify `ResolvedRefs: True`
+7. Test Gateway API on a cloud provider if available (Section 9): inspect built-in GatewayClasses
+8. Run the full Ingress-to-Gateway API migration sequence (Section 10) on a test Ingress object
+
+### Configuration Reference
+
+Key parameter tables are embedded in the Theory sections above:
+
+| Section | Table |
+|---------|-------|
+| Section 3 — GatewayClass | GatewayClass Parameters: `controllerName`, `parametersRef`, `status.conditions` |
+| Section 4 — Gateway | Gateway Listener Parameters: `allowedRoutes.namespaces`, `tls.mode`, `certificateRefs` |
+| Section 5 — HTTPRoute | Weight-based `backendRefs`, `hostnames`, `parentRefs.sectionName` |
+| Section 6 — Filters | `RequestHeaderModifier`, `RequestRedirect`, `URLRewrite`, `RequestMirror` |
+
+---
+
 ## Troubleshooting
 
 | Symptom | Likely Cause | Diagnostic Command | Fix |
@@ -490,4 +541,4 @@ kubectl get ingress,httproute
 
 ---
 
-**Next:** [Lesson 19 — Load Balancing on Bare Metal: MetalLB and kube-vip](19-metallb-kube-vip.md)
+**← Previous:** [Lesson 17 — Ingress Controllers and L7 Load Balancing](17-ingress-controllers.md)   |   **Next:** [Lesson 19 — Load Balancing on Bare Metal: MetalLB and kube-vip](19-metallb-kube-vip.md)

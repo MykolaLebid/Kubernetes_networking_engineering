@@ -4,38 +4,30 @@
 
 > **Goal:** Wire two virtual pods together on a single Linux host using veth pairs, a bridge, and ip_forward — replicating exactly what every CNI plugin does on node startup.
 
----
 
-## Practice Setup
-
-All commands in this lesson run on **Linux**. Use two terminals side by side:
-
-```bash
-# Terminal 1 — minikube Linux node
-minikube ssh
-
-# Terminal 2 — your Mac (observe differences)
-ip addr   # uses iproute2mac wrapper
-```
-
-Inside `minikube ssh` you have full Linux networking: `ip netns`, `ip link add veth`, `bridge`, `iptables`, etc.
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. The Linux Network Stack
 
 ```mermaid
 flowchart LR
-    A[Application\nsockets] --> B[Transport Layer\nTCP / UDP]
-    B --> C[Network Layer\nIP]
-    C --> D[Link Layer\nEthernet / drivers]
-    D --> E[Physical\nNIC / vNIC]
+    A["Application sockets (HTTP/gRPC)"] --"syscall send/recv"--> B["Transport Layer (TCP/UDP :80/:443)"]
+    B --"IP datagram"--> C["Network Layer (IPv4/IPv6)"]
+    C --"Ethernet frame"--> D["Link Layer (eth/veth driver)"]
+    D --"electrical/optical"--> E["Physical NIC (1G/10G/25G)"]
+    C --"kernel virtual path"--> F["CNI Layer (veth/bridge/VXLAN)"]
+    F --"kernel xmit"--> D
 
     style A fill:#4a6fa5,color:#fff
     style B fill:#4a6fa5,color:#fff
     style C fill:#4a6fa5,color:#fff
     style D fill:#4a6fa5,color:#fff
     style E fill:#4a6fa5,color:#fff
+    style F fill:#2d5a27,color:#fff
 ```
 
 Kubernetes adds virtual layers (veth pairs, bridges, tunnels) **between** the Link and Network layers. The kernel enforces namespace isolation at the network layer — each pod gets its own complete stack. CNI plugins operate at this virtual layer, never touching the physical NIC directly.
@@ -116,23 +108,27 @@ Flannel's `cbr0`, Docker's `docker0`, and Calico's `cali*`-to-bridge wiring all 
 ```mermaid
 flowchart LR
     subgraph poda [Pod A namespace]
-        PA[eth0\n10.244.0.10/24]
+        PA["eth0 10.244.0.10/24"]
+        LOBA["lo 127.0.0.1"]
     end
     subgraph podb [Pod B namespace]
-        PB[eth0\n10.244.0.11/24]
+        PB["eth0 10.244.0.11/24"]
+        LOBB["lo 127.0.0.1"]
     end
     subgraph host [Host network namespace]
-        VA[veth-a-br]
-        VB[veth-b-br]
-        BR[br0\n10.244.0.1/24]
-        ETH[eth0 — node NIC]
+        VA["veth-a-br (caliAAAA)"]
+        VB["veth-b-br (caliBBBB)"]
+        BR["br0 10.244.0.1/24"]
+        ETH["eth0 node NIC 192.168.1.10"]
+        RT["kernel routing ip_forward=1"]
     end
 
-    PA <-->|veth pair| VA
-    PB <-->|veth pair| VB
+    PA <-->|"veth pair L2"| VA
+    PB <-->|"veth pair L2"| VB
     VA --- BR
     VB --- BR
     BR --- ETH
+    BR --- RT
 
     style poda fill:#2d5a27,color:#fff
     style podb fill:#2d5a27,color:#fff
@@ -143,17 +139,23 @@ flowchart LR
 
 ```mermaid
 sequenceDiagram
-    participant PA as Pod A (10.244.0.10)
-    participant VA as veth-a-br (host)
+    participant PA as Pod A nginx :80
+    participant VA as veth-a-br host-side
+    participant ARP as ARP/FDB table
     participant BR as br0 bridge
-    participant VB as veth-b-br (host)
-    participant PB as Pod B (10.244.0.11)
+    participant VB as veth-b-br host-side
+    participant PB as Pod B redis :6379
 
-    PA->>VA: Packet src=10.244.0.10 dst=10.244.0.11
-    VA->>BR: Frame enters bridge port
-    Note over BR: ARP or FDB lookup<br/>dst MAC maps to veth-b-br port
-    BR->>VB: Frame forwarded to correct port
-    VB->>PB: Packet delivered to Pod B
+    PA->>VA: Ethernet frame src=10.244.0.10 dst=10.244.0.11
+    VA->>BR: Frame arrives at bridge port
+    BR->>ARP: Lookup dst MAC for 10.244.0.11
+    ARP-->>BR: MAC aa:bb:cc:00:01:02 on port veth-b-br
+    BR->>VB: Frame forwarded to matched bridge port
+    VB->>PB: Packet delivered TCP :6379
+    PB-->>VB: TCP reply ACK
+    VB-->>BR: Reply frame
+    BR-->>VA: Forwarded via FDB lookup
+    VA-->>PA: Reply delivered to Pod A
 ```
 
 ---
@@ -182,6 +184,7 @@ For cross-node pod routing, CNI plugins either:
 - **Encapsulate** packets in a tunnel and route the outer header (VXLAN, Geneve)
 
 > **See also:** [Lesson 02 — IP Routing and Forwarding](02-ip-routing-and-forwarding.md) for longest-prefix match, ECMP, policy routing, and cloud provider differences.
+
 
 ---
 
@@ -226,21 +229,34 @@ sysctl net.netfilter.nf_conntrack_max=1000000
 
 These are set in `/etc/sysctl.d/99-kubernetes.conf` by kubeadm.
 
-### Sysctl Configuration Reference
+### Industry Applications
 
-| Parameter | Default | Effect | When to change |
-|-----------|---------|--------|----------------|
-| `net.ipv4.ip_forward` | `0` | Enables packet forwarding between interfaces | Must be `1` on every Kubernetes node |
-| `net.bridge.bridge-nf-call-iptables` | `0` | Routes bridge traffic through iptables hooks | Required for kube-proxy and most CNIs |
-| `net.bridge.bridge-nf-call-ip6tables` | `0` | Same for IPv6 bridged traffic | Required for dual-stack clusters |
-| `net.netfilter.nf_conntrack_max` | `65536` | Maximum concurrent tracked connections | Raise to `524288`+ on nodes with many pods |
-| `net.ipv4.conf.all.rp_filter` | `1` | Strict reverse path filtering | Set to `0` or `2` for Calico asymmetric routing |
-| `net.ipv4.neigh.default.gc_thresh3` | `1024` | ARP table hard limit | Raise to `16384`+ on nodes with 100+ pods |
-| `net.core.somaxconn` | `128` | Maximum socket listen backlog | Raise to `32768` for high-connection workloads |
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| Google GKE | Each GKE node creates one veth pair per pod at scheduling time, connecting it to the cbr0 bridge | veth pairs + Linux bridge (cbr0) + ip_forward | Scales to millions of pods across the GKE fleet with no overlay overhead on-node |
+| Cloudflare | Edge nodes run thousands of containers on bare-metal Linux, using Linux bridges for intra-host routing | Linux bridge + veth pairs + ip_forward sysctl | Achieves sub-microsecond container routing without custom hardware switches |
+| Docker Desktop | Every Docker container on Mac and Linux gets a veth pair connected to the docker0 bridge | veth pair + bridge (docker0) | Same Linux primitives used in this lesson power 50M+ Docker Desktop installs worldwide |
+| AWS EKS Fargate | Each Fargate task receives its own network namespace and veth pair managed by the VPC CNI plugin | veth pairs + network namespaces + ip_forward | Provides workload isolation at scale without touching the physical NIC or hypervisor |
 
 ---
 
-## 8. Hands-On Lab: Simulate a Two-Pod Node
+## Practice
+
+### Environment Setup
+
+All commands in this lesson run on **Linux**. Use two terminals side by side:
+
+```bash
+# Terminal 1 — minikube Linux node
+minikube ssh
+
+# Terminal 2 — your Mac (observe differences)
+ip addr   # uses iproute2mac wrapper
+```
+
+Inside `minikube ssh` you have full Linux networking: `ip netns`, `ip link add veth`, `bridge`, `iptables`, etc.
+
+### Hands-On Lab
 
 Reproduce what a CNI plugin does on a single Linux machine.
 
@@ -277,7 +293,7 @@ ip netns exec pod-b ip link set lo up
 ip netns exec pod-b ip route add default via 10.244.0.1
 ```
 
-### Step-by-step Observation
+#### Step-by-step Observation
 
 ```bash
 # Observe bridge MAC learning — run after first ping
@@ -305,7 +321,7 @@ ip netns exec pod-a ping -c3 10.244.0.11
 # → PING 10.244.0.11: 3 packets transmitted, 3 received, 0% packet loss
 ```
 
-### Verification
+#### Verification
 
 ```bash
 # Confirm environment is correct before testing
@@ -319,6 +335,18 @@ ip netns del pod-a
 ip netns del pod-b
 ip link del br0
 ```
+
+### Configuration Reference
+
+| Parameter | Default | Effect | When to change |
+|-----------|---------|--------|----------------|
+| `net.ipv4.ip_forward` | `0` | Enables packet forwarding between interfaces | Must be `1` on every Kubernetes node |
+| `net.bridge.bridge-nf-call-iptables` | `0` | Routes bridge traffic through iptables hooks | Required for kube-proxy and most CNIs |
+| `net.bridge.bridge-nf-call-ip6tables` | `0` | Same for IPv6 bridged traffic | Required for dual-stack clusters |
+| `net.netfilter.nf_conntrack_max` | `65536` | Maximum concurrent tracked connections | Raise to `524288`+ on nodes with many pods |
+| `net.ipv4.conf.all.rp_filter` | `1` | Strict reverse path filtering | Set to `0` or `2` for Calico asymmetric routing |
+| `net.ipv4.neigh.default.gc_thresh3` | `1024` | ARP table hard limit | Raise to `16384`+ on nodes with 100+ pods |
+| `net.core.somaxconn` | `128` | Maximum socket listen backlog | Raise to `32768` for high-connection workloads |
 
 ---
 

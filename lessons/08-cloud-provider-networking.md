@@ -6,23 +6,13 @@
 
 > **Goal:** Explain how AWS VPC CNI, GKE Alias IPs, and Azure CNI assign pod IPs from cloud network resources, and configure security group and load balancer integrations for each provider.
 
----
 
-## Practice Setup
 
-```bash
-# Terminal 1 — kubectl (Mac)
-kubectl get nodes -o wide
-kubectl get pods -A -o wide | head -20
-
-# Terminal 2 — cloud CLI (optional, Mac)
-kubectl get cm -n kube-system amazon-vpc-cni -o yaml 2>/dev/null || echo "Not on AWS EKS"
-kubectl get cm -n kube-system ip-masq-agent -o yaml 2>/dev/null || echo "Not on GKE"
-```
-
-> **See also:** [Lesson 09 — CNI Specification](09-cni-specification.md) for how the cloud-specific CNI binaries plug into the kubelet ADD/DEL lifecycle.
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. The SDN Abstraction
 
@@ -30,20 +20,24 @@ Cloud VPCs implement routing in software, not on physical switches.
 
 ```mermaid
 flowchart LR
-    subgraph cloud["Cloud Provider SDN"]
-        HV1[Hypervisor Node 1]
-        HV2[Hypervisor Node 2]
-        FABRIC[Virtual Network Fabric<br/>Software-defined routes]
+    subgraph cloud["Cloud Provider SDN (AWS VPC / GCP VPC / Azure VNet)"]
+        HV1["hypervisor-1 (m5.xlarge host server)"]
+        HV2["hypervisor-2 (m5.xlarge host server)"]
+        FABRIC["SDN Controller (virtual routing fabric, software-defined)"]
+        IGW["Internet Gateway / Cloud Router (egress)"]
+        CTRL["Cloud API (route table update in ms, not BGP convergence)"]
     end
     subgraph k8s["Kubernetes Cluster"]
-        N1[EKS/GKE/AKS Node]
-        N2[EKS/GKE/AKS Node]
-        P1[Pod 10.0.1.5]
-        P2[Pod 10.0.2.7]
+        N1["eks-node-1 (eth0: 10.0.1.10/24, Primary ENI)"]
+        N2["eks-node-2 (eth0: 10.0.2.10/24, Primary ENI)"]
+        P1["nginx pod (IP: 10.0.1.21, Secondary ENI IP)"]
+        P2["backend pod (IP: 10.0.2.35, Secondary ENI IP)"]
     end
 
-    P1 --> N1 --> HV1 --> FABRIC
-    FABRIC --> HV2 --> N2 --> P2
+    P1 --"IP packet"--> N1 --"EC2 NIC frame"--> HV1 --"SDN encap (VXLAN/MPLS)"--> FABRIC
+    FABRIC --"VPC route lookup"--> HV2 --"EC2 NIC deliver"--> N2 --"veth to pod"--> P2
+    CTRL --"route API call (milliseconds)"--> FABRIC
+    FABRIC --"egress NAT"--> IGW
 ```
 
 This means:
@@ -60,25 +54,35 @@ This means:
 
 ```mermaid
 flowchart TD
-    subgraph vpc["VPC 10.0.0.0/16"]
+    subgraph vpc["VPC 10.0.0.0/16 (us-east-1)"]
         subgraph az1["us-east-1a"]
-            SUB1[Subnet 10.0.1.0/24]
-            N1[EC2 Node<br/>eth0=10.0.1.10<br/>Primary ENI]
-            N1E2[eth1=10.0.1.20<br/>Secondary ENI]
-            P1[Pod 10.0.1.21]
-            P2[Pod 10.0.1.22]
+            SUB1["Subnet 10.0.1.0/24"]
+            SG["Security Group (ENI-level stateful firewall)"]
+            N1["EC2 m5.xlarge (eth0: 10.0.1.10, Primary ENI)"]
+            N1E2["eth1: 10.0.1.20-34 (Secondary ENI, 15 IPs pre-allocated)"]
+            CNIAGENT["aws-node DaemonSet (VPC CNI agent, manages ENI pool)"]
+            P1["nginx :80 (pod IP: 10.0.1.21)"]
+            P2["worker pod (pod IP: 10.0.1.22)"]
         end
         subgraph az2["us-east-1b"]
-            SUB2[Subnet 10.0.2.0/24]
-            N2[EC2 Node<br/>eth0=10.0.2.10]
+            SUB2["Subnet 10.0.2.0/24"]
+            N2["EC2 m5.large (eth0: 10.0.2.10)"]
+            P3["replica pod (pod IP: 10.0.2.5)"]
         end
-        IGW[Internet Gateway]
-        NAT[NAT Gateway]
+        IGW["Internet Gateway"]
+        NAT["NAT Gateway (10.0.1.253, SNAT for private nodes)"]
+        EKSCPLANE["EKS Control Plane (kube-apiserver :443)"]
     end
 
-    N1E2 --> P1
-    N1E2 --> P2
-    SUB1 --> NAT --> IGW
+    CNIAGENT --"EC2 API AllocateAddress"--> N1E2
+    N1E2 --"veth pair (ENI secondary IP)"--> P1
+    N1E2 --"veth pair (ENI secondary IP)"--> P2
+    N1 --"VPC route (no overlay)"--> N2
+    N2 --"veth pair"--> P3
+    SG --"ENI-level stateful rules"--> N1
+    SUB1 --"private egress"--> NAT
+    NAT --"SNAT :443/:80"--> IGW
+    EKSCPLANE --"TCP :443"--> N1
 ```
 
 ### AWS VPC CNI (amazon-vpc-cni-k8s)
@@ -118,32 +122,6 @@ aws ec2 describe-network-interfaces \
 aws ec2 modify-instance-attribute \
   --instance-id <id> \
   --no-source-dest-check
-```
-
-### ENI Limits per Instance Type
-
-| Instance | ENIs | IPs/ENI | Max Pods | With Prefix Delegation |
-|----------|------|---------|----------|----------------------|
-| t3.medium | 3 | 6 | 15 | 54 |
-| m5.large | 3 | 10 | 27 | 90 |
-| m5.xlarge | 4 | 15 | 44 | 120 |
-| m5.4xlarge | 8 | 30 | 232 | 480 |
-| c5.18xlarge | 15 | 50 | 737 | 750 |
-
-### AWS VPC CNI Configuration Reference
-
-| Parameter | Default | Effect | When to change |
-|-----------|---------|--------|----------------|
-| `WARM_IP_TARGET` | 1 | IPs pre-warmed per node | Increase for faster pod startup |
-| `MINIMUM_IP_TARGET` | 0 | Min IPs always allocated | Set to expected pod count per node |
-| `ENABLE_PREFIX_DELEGATION` | false | Allocate /28 blocks instead of single IPs | Enable for high pod density nodes |
-| `WARM_PREFIX_TARGET` | 1 | /28 blocks pre-warmed | Tune for burst workloads |
-| `AWS_VPC_K8S_CNI_EXTERNALSNAT` | false | Use VPC NAT for pod egress | Set true when using NAT Gateway for pod egress |
-
-```bash
-# Enable prefix delegation for higher pod density
-kubectl set env ds -n kube-system aws-node ENABLE_PREFIX_DELEGATION=true
-kubectl set env ds -n kube-system aws-node WARM_PREFIX_TARGET=1
 ```
 
 ### AWS Security Groups
@@ -208,21 +186,30 @@ GCP VPC is **global** (no regional boundary) and uses custom-mode subnets.
 
 ```mermaid
 flowchart LR
-    subgraph vpc["GCP VPC: k8s-vpc (global)"]
+    subgraph vpc["GCP VPC: k8s-vpc (global — no regional boundary)"]
         subgraph region["us-central1"]
-            SUB[Subnet 10.0.0.0/20<br/>node IPs]
-            POD_RANGE[Secondary range<br/>pods: 10.100.0.0/14]
-            SVC_RANGE[Secondary range<br/>svcs: 10.200.0.0/20]
-            N1[GKE Node<br/>10.0.0.10/20]
-            N2[GKE Node<br/>10.0.0.11/20]
-            P1[Pod 10.100.1.5<br/>alias IP]
+            SUB["Subnet 10.0.0.0/20 (node IPs)"]
+            POD_RANGE["Secondary range: pods 10.100.0.0/14"]
+            SVC_RANGE["Secondary range: services 10.200.0.0/20"]
+            N1["GKE Node 1 (10.0.0.10/20, Dataplane v2 Cilium eBPF)"]
+            N2["GKE Node 2 (10.0.0.11/20, Dataplane v2 Cilium eBPF)"]
+            FW["GCP Firewall Rules (gke-cluster-vms, global VPC-level)"]
+            P1["nginx pod (alias IP: 10.100.1.5/32)"]
+            P2["backend pod (alias IP: 10.100.0.3/32)"]
         end
-        CR[Cloud Router]
-        NAT[Cloud NAT]
+        CR["Cloud Router (BGP :179 for external peering)"]
+        NAT["Cloud NAT (SNAT for private node egress)"]
+        DNS["Cloud DNS (kube-dns ClusterIP 10.200.0.10)"]
     end
 
-    N1 --> P1
-    N1 --> CR --> NAT
+    N1 --"alias IP route (VPC native)"--> P1
+    N2 --"alias IP route (VPC native)"--> P2
+    P1 --"TCP :8080 (direct VPC route)"--> P2
+    FW --"VPC-level firewall rules"--> N1
+    FW --"VPC-level firewall rules"--> N2
+    N1 --"BGP :179"--> CR
+    CR --"SNAT egress"--> NAT
+    SVC_RANGE --"ClusterIP range"--> DNS
 ```
 
 ### GKE Networking
@@ -290,21 +277,30 @@ metadata:
 
 ```mermaid
 flowchart TD
-    subgraph vnet["VNet 10.0.0.0/8"]
+    subgraph vnet["Azure VNet 10.0.0.0/8"]
         subgraph node_sub["nodeSubnet 10.240.0.0/16"]
-            N1[AKS Node<br/>10.240.0.4]
-            P1[Pod 10.240.0.10<br/>Azure CNI classic]
+            N1["AKS Node 1 (10.240.0.4, Standard_D4s_v3)"]
+            N2["AKS Node 2 (10.240.0.5, Standard_D4s_v3)"]
+            P1["nginx pod (10.240.0.10, Azure CNI classic VNet IP)"]
+            P2["worker pod (10.240.0.11, Azure CNI classic VNet IP)"]
+            CNIAGENT["azure-cni DaemonSet (manages VNet IP allocation)"]
         end
-        subgraph svc_sub["svcSubnet"]
-            SVC[Services 10.0.0.0/16]
+        subgraph svc_sub["svcSubnet (services CIDR)"]
+            SVC["ClusterIP Services 10.0.0.0/16"]
         end
-        NSG[NSG rules]
-        LB[Azure Standard LB]
+        NSG["NSG (AKS-managed rules — do not edit manually)"]
+        LB["Azure Standard LB (TCP :443/:80 frontend)"]
+        APISERVER["AKS API Server (kube-apiserver :443)"]
     end
 
-    N1 --> P1
-    NSG --> N1
-    LB --> N1
+    CNIAGENT --"Azure IPAM API (assign VNet IPs)"--> N1
+    N1 --"veth pair (VNet IP)"--> P1
+    N1 --"veth pair (VNet IP)"--> P2
+    NSG --"subnet-level stateful rules"--> N1
+    NSG --"subnet-level stateful rules"--> N2
+    LB --"TCP :80/:443 health probe"--> N1
+    LB --"TCP :80/:443 health probe"--> N2
+    APISERVER --"TCP :443"--> N1
 ```
 
 ### Azure CNI
@@ -407,9 +403,34 @@ az aks create --network-plugin azure --network-plugin-mode overlay ...
 # Gotcha 3: NSG rules are managed by AKS — manual edits get overwritten
 ```
 
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| AWS EKS (Amazon.com) | Runs millions of containers for retail, Prime Video, and core AWS services globally | AWS VPC CNI assigns pods real ENI IPs from VPC subnets; no overlay tunnel needed | Pods participate natively in VPC routing and security groups; near-zero networking overhead at massive scale |
+| GKE Autopilot (Google) | Google's fully-managed Kubernetes mode; default for new GKE clusters since 2022 | Alias IP ranges per node with Dataplane v2 (Cilium eBPF under the hood) | Zero-maintenance pod networking with sub-millisecond latency for GCP-native workloads |
+| Azure AKS + CNI Overlay (Microsoft) | Azure's managed Kubernetes for enterprise workloads with 1000+ node clusters | Azure CNI Overlay separates pod CIDR from VNet IPs to prevent address exhaustion | Clusters avoid VNet IP exhaustion; standard enterprise AKS deployments now default to Overlay mode |
+| Shopify | Multi-cloud Kubernetes platform serving high-traffic flash sales with burst traffic patterns | Cloud-native CNI with direct VPC routing and cloud load balancer integration | Deterministic pod-to-pod latency with no tunnel overhead during peak traffic spikes |
+
 ---
 
-## 7. Hands-On: Inspect Cloud Cluster Networking
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — kubectl (Mac)
+kubectl get nodes -o wide
+kubectl get pods -A -o wide | head -20
+
+# Terminal 2 — cloud CLI (optional, Mac)
+kubectl get cm -n kube-system amazon-vpc-cni -o yaml 2>/dev/null || echo "Not on AWS EKS"
+kubectl get cm -n kube-system ip-masq-agent -o yaml 2>/dev/null || echo "Not on GKE"
+```
+
+> **See also:** [Lesson 09 — CNI Specification](09-cni-specification.md) for how the cloud-specific CNI binaries plug into the kubelet ADD/DEL lifecycle.
+
+### Hands-On Lab
 
 ```bash
 # Any cloud cluster — trace a pod's IP back to the cloud resource
@@ -438,6 +459,34 @@ aws ec2 describe-network-interface-attribute \
 # GKE: verify alias IP assignment on the node
 gcloud compute instances describe $NODE --format='value(networkInterfaces[0].aliasIpRanges)'
 # → [{cidrRange: 10.100.1.0/24, subnetworkRangeName: pods}]
+```
+
+### Configuration Reference
+
+#### ENI Limits per Instance Type
+
+| Instance | ENIs | IPs/ENI | Max Pods | With Prefix Delegation |
+|----------|------|---------|----------|----------------------|
+| t3.medium | 3 | 6 | 15 | 54 |
+| m5.large | 3 | 10 | 27 | 90 |
+| m5.xlarge | 4 | 15 | 44 | 120 |
+| m5.4xlarge | 8 | 30 | 232 | 480 |
+| c5.18xlarge | 15 | 50 | 737 | 750 |
+
+#### AWS VPC CNI Parameters
+
+| Parameter | Default | Effect | When to change |
+|-----------|---------|--------|----------------|
+| `WARM_IP_TARGET` | 1 | IPs pre-warmed per node | Increase for faster pod startup |
+| `MINIMUM_IP_TARGET` | 0 | Min IPs always allocated | Set to expected pod count per node |
+| `ENABLE_PREFIX_DELEGATION` | false | Allocate /28 blocks instead of single IPs | Enable for high pod density nodes |
+| `WARM_PREFIX_TARGET` | 1 | /28 blocks pre-warmed | Tune for burst workloads |
+| `AWS_VPC_K8S_CNI_EXTERNALSNAT` | false | Use VPC NAT for pod egress | Set true when using NAT Gateway for pod egress |
+
+```bash
+# Enable prefix delegation for higher pod density
+kubectl set env ds -n kube-system aws-node ENABLE_PREFIX_DELEGATION=true
+kubectl set env ds -n kube-system aws-node WARM_PREFIX_TARGET=1
 ```
 
 ---
@@ -553,4 +602,4 @@ gcloud compute instances describe $NODE --format='value(networkInterfaces[0].ali
 
 ---
 
-**Next:** [Lesson 09 — CNI Specification and Plugin Architecture](09-cni-specification.md)
+**← Previous:** [Lesson 07 — Bare Metal Network Infrastructure for Kubernetes](07-bare-metal-network-infrastructure.md)   |   **Next:** [Lesson 09 — CNI Specification and Plugin Architecture](09-cni-specification.md)

@@ -4,44 +4,29 @@
 
 > **Goal:** Apply layered network security controls — default-deny policies, metadata API blocks, encrypted transit, and runtime enforcement — that satisfy PCI-DSS, HIPAA, and CIS Kubernetes Benchmark requirements.
 
----
 
-## Practice Setup
-
-```bash
-# Terminal 1 — Mac (kubectl — audit current posture)
-kubectl get netpol -A
-# expect: list of policies; empty namespace means no policies = all pods open
-
-kubectl get peerauthentication -A 2>/dev/null || echo "Istio not installed"
-kubectl get pods -A -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.hostNetwork}{"\n"}{end}' | grep true
-# expect: only system components (node-exporter, CNI) should use hostNetwork
-
-# Terminal 2 — Mac
-# Check for pods with no NetworkPolicy coverage
-kubectl get pods -n default -o wide
-kubectl get netpol -n default
-# A production namespace with pods but no netpol = security gap
-```
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. The Threat Model
 
 ```mermaid
 flowchart TD
-    attacker["Compromised Pod"]
+    attacker["compromised-pod (billing-ns)"]
 
-    attacker -- "1 Lateral movement" --> other_pods["Other Pods\n(same cluster)"]
-    attacker -- "2 Exfiltration" --> internet["Attacker C2\n(internet)"]
-    attacker -- "3 Credential theft" --> metadata["Cloud Metadata API\n169.254.169.254"]
-    attacker -- "4 Eavesdropping" --> wire["Unencrypted\nPod Traffic"]
-    attacker -- "5 Privilege escalation" --> host["Host Network\n(bypass pod controls)"]
-    attacker -- "6 Supply chain" --> supply["Malicious image\ncalls home"]
+    attacker --"TCP :random lateral move"--> other_pods["Other Pods (same cluster)"]
+    attacker --"TCP :443 data exfil"--> internet["Attacker C2 (internet)"]
+    attacker --"HTTP :80 169.254.169.254"--> metadata["Cloud Metadata API (IMDS)"]
+    attacker --"ARP spoof / MITM"--> wire["Unencrypted Pod Traffic"]
+    attacker --"proc escape / nsenter"--> host["Host Network (bypass pod controls)"]
+    attacker --"DNS :53 beacon"--> supply["Malicious Image Callback"]
 
     control1["Default-Deny NetworkPolicy"] -. mitigates .-> other_pods
     control2["FQDN Egress Policy"] -. mitigates .-> internet
-    control3["ipBlock except 169.254.169.254"] -. mitigates .-> metadata
+    control3["ipBlock except 169.254.169.254/32"] -. mitigates .-> metadata
     control4["WireGuard / mTLS"] -. mitigates .-> wire
     control5["PodSecurity restricted"] -. mitigates .-> host
     control6["FQDN allowlist"] -. mitigates .-> supply
@@ -389,6 +374,94 @@ kubectl logs -f job.kube-bench | grep -A3 "5.3"
 # expect: PASS for 5.3.1 and 5.3.2
 ```
 
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| US DoD | Classified K8s deployments (IL-5/IL-6) | NIST SP 800-204 + CISA K8s Hardening Guide | Zero-trust default-deny + metadata API block mandated across all classified clusters |
+| Goldman Sachs | PCI DSS zone enforcement | Admission webhooks + default-deny NetworkPolicy | Automated cardholder environment segmentation applied at every deploy pipeline stage |
+| Fortune 500 financial firms | Org-wide baseline security standard | CISA K8s Hardening Guide as org policy | Default-deny + metadata block standardized across 100+ production clusters |
+| CNCF enterprise adopters | Runtime audit and forensics | Tetragon + Hubble flow logs exported to SIEM | Process-level network event capture meeting SOC 2 audit log retention requirements |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — Mac (kubectl — audit current posture)
+kubectl get netpol -A
+# expect: list of policies; empty namespace means no policies = all pods open
+
+kubectl get peerauthentication -A 2>/dev/null || echo "Istio not installed"
+kubectl get pods -A -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.hostNetwork}{"\n"}{end}' | grep true
+# expect: only system components (node-exporter, CNI) should use hostNetwork
+
+# Terminal 2 — Mac
+# Check for pods with no NetworkPolicy coverage
+kubectl get pods -n default -o wide
+kubectl get netpol -n default
+# A production namespace with pods but no netpol = security gap
+```
+
+### Hands-On Lab
+
+```bash
+# 1. Default deny policies in all namespaces
+for ns in $(kubectl get ns -o jsonpath='{.items[*].metadata.name}'); do
+  count=$(kubectl get networkpolicy -n $ns 2>/dev/null | grep deny | wc -l)
+  echo "$ns: $count deny policies"
+done
+# expect: each namespace shows ≥1 deny policy
+
+# 2. Pod → metadata API is blocked
+kubectl run -it --rm meta-test --image=curlimages/curl -- \
+  curl -m 3 http://169.254.169.254/
+# expect: timeout
+
+# 3. Encryption is active
+cilium encrypt status   # for Cilium/WireGuard
+# expect: "Encryption: Wireguard" and "Keys in use: 1"
+
+# 4. mTLS is enforced (Istio)
+istioctl authn tls-check --all-namespaces 2>/dev/null | grep CONFLICT
+# expect: empty — no CONFLICT rows
+
+# 5. No hostNetwork pods (except system components)
+kubectl get pods --all-namespaces \
+  -o json | jq '.items[] | select(.spec.hostNetwork == true) |
+    .metadata.namespace + "/" + .metadata.name'
+# expect: only kube-system / openshift-* components
+
+# 6. No pods with excessive capabilities
+kubectl get pods --all-namespaces \
+  -o json | jq '.items[].spec.containers[].securityContext.capabilities.add // empty'
+# expect: empty or only NET_BIND_SERVICE
+
+# 7. Egress to internet is controlled
+kubectl run -it --rm egress-test --image=nicolaka/netshoot -- \
+  curl -m 5 https://ifconfig.me
+# expect: timeout (if egress blocked) or only expected exit IPs
+```
+
+### Configuration Reference
+
+| Method | Layer | Scope | Key Management | Performance Cost |
+|--------|-------|-------|---------------|-----------------|
+| WireGuard (Cilium/Calico) | L3 | Node-to-node | Automatic per-node keys | ~3-5% CPU overhead |
+| IPsec (Cilium/Submariner) | L3 | Node-to-node | Manual or operator-managed | ~5-8% CPU overhead |
+| Istio mTLS | L7 | Pod-to-pod | istiod CA (SPIFFE) | Envoy sidecar overhead |
+| TLS (application) | L7 | Service-to-service | App-managed certs | Minimal if hardware offloaded |
+
+| Parameter | Default | Effect | When to change |
+|-----------|---------|--------|----------------|
+| `podSelector: {}` | Selects ALL pods | Policy applies namespace-wide | Use label selector for per-app granularity |
+| `policyTypes: [Ingress]` | Only ingress controlled | Egress remains open | Always add `Egress` to `policyTypes` for full control |
+| `namespaceSelector` | Not set (any namespace) | Restricts by namespace labels | Required for cross-namespace allow rules |
+| `ipBlock.except` | Not set | Allow all IPs in CIDR | Use to carve out cloud metadata API |
+| `port: 53, protocol: UDP` | UDP DNS | Allow DNS resolution | Add TCP 53 for large DNS responses |
+
 ---
 
 ## Troubleshooting
@@ -404,6 +477,7 @@ kubectl logs -f job.kube-bench | grep -A3 "5.3"
 | Hubble shows flows but no drop verdicts | PeerAuthentication in PERMISSIVE — policy not enforced | `kubectl get peerauthentication -A` | Switch to STRICT after confirming all sidecars injected |
 
 > **See also:** [Lesson 16 — Network Policies](16-network-policies.md) for base NetworkPolicy syntax. [Lesson 21 — Istio](21-service-mesh-istio.md) for mTLS STRICT enforcement.
+
 
 ---
 
@@ -505,4 +579,4 @@ kubectl logs -f job.kube-bench | grep -A3 "5.3"
 
 ---
 
-**Next:** [Lesson 24 — Network Observability and Troubleshooting](24-network-observability-troubleshooting.md)
+**← Previous:** [Lesson 22 — Multi-Cluster Networking](22-multi-cluster-networking.md)   |   **Next:** [Lesson 24 — Network Observability and Troubleshooting](24-network-observability-troubleshooting.md)

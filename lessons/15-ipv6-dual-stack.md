@@ -4,39 +4,34 @@
 
 > **Goal:** Configure a dual-stack Kubernetes cluster, create dual-stack services with the correct ipFamilyPolicy, and diagnose IPv6 connectivity failures at the node and pod level.
 
----
 
-## Practice Setup
 
-```bash
-# Terminal 1 — Mac (kubectl)
-kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.addresses[*].address}{"\n"}{end}'
-kubectl get pods -A -o wide | head -15
-kubectl get svc -A | head -10
-
-# Terminal 2 — minikube Linux node
-minikube ssh
-ip -6 addr show
-ip -6 route show
-ip -6 neigh show   # NDP neighbor table
-```
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. Dual-Stack vs IPv6-Only
 
 ```mermaid
 flowchart LR
     subgraph SS["Single-Stack (IPv4 only)"]
-        N1[Node\n192.168.1.10]
-        P1[Pod\n10.244.1.5/24]
-        S1[Service ClusterIP\n10.96.0.10/32]
+        N1["node1 192.168.1.10"]
+        P1["web-pod 10.244.1.5/24"]
+        S1["web-service ClusterIP 10.96.0.10/32"]
     end
     subgraph DS["Dual-Stack (IPv4 + IPv6)"]
-        N2[Node\n192.168.1.10\nfd00::10]
-        P2[Pod\n10.244.1.5/24\nfd01::a:f405/96]
-        S2[Service ClusterIPs\n10.96.0.10/32\nfd02::a/128]
+        N2["node1 192.168.1.10 fd00::10"]
+        P2["web-pod 10.244.1.5/24 fd01::a:f405/96"]
+        S2["web-service ClusterIPs 10.96.0.10/32 fd02::a/128"]
+        P3["db-pod 10.244.1.6/24 fd01::a:f406/96"]
     end
+    N1 --- P1
+    P1 --- S1
+    N2 --- P2
+    P2 --- S2
+    P3 --- S2
 ```
 
 **Dual-stack:** Every pod and service has both an IPv4 and IPv6 address. Traffic uses IPv4 or IPv6 based on the caller's preference.
@@ -128,10 +123,12 @@ helm install cilium cilium/cilium \
 
 ```mermaid
 flowchart LR
-    POD[Pod] -->|IPv4 dst 10.96.42.10:80| SVC4[Service ClusterIP\n10.96.42.10]
-    POD -->|IPv6 dst fd00:10:96::1:80| SVC6[Service ClusterIP\nfd00:10:96::1]
-    SVC4 --> B1[Backend\n10.244.0.5:8080]
-    SVC6 --> B1
+    POD["app-pod 10.244.0.6 fd01::a:0006"] --"IPv4 TCP :80 ClusterIP"--> SVC4["web-service ClusterIP 10.96.42.10"]
+    POD --"IPv6 TCP :80 ClusterIP"--> SVC6["web-service ClusterIP fd00:10:96::1"]
+    SVC4 --"DNAT :8080"--> B1["web-pod-1 10.244.0.5:8080 fd01::a:0005"]
+    SVC6 --"DNAT :8080"--> B1
+    SVC4 --"DNAT :8080"--> B2["web-pod-2 10.244.1.3:8080 fd01::b:0003"]
+    SVC6 --"DNAT :8080"--> B2
 ```
 
 ```yaml
@@ -351,6 +348,111 @@ ip6tables -t nat -L KUBE-SERVICES -n | head -10
 # Expected: KUBE-SVC-* entries for IPv6 ClusterIPs
 ```
 
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| BT Group (UK telecom) | 5G core network functions running on Kubernetes | Full dual-stack cluster with ULA IPv6 pod CIDRs for 5G core NFs | Met 3GPP IPv6 requirements for 5G core; simplified integration with IPv6-native radio access nodes |
+| AWS EKS | Cloud-native Kubernetes for telco and enterprise customers | IPv6-only cluster mode added in 2022 for EKS; each pod gets a unique VPC IPv6 address | Exhausted IPv4 space in large VPCs; IPv6-only pods scale to millions of endpoints per region |
+| Comcast | Cable modem provisioning services on Kubernetes | IPv6-only pods used in DOCSIS provisioning infrastructure | Cable modems receive IPv6 from K8s pods without NAT; end-to-end IPv6 from CPE to provisioning server |
+| GKE / Anthos | Google's managed Kubernetes platform | Dual-stack enabled by default since GKE 1.21; Cloud DNS handles AAAA records automatically | Zero-config dual-stack for all new clusters; transparent migration path for IPv4 workloads |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — Mac (kubectl)
+kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.addresses[*].address}{"\n"}{end}'
+kubectl get pods -A -o wide | head -15
+kubectl get svc -A | head -10
+
+# Terminal 2 — minikube Linux node
+minikube ssh
+ip -6 addr show
+ip -6 route show
+ip -6 neigh show   # NDP neighbor table
+```
+
+### Hands-On Lab
+
+**Step 1 — Verify dual-stack node and pod addressing:**
+
+```bash
+# Check nodes have both IPv4 and IPv6 addresses
+kubectl get nodes -o custom-columns=\
+"NAME:.metadata.name,ADDRESSES:.status.addresses[*].address"
+
+# Check pods have both pod IPs
+kubectl get pods -A -o custom-columns=\
+"NS:.metadata.namespace,NAME:.metadata.name,IPs:.status.podIPs[*].ip" | head -20
+
+# Check services have dual ClusterIPs
+kubectl get svc -A -o custom-columns=\
+"NS:.metadata.namespace,NAME:.metadata.name,CLUSTER-IPS:.spec.clusterIPs"
+```
+
+**Step 2 — Create a dual-stack service and verify:**
+
+```bash
+# Deploy a test workload
+kubectl create deployment web --image=nginx --replicas=2
+kubectl expose deployment web --port=80 --target-port=80
+
+# Check if service got dual ClusterIPs (requires ipFamilyPolicy: PreferDualStack or RequireDualStack)
+kubectl patch svc web -p '{"spec":{"ipFamilyPolicy":"PreferDualStack"}}'
+kubectl get svc web -o jsonpath='{.spec.clusterIPs}'
+# ["10.96.42.10","fd00:10:96::1"]
+
+# Verify DNS AAAA record exists
+kubectl run -it --rm dns-test --image=nicolaka/netshoot -- \
+  nslookup -type=AAAA web.default.svc.cluster.local
+```
+
+**Step 3 — Test IPv6 pod-to-pod connectivity:**
+
+```bash
+# Get IPv6 addresses of two pods
+kubectl get pods -o custom-columns="NAME:.metadata.name,IPs:.status.podIPs[*].ip"
+
+# Ping between pods over IPv6
+kubectl exec -it <pod-a> -- ping6 -c 3 <pod-b-ipv6-addr>
+# Expected: 3 packets transmitted, 3 received, 0% packet loss
+
+# Verify ip6tables has KUBE-SERVICES rules for IPv6 ClusterIPs
+minikube ssh
+sudo ip6tables -t nat -L KUBE-SERVICES -n | head -10
+```
+
+**Step 4 — Check NDP neighbor table (IPv6 ARP equivalent):**
+
+```bash
+# On the node — NDP should show pod IPv6 entries
+minikube ssh
+ip -6 neigh show
+# fd01::a:0005 dev cni0 lladdr aa:bb:cc:dd:ee:01 REACHABLE
+# fd01::a:0006 dev cni0 lladdr aa:bb:cc:dd:ee:02 REACHABLE
+
+# Check IPv6 forwarding is enabled (required for cross-node traffic)
+sysctl net.ipv6.conf.all.forwarding
+# net.ipv6.conf.all.forwarding = 1
+```
+
+### Configuration Reference
+
+| Parameter | Default | Effect | When to Change |
+|-----------|---------|--------|----------------|
+| `ipFamilyPolicy: SingleStack` | Default | One IP family only | Keep for existing services that do not need dual-stack |
+| `ipFamilyPolicy: PreferDualStack` | — | Dual-stack if cluster supports it, falls back | Use for gradual migration; safe for clusters in both modes |
+| `ipFamilyPolicy: RequireDualStack` | — | Fails if cluster is single-stack | Enforce dual-stack requirement in production manifests |
+| `ipFamilies: [IPv6, IPv4]` | Cluster preference | IPv6 is preferred address family | Use when backend clients are IPv6-native |
+| kubeadm `podSubnet` | IPv4 only | Pod IP range; add IPv6 CIDR with comma | Required at init time — cannot add IPv6 CIDR later without full re-init |
+| kubeadm `serviceSubnet` | IPv4 only | Service IP range; add IPv6 CIDR with comma | Required at init time alongside podSubnet |
+| `net.ipv6.conf.all.forwarding` | 0 (off) | Kernel forwards IPv6 between interfaces | Must be `1` on every node for cross-node IPv6 pod traffic |
+| `net.bridge.bridge-nf-call-ip6tables` | 0 | ip6tables sees bridged IPv6 traffic | Must be `1` on every node for CNI IPv6 policy enforcement |
+
 ---
 
 ## Troubleshooting
@@ -463,4 +565,4 @@ ip6tables -t nat -L KUBE-SERVICES -n | head -10
 
 ---
 
-**Next:** [Lesson 16 — Network Policies: Microsegmentation](16-network-policies.md)
+**← Previous:** [Lesson 14 — CoreDNS and Service Discovery](14-coredns-service-discovery.md)   |   **Next:** [Lesson 16 — Network Policies: Microsegmentation](16-network-policies.md)

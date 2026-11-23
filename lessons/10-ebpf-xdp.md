@@ -6,24 +6,13 @@
 
 > **Goal:** Attach an XDP program to drop traffic and inspect Cilium's TC eBPF programs with bpftool so you understand how eBPF replaces iptables for Kubernetes network policy and service load balancing.
 
----
 
-## Practice Setup
 
-```bash
-# Terminal 1 — minikube node
-minikube ssh
-uname -r                          # kernel version (5.4+ needed, 5.10+ recommended)
-bpftool version 2>/dev/null || echo "bpftool not installed"
-mount | grep bpf                  # BPF filesystem must be mounted
-
-# Terminal 2 — kubectl (Mac)
-kubectl get pods -n kube-system | grep cilium   # if using Cilium
-```
-
-> **See also:** [Lesson 03 — iptables](03-iptables-and-netfilter.md) for the legacy network stack that eBPF/Cilium replaces. [Lesson 09 — CNI Specification](09-cni-specification.md) for how the CNI ADD call loads eBPF programs onto new pod interfaces.
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. What eBPF Is
 
@@ -32,26 +21,30 @@ eBPF (extended Berkeley Packet Filter) is a sandboxed virtual machine in the Lin
 ```mermaid
 flowchart LR
     subgraph userspace["User Space"]
-        SRC[eBPF program<br/>C source]
-        CLANG[clang -target bpf<br/>compile to bytecode]
-        CTL[bpftool / libbpf<br/>load into kernel]
+        SRC["xdp_drop.c (eBPF C source, restricted C dialect)"]
+        CLANG["clang -O2 -target bpf (compile to eBPF bytecode ELF)"]
+        CTL["bpftool prog load / ip link set dev eth0 xdp obj"]
     end
     subgraph kernel["Kernel Space"]
-        VER[Verifier<br/>safety checks]
-        JIT[JIT compiler<br/>→ native machine code]
+        VER["Verifier (bounds checks, stack depth 512B, loop limits, type safety)"]
+        JIT["JIT compiler (eBPF bytecode to x86-64 / arm64 machine code)"]
         subgraph hooks["Hook Points"]
-            XDP[XDP<br/>NIC driver]
-            TC[TC ingress/egress]
-            SK[Socket layer]
-            KP[kprobe / tracepoint]
-            LSM[LSM hook]
+            XDP["XDP (NIC driver receive, before sk_buff allocation)"]
+            TC["TC ingress/egress (after sk_buff, full packet + metadata)"]
+            SK["Socket layer (L4 sock_ops, bypass loopback)"]
+            KP["kprobe / tracepoint (kernel function entry / event)"]
+            LSM["LSM hook (Linux Security Module, Tetragon)"]
         end
-        MAPS[eBPF Maps<br/>kernel ↔ userspace<br/>shared state]
+        MAPS["eBPF Maps (cilium_lxc, cilium_policy, cilium_ct_tcp4, cilium_lb4_services)"]
     end
 
-    SRC --> CLANG --> CTL --> VER --> JIT --> hooks
-    hooks <--> MAPS
-    CTL <--> MAPS
+    SRC --"clang -target bpf compile"--> CLANG
+    CLANG --"prog.o ELF bytecode"--> CTL
+    CTL --"bpf() syscall BPF_PROG_LOAD"--> VER
+    VER --"verified bytecode"--> JIT
+    JIT --"attach native code"--> hooks
+    hooks <--"map read/write (O(1) hash)"--> MAPS
+    CTL <--"map dump/update userspace"--> MAPS
 ```
 
 ---
@@ -62,20 +55,28 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    APP[Application userspace<br/>write / read]
-    SOCK[Socket layer<br/>BPF_PROG_TYPE_SK_SKB]
-    PROTO[TCP / UDP / ICMP]
-    ROUTE[IP routing]
-    TC_IN[TC ingress<br/>BPF_PROG_TYPE_SCHED_CLS<br/>← Cilium policy / NAT]
-    TC_EG[TC egress<br/>BPF_PROG_TYPE_SCHED_CLS<br/>← Cilium policy / NAT]
-    XDP_H[XDP — eXpress Data Path<br/>BPF_PROG_TYPE_XDP<br/>← DDoS drop / L4 LB<br/>runs before sk_buff allocation]
-    DRV[Network Driver / NIC]
-    WIRE[Physical Wire]
+    APP["Application (nginx :80 / redis :6379 / gRPC :9090)"]
+    SOCK["Socket layer BPF_PROG_TYPE_SK_SKB (Cilium socket-level LB, bypass loopback)"]
+    PROTO["TCP/UDP/ICMP protocol stack (L4 connection tracking)"]
+    ROUTE["IP routing table (kernel FIB, longest-prefix match)"]
+    CONNTRACK["Conntrack (nf_conntrack or Cilium cilium_ct_tcp4 eBPF map)"]
+    TC_IN["TC ingress BPF_PROG_TYPE_SCHED_CLS (Cilium policy, service DNAT, identity check)"]
+    TC_EG["TC egress BPF_PROG_TYPE_SCHED_CLS (Cilium SNAT, egress policy, encap)"]
+    XDP_H["XDP BPF_PROG_TYPE_XDP (DDoS drop, L4 LB, before sk_buff — fastest hook)"]
+    DRV["Network Driver (eth0 / lxc1234abcd veth / bond0)"]
+    WIRE["Physical NIC / veth pair"]
 
-    APP <--> SOCK <--> PROTO <--> ROUTE
-    ROUTE --> TC_EG --> DRV
-    DRV --> XDP_H --> TC_IN --> ROUTE
-    DRV <--> WIRE
+    APP <--"syscall send/recv"--> SOCK
+    SOCK <--"L4 sock_ops"--> PROTO
+    PROTO <--"IP layer (TTL, checksum)"--> ROUTE
+    ROUTE --"output decision"--> TC_EG
+    ROUTE --"conntrack lookup"--> CONNTRACK
+    TC_EG --"frame ready"--> DRV
+    DRV --"NIC transmit"--> WIRE
+    WIRE --"NIC receive (DMA)"--> XDP_H
+    XDP_H --"XDP_PASS (not dropped)"--> DRV
+    DRV --"sk_buff alloc, DMA"--> TC_IN
+    TC_IN --"routing decision"--> ROUTE
 ```
 
 | Hook | Location | Program Type | Use in Kubernetes |
@@ -255,28 +256,29 @@ cilium bpf lb list
 
 ```mermaid
 sequenceDiagram
-    participant Wire as Physical Wire
-    participant XDP as XDP hook
-    participant TC_IN as TC ingress<br/>(cilium_netdev)
-    participant RT as Kernel routing
-    participant LXC_EG as TC egress<br/>(pod lxc interface)
-    participant POD as Pod
+    participant Wire as Physical NIC eth0
+    participant XDP as XDP hook (DDoS filter, L4 LB offload)
+    participant TC_IN as TC ingress cilium_netdev (node-level)
+    participant RT as Kernel routing (FIB lookup)
+    participant LXC_EG as TC egress lxc1234abcd (pod veth)
+    participant POD as Pod nginx :80
+    participant CT as cilium_ct_tcp4 (eBPF conntrack map)
 
-    Wire->>XDP: Packet arrives on eth0
-    XDP->>TC_IN: XDP_PASS (or drop DDoS)
-    TC_IN->>TC_IN: Tail call: conntrack lookup
-    TC_IN->>TC_IN: Tail call: service LB (DNAT VIP→pod)
-    TC_IN->>TC_IN: Tail call: policy enforcement
-    TC_IN->>RT: bpf_redirect / kernel route
-    RT->>LXC_EG: forward to pod lxc interface
-    LXC_EG->>LXC_EG: Egress policy check
-    LXC_EG->>POD: deliver packet
+    Wire->>XDP: Packet arrives: src=1.2.3.4:50000 dst=10.96.0.10:80
+    XDP->>TC_IN: XDP_PASS (not in DDoS drop map)
+    TC_IN->>TC_IN: Tail call: cilium_lb4_services lookup (DNAT VIP 10.96.0.10 to 10.244.1.5)
+    TC_IN->>CT: Record new TCP flow in cilium_ct_tcp4
+    TC_IN->>TC_IN: Tail call: identity check (source=world, identity 0)
+    TC_IN->>RT: bpf_redirect_neigh to lxc1234abcd
+    RT->>LXC_EG: forward to pod veth interface
+    LXC_EG->>LXC_EG: Egress policy check (allow world to app=web port :80)
+    LXC_EG->>POD: Deliver: dst=10.244.1.5:80 (DNAT complete, no kernel NAT)
 
-    POD->>LXC_EG: Pod sends reply
-    LXC_EG->>LXC_EG: Egress policy + SNAT
-    LXC_EG->>RT: kernel route
-    RT->>TC_IN: re-enter for encap/forward
-    TC_IN->>Wire: out eth0
+    POD->>LXC_EG: Reply: src=10.244.1.5:80 dst=1.2.3.4:50000
+    LXC_EG->>LXC_EG: Egress policy pass + SNAT reverse (restore VIP src=10.96.0.10)
+    LXC_EG->>RT: kernel route back to eth0
+    RT->>TC_IN: re-enter for encap/forward (VXLAN UDP :4789 or native)
+    TC_IN->>Wire: out eth0 src=10.96.0.10:80 (session complete)
 ```
 
 ```bash
@@ -405,6 +407,86 @@ grep -E "CONFIG_BPF|CONFIG_XDP|CONFIG_NET_CLS_BPF" /boot/config-$(uname -r)
 # → all should show =y or =m
 ```
 
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| Cloudflare | Protects millions of websites from DDoS attacks, up to 1 Tbps+ volumetric floods | XDP with native NIC driver mode, XDP_DROP return code, hardware offload on SmartNICs | Drops malicious packets at line rate before sk_buff allocation; no CPU overhead for dropped traffic |
+| Meta (Facebook) | Open-source katran L4 load balancer used to handle billions of connections per day | XDP_TX and XDP_REDIRECT for L4 load balancing; eBPF maps for consistent hash backend tables | Near-linear scaling of L4 LB without stateful kernel NAT; katran is open-sourced on GitHub |
+| Datadog | Replaced iptables-based kube-proxy with Cilium eBPF across 1M+ containers in production | TC hook programs on pod lxc interfaces, eBPF service maps replacing kube-proxy iptables rules | 50% reduction in CPU overhead for networking; policy enforcement at kernel speed with zero iptables |
+| Netflix | Uses eBPF-based profiling tools in production to identify hot paths in microservices | kprobe/tracepoint hooks, BPF_MAP_TYPE_PERF_EVENT_ARRAY for event streaming, bpftrace | Continuous flamegraph profiling with <1% CPU overhead; replaced heavyweight Java profiling agents |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — minikube node
+minikube ssh
+uname -r                          # kernel version (5.4+ needed, 5.10+ recommended)
+bpftool version 2>/dev/null || echo "bpftool not installed"
+mount | grep bpf                  # BPF filesystem must be mounted
+
+# Terminal 2 — kubectl (Mac)
+kubectl get pods -n kube-system | grep cilium   # if using Cilium
+```
+
+> **See also:** [Lesson 03 — iptables](03-iptables-and-netfilter.md) for the legacy network stack that eBPF/Cilium replaces. [Lesson 09 — CNI Specification](09-cni-specification.md) for how the CNI ADD call loads eBPF programs onto new pod interfaces.
+
+### Hands-On Lab
+
+```bash
+# Step 1: Verify kernel and BPF filesystem
+uname -r                                        # → 5.10+ required
+mount | grep bpf                                # → bpf on /sys/fs/bpf type bpf
+bpftool feature probe | grep xdp               # → XDP support
+
+# Step 2: Compile an XDP drop program (requires clang + kernel headers)
+cat > xdp_drop_icmp.c << 'EOF'
+#include <linux/bpf.h>
+#include <linux/if_ether.h>
+#include <linux/ip.h>
+#include <linux/icmp.h>
+#include <bpf/bpf_helpers.h>
+
+SEC("xdp")
+int xdp_drop_icmp(struct xdp_md *ctx) {
+    void *data = (void *)(long)ctx->data;
+    void *data_end = (void *)(long)ctx->data_end;
+    struct ethhdr *eth = data;
+    if ((void *)(eth + 1) > data_end) return XDP_PASS;
+    if (eth->h_proto != htons(ETH_P_IP)) return XDP_PASS;
+    struct iphdr *ip = (void *)(eth + 1);
+    if ((void *)(ip + 1) > data_end) return XDP_PASS;
+    if (ip->protocol == IPPROTO_ICMP) return XDP_DROP;
+    return XDP_PASS;
+}
+char LICENSE[] SEC("license") = "GPL";
+EOF
+
+clang -O2 -target bpf -c xdp_drop_icmp.c -o xdp_drop_icmp.o
+
+# Step 3: Attach to interface (generic mode works on all NICs)
+ip link set dev eth0 xdpgeneric obj xdp_drop_icmp.o sec xdp
+ip link show eth0 | grep xdp                   # → prog/xdp id <N>
+
+# Step 4: Test (ping from another terminal should fail)
+ping -c 3 <this-node-ip>                       # → 100% packet loss
+
+# Step 5: Inspect the loaded program
+bpftool net show dev eth0
+bpftool prog show id <N>
+
+# Step 6: Detach
+ip link set dev eth0 xdp off
+```
+
+### Configuration Reference
+
+#### eBPF Kernel Requirements
+
 | Feature | Min Kernel | Notes |
 |---------|-----------|-------|
 | XDP (generic) | 4.12 | Software XDP, any NIC |
@@ -531,4 +613,4 @@ grep -E "CONFIG_BPF|CONFIG_XDP|CONFIG_NET_CLS_BPF" /boot/config-$(uname -r)
 
 ---
 
-**Next:** [Lesson 11 — Calico CNI Deep Dive](11-calico-cni-deep-dive.md)
+**← Previous:** [Lesson 09 — CNI Specification and Plugin Architecture](09-cni-specification.md)   |   **Next:** [Lesson 11 — Calico CNI Deep Dive](11-calico-cni-deep-dive.md)

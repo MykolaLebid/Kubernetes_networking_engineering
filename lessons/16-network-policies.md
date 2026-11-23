@@ -6,46 +6,13 @@
 
 > **Goal:** Configure NetworkPolicy resources to implement microsegmentation, enforce default-deny namespaces, test connectivity enforcement with Cilium and Calico tooling, and avoid common selector and DNS egress pitfalls.
 
----
 
-## Practice Setup
 
-```bash
-# Terminal 1 — Mac (kubectl)
-kubectl get netpol -A
-kubectl get pods -A -o wide | head -15
-
-# Terminal 2 — minikube Linux node
-minikube ssh
-# Inspect CNI-enforced iptables rules (Calico)
-sudo iptables -L | grep -i cali | head -20
-# Or for Cilium: sudo bpftool map dump name cilium_policy 2>/dev/null | head -20
-```
-
-Observation commands — run after deploying test pods to see enforcement live:
-
-```bash
-# Deploy test pods with labels
-kubectl run web --image=nginx --labels="app=web" --expose --port=80
-kubectl run frontend --image=nicolaka/netshoot --labels="app=frontend" -- sleep 3600
-kubectl run attacker --image=nicolaka/netshoot --labels="app=other" -- sleep 3600
-
-# Confirm connectivity BEFORE any policy (all pods reachable — flat network)
-kubectl exec frontend -- curl -s --max-time 2 http://web   # expect: nginx HTML
-kubectl exec attacker -- curl -s --max-time 2 http://web   # expect: nginx HTML
-
-# Apply default-deny + selective allow (Section 4), then verify isolation
-kubectl exec frontend -- curl -s --max-time 2 http://web   # expect: nginx HTML (allowed)
-kubectl exec attacker -- curl -s --max-time 2 http://web   # expect: silence / timeout (blocked)
-echo "Enforcement confirmed if attacker timed out"
-
-# Watch live events as policies are applied
-kubectl get events --watch --field-selector reason=NetworkPolicyUpdated 2>/dev/null &
-```
-
-> **See also:** [Lesson 03 — iptables and Netfilter](03-iptables-and-netfilter.md) for CNI enforcement mechanics.
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. The Default Model
 
@@ -61,18 +28,20 @@ The CNI plugin (Calico, Cilium, etc.) — not the Kubernetes API server — perf
 ```mermaid
 flowchart LR
     subgraph ns["Namespace: default"]
-        FE["frontend\napp=frontend"]
-        ATK["attacker\napp=other"]
-        WEB["web pod\napp=web\n[isolated by policy]"]
-        DB["db pod\napp=db\n[isolated by policy]"]
+        FE["frontend pod app=frontend :3000"]
+        ATK["attacker pod app=other (blocked)"]
+        WEB["web pod app=web :80 isolated by policy"]
+        DB["db pod app=db :5432 isolated by policy"]
     end
-    DNS["kube-dns\nkube-system"]
+    DNS["CoreDNS :53 UDP kube-system"]
+    MON["prometheus :9090 namespace=monitoring"]
 
-    FE -->|"TCP 80 ✓ allowed"| WEB
-    ATK -->|"TCP 80 ✗ dropped"| WEB
-    WEB -->|"TCP 5432 ✓ allowed"| DB
-    ATK -->|"TCP 5432 ✗ dropped"| DB
-    WEB -->|"UDP 53 ✓ DNS exception"| DNS
+    FE --"TCP :80 allowed"--> WEB
+    ATK --"TCP :80 dropped"--> WEB
+    WEB --"TCP :5432 allowed"--> DB
+    ATK --"TCP :5432 dropped"--> DB
+    WEB --"UDP :53 DNS exception allowed"--> DNS
+    MON --"TCP :9090 scrape allowed"--> WEB
 
     style ATK fill:#fcc,stroke:#c00
     style WEB fill:#cfc,stroke:#090
@@ -143,21 +112,21 @@ The packet journey through CNI enforcement:
 
 ```mermaid
 sequenceDiagram
-    participant SP as Source Pod
-    participant K as Kernel (iptables / eBPF)
-    participant CNI as CNI Agent\n(Calico Felix / Cilium Agent)
-    participant TP as Target Pod
+    participant SP as frontend pod 10.244.1.5
+    participant K as Linux kernel (iptables/eBPF hook)
+    participant CNI as Calico Felix / Cilium Agent (policy store)
+    participant TP as web pod 10.244.0.5:80
 
-    SP->>K: send TCP SYN packet
-    K->>CNI: policy table lookup (src/dst labels + port)
-    CNI-->>K: allow / deny decision
+    SP->>K: TCP SYN dst=10.244.0.5:80 (or ClusterIP)
+    K->>CNI: policy lookup src-label=app:frontend dst-label=app:web port=80
+    CNI-->>K: allow (ingress rule matches podSelector app:frontend port:80)
     alt Allowed by NetworkPolicy
-        K->>TP: deliver packet
+        K->>TP: deliver TCP SYN
         TP-->>SP: TCP SYN-ACK — connection established
-    else Denied (drop — default)
-        Note over K,SP: Packet silently dropped — sender sees timeout
-    else Denied (reject — Calico action: Reject)
-        K-->>SP: TCP RST or ICMP unreachable
+    else Denied by default-deny (drop action)
+        Note over K,SP: packet silently dropped — sender sees timeout after ~30s
+    else Denied with reject (Calico action: Reject)
+        K-->>SP: TCP RST / ICMP unreachable — fast fail
     end
 ```
 
@@ -412,6 +381,172 @@ az aks create --network-policy calico
 az aks create --network-policy azure
 ```
 
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| Goldman Sachs | PCI DSS payment card workloads on internal Kubernetes platform | Calico NetworkPolicy for microsegmentation between payment-processing pods | Met PCI DSS Requirement 1 for network segmentation; isolated card data environment from non-CDE workloads |
+| US Department of Defense (DoD) | Classified Kubernetes environments under DoD DevSecOps reference design | NetworkPolicy as a mandatory baseline zero-trust control in every namespace | Enforced least-privilege pod communication without relying solely on network perimeter; audit trail via Calico policy events |
+| Stripe | Payments API infrastructure handling billions of transactions | Namespace-scoped default-deny policies for PCI card data isolation | Prevented lateral movement between payment-processing and non-PCI namespaces; simplified PCI audit scope |
+| Shopify | Multi-tenant e-commerce platform with hundreds of merchant environments | Cilium L7 NetworkPolicy enforcing HTTP path-level access rules | Blocked unauthorized cross-tenant API calls at layer 7; reduced blast radius of compromised merchant pods |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — Mac (kubectl)
+kubectl get netpol -A
+kubectl get pods -A -o wide | head -15
+
+# Terminal 2 — minikube Linux node
+minikube ssh
+# Inspect CNI-enforced iptables rules (Calico)
+sudo iptables -L | grep -i cali | head -20
+# Or for Cilium: sudo bpftool map dump name cilium_policy 2>/dev/null | head -20
+```
+
+Observation commands — run after deploying test pods to see enforcement live:
+
+```bash
+# Deploy test pods with labels
+kubectl run web --image=nginx --labels="app=web" --expose --port=80
+kubectl run frontend --image=nicolaka/netshoot --labels="app=frontend" -- sleep 3600
+kubectl run attacker --image=nicolaka/netshoot --labels="app=other" -- sleep 3600
+
+# Confirm connectivity BEFORE any policy (all pods reachable — flat network)
+kubectl exec frontend -- curl -s --max-time 2 http://web   # expect: nginx HTML
+kubectl exec attacker -- curl -s --max-time 2 http://web   # expect: nginx HTML
+
+# Apply default-deny + selective allow (Section 4), then verify isolation
+kubectl exec frontend -- curl -s --max-time 2 http://web   # expect: nginx HTML (allowed)
+kubectl exec attacker -- curl -s --max-time 2 http://web   # expect: silence / timeout (blocked)
+echo "Enforcement confirmed if attacker timed out"
+
+# Watch live events as policies are applied
+kubectl get events --watch --field-selector reason=NetworkPolicyUpdated 2>/dev/null &
+```
+
+> **See also:** [Lesson 03 — iptables and Netfilter](03-iptables-and-netfilter.md) for CNI enforcement mechanics.
+
+### Hands-On Lab
+
+**Step 1 — Confirm the flat network baseline:**
+
+```bash
+# All pods should be reachable before any policy is applied
+kubectl exec frontend -- curl -s --max-time 2 http://web | head -3   # nginx HTML
+kubectl exec attacker -- curl -s --max-time 2 http://web | head -3   # nginx HTML
+echo "Both pods reachable — flat network confirmed"
+```
+
+**Step 2 — Apply default-deny-all and observe the effect:**
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: default
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+EOF
+
+# Now all traffic is blocked including DNS
+kubectl exec frontend -- curl -s --max-time 3 http://web   # expect: timeout
+kubectl exec attacker -- curl -s --max-time 3 http://web   # expect: timeout
+```
+
+**Step 3 — Add selective allow and DNS exception:**
+
+```bash
+# Allow DNS egress for all pods
+kubectl apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: default
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+EOF
+
+# Allow frontend to reach web on port 80
+kubectl apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-to-web
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: web
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: frontend
+      ports:
+        - protocol: TCP
+          port: 80
+EOF
+
+# Verify: frontend allowed, attacker blocked
+kubectl exec frontend -- curl -s --max-time 3 http://web | head -3   # nginx HTML
+kubectl exec attacker -- curl -s --max-time 3 http://web             # timeout
+echo "Microsegmentation confirmed"
+```
+
+**Step 4 — Trace policies with Cilium Hubble or Calico:**
+
+```bash
+# Cilium — watch dropped flows in real time
+hubble observe --verdict DROPPED --namespace default
+
+# Calico — trace expected policy decision
+calicoctl policy trace \
+  --src-pod default/frontend \
+  --dst-pod default/web \
+  --dst-port 80
+
+# Validate NetworkPolicy YAML before applying
+kubectl apply --dry-run=server -f policy.yaml
+```
+
+### Configuration Reference
+
+| Parameter | Default | Effect | When to Change |
+|-----------|---------|--------|----------------|
+| `podSelector: {}` | Selects no pods | With `policyTypes`, selects ALL pods in namespace | Use for namespace-wide default-deny baseline policy |
+| `policyTypes: [Ingress, Egress]` | Ingress only if ingress rules present | Governs both traffic directions | Always declare explicitly to avoid implicit inferences |
+| `from: []` / `to: []` empty list | — | Denies ALL ingress or ALL egress | Use alongside `podSelector: {}` for default-deny pattern |
+| `namespaceSelector` + `podSelector` same `from` entry | — | AND logic: pod must match AND be in matching namespace | Cross-namespace access with pod-level specificity |
+| `namespaceSelector` + `podSelector` separate `from` entries | — | OR logic: either selector alone allows access | Permits broader access than intended — use same-entry AND form |
+| `ipBlock: cidr` with `except` | — | Allow/block external CIDR with exclusions | On-prem resources, cloud health check IPs, monitoring agents |
+| `port: 53 protocol: UDP` and `protocol: TCP` | — | DNS exception for egress policy | Required whenever any egress policy is applied to avoid DNS breakage |
+
 ---
 
 ## Troubleshooting
@@ -527,4 +662,4 @@ az aks create --network-policy azure
 
 ---
 
-**Next:** [Lesson 17 — Ingress Controllers and L7 Load Balancing](17-ingress-controllers.md)
+**← Previous:** [Lesson 15 — IPv6 and Dual-Stack Kubernetes](15-ipv6-dual-stack.md)   |   **Next:** [Lesson 17 — Ingress Controllers and L7 Load Balancing](17-ingress-controllers.md)

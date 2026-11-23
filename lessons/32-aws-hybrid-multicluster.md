@@ -6,22 +6,12 @@
 
 > **Goal:** Connect multiple EKS clusters and on-premises workloads using VPC Peering, Transit Gateway, Direct Connect, and VPC Lattice, with cross-cluster DNS discovery and GitOps delivery.
 
----
 
-## Practice Setup
-
-```bash
-# Terminal 1 — Mac (kubectl multi-context)
-kubectl config get-contexts
-aws eks list-clusters --output table 2>/dev/null || echo "Configure AWS CLI first"
-
-# Terminal 2 — Mac (aws CLI — inspect Transit Gateway if present)
-aws ec2 describe-transit-gateways \
-  --query 'TransitGateways[*].[TransitGatewayId,State,Description]' \
-  --output table 2>/dev/null || echo "No Transit Gateways or AWS CLI not configured"
-```
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. Connectivity Options at a Glance
 
@@ -97,17 +87,17 @@ TGW supports transitive routing: A↔B, B↔C, A↔C all work. Scales to 5,000 a
 
 ```mermaid
 flowchart LR
-    subgraph TGW["Transit Gateway (hub)"]
-        RT[Route Table\n10.0.0.0/8 → all attachments]
+    subgraph TGW["Transit Gateway (hub-and-spoke)"]
+        RT["TGW Route Table 10.0.0.0/8 all attachments"]
     end
-    EKS1[EKS Cluster-1\n10.0.0.0/16] -->|attachment| RT
-    EKS2[EKS Cluster-2\n10.1.0.0/16] -->|attachment| RT
-    EKS3[EKS Cluster-3\n10.2.0.0/16] -->|attachment| RT
-    OnPrem[On-Premises\n192.168.0.0/16\nvia Direct Connect] -->|attachment| RT
-    RT -->|routes| EKS1
-    RT -->|routes| EKS2
-    RT -->|routes| EKS3
-    RT -->|routes| OnPrem
+    EKS1["EKS Cluster-1 10.0.0.0/16"] --"attachment VPC ENI"--> RT
+    EKS2["EKS Cluster-2 10.1.0.0/16"] --"attachment VPC ENI"--> RT
+    EKS3["EKS Cluster-3 10.2.0.0/16"] --"attachment VPC ENI"--> RT
+    OnPrem["On-Premises 192.168.0.0/16 via Direct Connect"] --"Transit VIF BGP :179"--> RT
+    RT --"route"--> EKS1
+    RT --"route"--> EKS2
+    RT --"route"--> EKS3
+    RT --"route"--> OnPrem
 ```
 
 ---
@@ -118,26 +108,33 @@ flowchart LR
 flowchart TD
     subgraph Region["AWS Region us-east-1"]
         subgraph ClusterA["EKS Cluster A — 10.0.0.0/16"]
-            PodA[Pod\n10.0.1.5]
+            SubA["Private Subnet 10.0.1.0/22"]
+            NodeA["EC2 Node (m5.xlarge)"]
+            PodA["Pod 10.0.1.5 VPC CNI ENI"]
+            SubA --> NodeA --> PodA
         end
         subgraph ClusterB["EKS Cluster B — 10.1.0.0/16"]
-            PodB[Pod\n10.1.2.8]
+            SubB["Private Subnet 10.1.2.0/22"]
+            NodeB["EC2 Node (m5.xlarge)"]
+            PodB["Pod 10.1.2.8 VPC CNI ENI"]
+            SubB --> NodeB --> PodB
         end
-        TGW[Transit Gateway]
-        Lattice[VPC Lattice\nService Network]
-        ClusterA -->|TGW attachment| TGW
-        ClusterB -->|TGW attachment| TGW
-        ClusterA -->|service registration| Lattice
-        ClusterB -->|service registration| Lattice
+        TGW["Transit Gateway (hub-and-spoke)"]
+        Lattice["VPC Lattice Service Network (L7 mesh)"]
+        ClusterA --"TGW attachment"--> TGW
+        ClusterB --"TGW attachment"--> TGW
+        ClusterA --"service registration HTTPS"--> Lattice
+        ClusterB --"service registration HTTPS"--> Lattice
     end
     subgraph OnPrem["On-Premises Data Center"]
-        DC[Servers\n192.168.0.0/16]
+        DC["Servers 192.168.0.0/16"]
     end
-    DX[AWS Direct Connect\nLocation] -->|dedicated fiber| TGW
+    DX["AWS Direct Connect Location PoP"] --"dedicated fiber 1-100 Gbps BGP :179"--> TGW
     DC --> DX
 ```
 
 > **See also:** [Lesson 22 — Multi-Cluster Networking](22-multi-cluster-networking.md) for Cilium Cluster Mesh and Submariner details.
+
 
 ---
 
@@ -231,10 +228,10 @@ EOF
 
 ```mermaid
 flowchart LR
-    DC[On-Premises\nData Center] -->|dedicated fiber\n1-100 Gbps| DXLoc[Direct Connect\nLocation / PoP]
-    DXLoc --> DXGW[Direct Connect\nGateway]
-    DXGW -->|Transit VIF\nBGP session| TGW[Transit\nGateway]
-    TGW --> EKS[EKS VPC\n10.0.0.0/16]
+    DC["On-Premises Data Center"] --"dedicated fiber 1-100 Gbps"--> DXLoc["Direct Connect Location PoP"]
+    DXLoc --> DXGW["Direct Connect Gateway"]
+    DXGW --"Transit VIF BGP :179 ASN 64512"--> TGW["Transit Gateway"]
+    TGW --"VPC attachment TCP/UDP any"--> EKS["EKS VPC 10.0.0.0/16"]
 ```
 
 ```bash
@@ -350,33 +347,33 @@ aws ec2 create-transit-gateway-vpc-attachment \
   --subnet-ids subnet-xxxxx
 ```
 
----
+### Industry Applications
 
-## 11. Key Configuration Reference
-
-### VPC Peering vs Transit Gateway Parameters
-
-| Parameter | VPC Peering | Transit Gateway |
-|-----------|------------|----------------|
-| Max connections | N×(N-1)/2 — unlimited but unmanageable | 5,000 attachments |
-| Transitive routing | No | Yes (via TGW route tables) |
-| Cross-account | Yes (requires accept in peer account) | Yes (via AWS RAM sharing) |
-| Cross-region | Yes (inter-region peering) | Yes (TGW peering between regions) |
-| Bandwidth limit | None (limited by NIC) | 50 Gbps per attachment burst |
-| Cost | No hourly fee; data transfer charged | $0.05/hr per attachment + data transfer |
-
-### Direct Connect Virtual Interface Types
-
-| VIF Type | Connects To | Use Case | When to change |
-|----------|------------|---------|----------------|
-| Private VIF | VGW (single VPC) | Simple single-VPC connectivity | Upgrade to Transit VIF for multi-VPC |
-| Public VIF | AWS public endpoints | Access S3, DynamoDB over DX | Avoid unless specifically needed |
-| Transit VIF | Direct Connect Gateway → TGW | Multi-VPC, multi-account hybrid | Default choice for EKS hybrid |
-| Hosted VIF | Partner-managed | Smaller bandwidth increments | When <1 Gbps is sufficient |
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| Goldman Sachs | Hybrid on-prem K8s to AWS | Direct Connect + Transit Gateway for financial workloads | Sub-millisecond latency between on-prem trading systems and EKS order management |
+| SAP | Multi-region EKS for data-residency compliance | AWS Outposts + EKS with TGW for data-sovereign workloads | EU customer data never leaves EU while sharing control plane with global fleet |
+| Siemens | Factory-floor K8s connected to AWS | Transit Gateway connecting OT/IT networks via Direct Connect | Real-time telemetry from 50+ factories aggregated into central AWS analytics cluster |
+| Atlassian | Multi-cluster SaaS platform | VPC Lattice for cross-cluster service-to-service communication | Eliminated 300+ manual SecurityGroup rules with policy-based service access control |
 
 ---
 
-## 12. Hands-On Practice
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — Mac (kubectl multi-context)
+kubectl config get-contexts
+aws eks list-clusters --output table 2>/dev/null || echo "Configure AWS CLI first"
+
+# Terminal 2 — Mac (aws CLI — inspect Transit Gateway if present)
+aws ec2 describe-transit-gateways \
+  --query 'TransitGateways[*].[TransitGatewayId,State,Description]' \
+  --output table 2>/dev/null || echo "No Transit Gateways or AWS CLI not configured"
+```
+
+### Hands-On Lab
 
 ```bash
 # 1. Check existing VPC peering connections
@@ -421,6 +418,28 @@ aws ec2 describe-vpn-connections \
 ```
 
 > **See also:** [Lesson 29 — EKS Networking](29-aws-eks-networking.md) for VPC CNI behavior and pod CIDR assignments that must not overlap across peered clusters.
+
+### Configuration Reference
+
+#### VPC Peering vs Transit Gateway
+
+| Parameter | VPC Peering | Transit Gateway |
+|-----------|------------|----------------|
+| Max connections | N×(N-1)/2 — unlimited but unmanageable | 5,000 attachments |
+| Transitive routing | No | Yes (via TGW route tables) |
+| Cross-account | Yes (requires accept in peer account) | Yes (via AWS RAM sharing) |
+| Cross-region | Yes (inter-region peering) | Yes (TGW peering between regions) |
+| Bandwidth limit | None (limited by NIC) | 50 Gbps per attachment burst |
+| Cost | No hourly fee; data transfer charged | $0.05/hr per attachment + data transfer |
+
+#### Direct Connect Virtual Interface Types
+
+| VIF Type | Connects To | Use Case | When to change |
+|----------|------------|---------|----------------|
+| Private VIF | VGW (single VPC) | Simple single-VPC connectivity | Upgrade to Transit VIF for multi-VPC |
+| Public VIF | AWS public endpoints | Access S3, DynamoDB over DX | Avoid unless specifically needed |
+| Transit VIF | Direct Connect Gateway → TGW | Multi-VPC, multi-account hybrid | Default choice for EKS hybrid |
+| Hosted VIF | Partner-managed | Smaller bandwidth increments | When <1 Gbps is sufficient |
 
 ---
 
@@ -537,4 +556,4 @@ aws ec2 describe-vpn-connections \
 
 **See also:** [Lesson 22 — Multi-Cluster Networking](22-multi-cluster-networking.md) for Cilium Cluster Mesh and Submariner details.
 
-**Next:** [Lesson 33 — ArgoCD and GitOps for Network Configuration](33-argocd-gitops.md)
+**← Previous:** [Lesson 31 — AWS Load Balancer Controller Deep Dive](31-aws-load-balancer-controller.md)   |   **Next:** [Lesson 33 — ArgoCD and GitOps for Network Configuration](33-argocd-gitops.md)

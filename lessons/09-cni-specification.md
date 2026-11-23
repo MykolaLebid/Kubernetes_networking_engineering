@@ -6,23 +6,13 @@
 
 > **Goal:** Trace a Kubernetes pod creation through the full CNI ADD lifecycle — from kubelet invocation to IP assignment — and manually execute a CNI plugin to verify your understanding of the stdin/stdout JSON protocol.
 
----
 
-## Practice Setup
 
-```bash
-# Terminal 1 — minikube node (inspect CNI config and binaries)
-minikube ssh
-ls /etc/cni/net.d/        # CNI config files (first alphabetically is used)
-ls /opt/cni/bin/          # CNI plugin binaries
-
-# Terminal 2 — kubectl (Mac)
-kubectl get pods -A | grep calico   # the running CNI
-```
-
-> **See also:** [Lesson 10 — eBPF and XDP](10-ebpf-xdp.md) for how Cilium replaces iptables-based CNI plumbing with eBPF TC programs loaded during the ADD operation.
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. What CNI Is
 
@@ -38,36 +28,39 @@ CNI is a **specification + set of libraries** defining how container runtimes co
 
 ```mermaid
 flowchart LR
-    subgraph node["Kubernetes Node"]
-        KL[kubelet]
+    subgraph node["Kubernetes Node (minikube / EKS / GKE / AKS)"]
+        KL["kubelet (node agent, gRPC :10250)"]
+        PAUSE["pause container (sandbox, holds network namespace)"]
         subgraph cni_bin["/opt/cni/bin/"]
-            CALICO[calico]
-            BRIDGE[bridge]
-            IPAM[host-local]
-            BW[bandwidth]
-            PM[portmap]
+            CALICO["calico (main CNI plugin binary)"]
+            BRIDGE["bridge (generic Linux bridge plugin)"]
+            IPAM["host-local (IPAM: flat file per node)"]
+            BW["bandwidth (TC traffic shaping)"]
+            PM["portmap (iptables NAT for hostPort)"]
         end
         subgraph cni_conf["/etc/cni/net.d/"]
-            CONF[10-calico.conflist]
+            CONF["10-calico.conflist (first alphabetically wins)"]
         end
         subgraph netns["Network Namespaces"]
-            NS1[/var/run/netns/cni-abc<br/>Pod eth0: 10.244.0.6]
+            NS1["/var/run/netns/cni-abc123ef (pod eth0: 10.244.0.6/24)"]
         end
     end
     subgraph ipam_backends["IPAM Backends"]
-        HL[host-local<br/>/var/lib/cni/networks/]
-        CIPAM[calico-ipam<br/>Kubernetes CRDs]
-        WA[whereabouts<br/>Cluster-wide]
-        VPCNI[aws-vpc-cni<br/>EC2 ENI secondary IPs]
+        HL["host-local (/var/lib/cni/networks/ — node filesystem)"]
+        CIPAM["calico-ipam (Kubernetes CRDs, /26 blocks per node)"]
+        WA["whereabouts (cluster-wide etcd, no per-node boundaries)"]
+        VPCNI["aws-vpc-cni (EC2 ENI secondary IPs via AWS API)"]
     end
 
-    KL -- "reads first conf" --> CONF
-    KL -- "exec with env vars" --> CALICO
-    CALICO -- "calls IPAM" --> CIPAM
-    CALICO -- "creates veth in" --> NS1
-    CIPAM --> WA
-    CALICO -.chain.-> BW
-    CALICO -.chain.-> PM
+    KL --"reads first .conflist (alphabetical sort)"--> CONF
+    KL --"exec CNI_COMMAND=ADD env vars + stdin JSON"--> CALICO
+    KL --"creates sandbox first"--> PAUSE
+    PAUSE --"shares netns with all containers"--> NS1
+    CALICO --"calls calico-ipam ADD (request IP)"--> CIPAM
+    CALICO --"ip link add veth type veth peer name eth0"--> NS1
+    CIPAM --"allocates from /26 block"--> HL
+    CALICO --"conflist chain (bandwidth shaping)"--> BW
+    BW --"conflist chain (hostPort NAT)"--> PM
 ```
 
 ---
@@ -140,18 +133,6 @@ For chained plugins (multiple plugins in sequence, `.conflist` format):
 }
 ```
 
-### Configuration Reference
-
-| Field | Required | Default | Effect |
-|-------|----------|---------|--------|
-| `cniVersion` | Yes | — | CNI spec version; must match plugin support |
-| `name` | Yes | — | Network name; used as key for IPAM state |
-| `type` | Yes | — | Binary filename in `CNI_PATH` to execute |
-| `ipam.type` | Yes (usually) | — | IPAM plugin name; called by main plugin |
-| `isGateway` | No | false | Assign gateway IP to bridge interface |
-| `ipMasq` | No | false | Add iptables MASQUERADE for pod egress |
-| `plugins` | Conflist only | — | Array of plugins to chain in sequence |
-
 ---
 
 ## 4. CNI ADD Operation Flow
@@ -160,27 +141,27 @@ For chained plugins (multiple plugins in sequence, `.conflist` format):
 
 ```mermaid
 sequenceDiagram
-    participant KB as kubelet
-    participant FS as /etc/cni/net.d/
+    participant KB as kubelet (node agent)
+    participant FS as /etc/cni/net.d/10-calico.conflist
     participant BIN as /opt/cni/bin/calico
-    participant IPAM as calico-ipam
-    participant NS as Network Namespace
-    participant OS as Linux kernel
+    participant IPAM as calico-ipam (CRD store, /26 block)
+    participant NS as netns /var/run/netns/cni-abc123ef
+    participant OS as Linux kernel (iproute2 / nftables)
 
-    KB->>KB: Create pod sandbox (pause container)
-    KB->>NS: ip netns add /var/run/netns/cni-abc123
-    KB->>FS: Read first .conf/.conflist file
-    KB->>KB: Set CNI_COMMAND=ADD, CNI_NETNS=..., CNI_IFNAME=eth0
-    KB->>BIN: exec calico (config via stdin JSON)
-    BIN->>IPAM: Call calico-ipam ADD
-    IPAM-->>BIN: Return: ip=10.244.0.6/24, gw=10.244.0.1
+    KB->>KB: Create pod sandbox (pause container, allocate PID)
+    KB->>NS: ip netns add /var/run/netns/cni-abc123ef
+    KB->>FS: Read first .conflist (alphabetical sort in /etc/cni/net.d/)
+    KB->>KB: Set CNI_COMMAND=ADD CNI_NETNS=/var/run/netns/cni-abc123ef CNI_IFNAME=eth0
+    KB->>BIN: exec /opt/cni/bin/calico (stdin: JSON config from conflist)
+    BIN->>IPAM: calico-ipam ADD (request IP from /26 block assigned to this node)
+    IPAM-->>BIN: return: ip=10.244.0.6/24 gw=10.244.0.1 (from block 10.244.0.0/26)
     BIN->>OS: ip link add veth1234 type veth peer name eth0
-    BIN->>NS: ip link set eth0 netns /var/run/netns/cni-abc123
-    BIN->>NS: ip addr add 10.244.0.6/24 dev eth0 (inside ns)
-    BIN->>OS: ip route add 10.244.0.6 dev veth1234 scope link
-    BIN->>OS: Configure eBPF/iptables rules (Calico)
-    BIN-->>KB: stdout: CNI result JSON
-    KB->>KB: Store pod IP in pod.status.podIP
+    BIN->>NS: ip link set eth0 netns /var/run/netns/cni-abc123ef
+    BIN->>NS: ip addr add 10.244.0.6/24 dev eth0 (configure inside namespace)
+    BIN->>OS: ip route add 10.244.0.6/32 dev veth1234 scope link (host-side route)
+    BIN->>OS: Configure eBPF TC programs (Calico) or iptables cali-FORWARD chain
+    BIN-->>KB: stdout: CNI result JSON (interfaces ips routes dns)
+    KB->>KB: Store pod IP in pod.status.podIP via kube-apiserver
 ```
 
 ---
@@ -302,7 +283,45 @@ kubectl exec -it <pod> -- ip addr
 
 ---
 
-## 8. Debugging CNI
+## 9. CNI Plugin Comparison
+
+| Plugin | Overlay | BGP | NetworkPolicy | eBPF | Cloud Support |
+|--------|---------|-----|--------------|------|--------------|
+| Flannel | VXLAN/host-gw | No | No (needs plugin) | No | Yes |
+| Calico | VXLAN/IP-IP | Yes | Yes | Yes (eBPF mode) | Yes |
+| Cilium | VXLAN/Geneve | No (uses eBPF) | Yes | Yes | Yes |
+| Weave | VXLAN mesh | No | Yes | No | Yes |
+| AWS VPC CNI | No (native) | No | Via SGs | Possible | AWS only |
+| Azure CNI | No/Overlay | No | Via NSG | Cilium option | Azure only |
+
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| AWS EKS (Amazon.com) | AWS VPC CNI is a fully spec-compliant CNI plugin used by all EKS clusters | CNI ADD/DEL lifecycle, IPAM via EC2 ENI secondary IPs, chained plugins (bandwidth, portmap) | Pods get real VPC IPs through the standard CNI interface; interoperable with any CNI-compatible tooling |
+| Calico (open source) | Default CNI on many on-prem and cloud Kubernetes distributions including EKS-A, OpenShift, Rancher | calico-ipam with /26 IPAM blocks, calico binary in /opt/cni/bin/, 10-calico.conflist | Full NetworkPolicy enforcement via standard CNI lifecycle; used by Goldman Sachs, SAP BTP, and thousands of enterprises |
+| Azure CNI (Microsoft AKS) | Azure's cloud-native CNI is spec-compliant and assigns VNet IPs through the standard ADD/DEL flow | CNI spec stdin/stdout protocol, chained with bandwidth + portmap plugins, IPAM backed by Azure VNET API | Azure-native IP assignment while maintaining full compatibility with standard CNI tooling and kubectl debugging |
+| Multus (Red Hat / CNCF) | Meta-CNI used in telco 5G networks (Nokia, Ericsson) for pods with multiple network interfaces | CNI chaining, NetworkAttachmentDefinition CRD, delegates ADD to multiple plugins per pod | Telco workloads get separate management, data, and control-plane interfaces from a single CNI framework |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — minikube node (inspect CNI config and binaries)
+minikube ssh
+ls /etc/cni/net.d/        # CNI config files (first alphabetically is used)
+ls /opt/cni/bin/          # CNI plugin binaries
+
+# Terminal 2 — kubectl (Mac)
+kubectl get pods -A | grep calico   # the running CNI
+```
+
+> **See also:** [Lesson 10 — eBPF and XDP](10-ebpf-xdp.md) for how Cilium replaces iptables-based CNI plumbing with eBPF TC programs loaded during the ADD operation.
+
+### Hands-On Lab
 
 ```bash
 # CNI logs (location varies by plugin)
@@ -345,18 +364,17 @@ lsmod | grep -E "vxlan|bridge|8021q"
 modprobe bridge vxlan
 ```
 
----
+### Configuration Reference
 
-## 9. CNI Plugin Comparison
-
-| Plugin | Overlay | BGP | NetworkPolicy | eBPF | Cloud Support |
-|--------|---------|-----|--------------|------|--------------|
-| Flannel | VXLAN/host-gw | No | No (needs plugin) | No | Yes |
-| Calico | VXLAN/IP-IP | Yes | Yes | Yes (eBPF mode) | Yes |
-| Cilium | VXLAN/Geneve | No (uses eBPF) | Yes | Yes | Yes |
-| Weave | VXLAN mesh | No | Yes | No | Yes |
-| AWS VPC CNI | No (native) | No | Via SGs | Possible | AWS only |
-| Azure CNI | No/Overlay | No | Via NSG | Cilium option | Azure only |
+| Field | Required | Default | Effect |
+|-------|----------|---------|--------|
+| `cniVersion` | Yes | — | CNI spec version; must match plugin support |
+| `name` | Yes | — | Network name; used as key for IPAM state |
+| `type` | Yes | — | Binary filename in `CNI_PATH` to execute |
+| `ipam.type` | Yes (usually) | — | IPAM plugin name; called by main plugin |
+| `isGateway` | No | false | Assign gateway IP to bridge interface |
+| `ipMasq` | No | false | Add iptables MASQUERADE for pod egress |
+| `plugins` | Conflist only | — | Array of plugins to chain in sequence |
 
 ---
 
@@ -473,4 +491,4 @@ modprobe bridge vxlan
 
 ---
 
-**Next:** [Lesson 10 — eBPF and XDP](10-ebpf-xdp.md)
+**← Previous:** [Lesson 08 — Cloud Provider Networking Basics](08-cloud-provider-networking.md)   |   **Next:** [Lesson 10 — eBPF and XDP in Kubernetes Networking](10-ebpf-xdp.md)

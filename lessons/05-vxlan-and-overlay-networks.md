@@ -4,21 +4,12 @@
 
 > **Goal:** Build a working VXLAN tunnel between two Linux hosts, explain how the FDB maps pod MACs to VTEP IPs, and calculate the correct pod MTU to prevent silent fragmentation.
 
----
 
-## Practice Setup
-
-```bash
-# Two terminals:
-# Terminal 1 — minikube Linux node
-minikube ssh
-ip link show | grep -E "vxlan|tunl|cali"
-
-# Terminal 2 — Mac, kubectl
-kubectl get pods -A -o wide   # see pod IPs and nodes
-```
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. The Problem Overlay Networks Solve
 
@@ -31,6 +22,7 @@ Overlay networks choose the third option: **encapsulate first, route second**.
 
 > **See also:** [Lesson 02 — IP Routing and Forwarding](02-ip-routing-and-forwarding.md) for how CNI plugins using Flannel host-gw or Calico BGP avoid encapsulation entirely by programming the physical routing layer instead.
 
+
 ---
 
 ## 2. VXLAN Fundamentals
@@ -41,16 +33,16 @@ Overlay networks choose the third option: **encapsulate first, route second**.
 
 ```mermaid
 flowchart TD
-    subgraph outer [Outer packet - routed on physical network]
-        OE[Outer Ethernet Header\nnode MAC to next-hop MAC]
-        OI[Outer IP Header\nsrc: node IP, dst: remote node IP]
-        OU[Outer UDP Header\nsrc: ephemeral, dst: 4789]
-        OV[VXLAN Header 8 bytes\nVNI 24-bit segment ID]
+    subgraph outer [Outer packet routed on physical network]
+        OE["Outer Ethernet Header node MAC to next-hop MAC"]
+        OI["Outer IP Header src: node IP dst: remote node IP"]
+        OU["Outer UDP Header src: ephemeral dst: UDP 4789"]
+        OV["VXLAN Header 8 bytes VNI 24-bit segment ID"]
     end
-    subgraph inner [Inner packet - original pod frame]
-        IE[Inner Ethernet\npod src MAC to dst pod MAC]
-        II[Inner IP Header\npod src IP to pod dst IP]
-        IP2[Inner TCP/UDP\napplication payload]
+    subgraph inner [Inner packet original pod frame]
+        IE["Inner Ethernet pod src MAC to dst pod MAC"]
+        II["Inner IP Header pod src IP to pod dst IP"]
+        IP2["Inner TCP/UDP application payload"]
     end
     outer --> inner
 
@@ -68,26 +60,28 @@ Key facts:
 
 ```mermaid
 flowchart LR
-    subgraph nodeA [Node A — 192.168.1.10]
-        PA[Pod A\n10.244.0.5]
-        BRA[cni0\nbridge]
-        VTEPA[flannel.1\nVTEP]
+    subgraph nodeA [Node A 192.168.1.10]
+        PA["Pod A 10.244.0.5"]
+        BRA["cni0 bridge 10.244.0.1/24"]
+        VTEPA["flannel.1 VTEP 10.244.0.0"]
         PA --- BRA --- VTEPA
     end
 
-    subgraph net [Physical Network]
-        PHYS[UDP 4789\nencapsulated traffic]
+    subgraph net [Physical Network UDP 4789]
+        PHYS["UDP encapsulated traffic outer IP routing"]
+        FDB["VXLAN FDB pod MAC to VTEP mapping"]
     end
 
-    subgraph nodeB [Node B — 192.168.1.20]
-        VTEPB[flannel.1\nVTEP]
-        BRB[cni0\nbridge]
-        PB[Pod B\n10.244.1.7]
+    subgraph nodeB [Node B 192.168.1.20]
+        VTEPB["flannel.1 VTEP 10.244.1.0"]
+        BRB["cni0 bridge 10.244.1.1/24"]
+        PB["Pod B 10.244.1.7"]
         VTEPB --- BRB --- PB
     end
 
-    VTEPA <-->|outer src=192.168.1.10\nouter dst=192.168.1.20| PHYS
+    VTEPA <-->|"outer src=192.168.1.10 dst=192.168.1.20 VNI=1"| PHYS
     PHYS <--> VTEPB
+    PHYS --- FDB
 
     style nodeA fill:#1a3a5c,color:#fff
     style nodeB fill:#1a3a5c,color:#fff
@@ -153,22 +147,28 @@ Pod A (10.244.0.5) → Pod B (10.244.1.7)
 
 ```mermaid
 sequenceDiagram
-    participant PA as Pod A (10.244.0.5)
-    participant BRA as cni0 bridge (Node A)
-    participant VTEPA as flannel.1 VTEP (Node A)
+    participant PA as Pod A 10.244.0.5
+    participant BRA as cni0 bridge Node A
+    participant VTEPA as flannel.1 VTEP Node A
+    participant FDB as VXLAN FDB table
     participant NET as Physical Network
-    participant VTEPB as flannel.1 VTEP (Node B)
-    participant BRB as cni0 bridge (Node B)
-    participant PB as Pod B (10.244.1.7)
+    participant VTEPB as flannel.1 VTEP Node B
+    participant BRB as cni0 bridge Node B
+    participant PB as Pod B 10.244.1.7
 
-    PA->>BRA: Frame: src=10.244.0.5 dst=10.244.1.7
+    PA->>BRA: Frame src=10.244.0.5 dst=10.244.1.7 TCP :8080
     BRA->>VTEPA: Routed to flannel.1 (ip route: 10.244.1.0/24 via flannel.1 onlink)
-    Note over VTEPA: FDB lookup: dst MAC for 10.244.1.0 → Node B VTEP at 192.168.1.20
-    VTEPA->>NET: UDP encap: outer 192.168.1.10→192.168.1.20 port 8472 VNI=1
-    NET->>VTEPB: Physical delivery
-    Note over VTEPB: Decap: strip outer headers, recover inner frame
-    VTEPB->>BRB: Inner frame: 10.244.0.5→10.244.1.7
-    BRB->>PB: Delivered via pod-side veth
+    VTEPA->>FDB: Lookup dst MAC for 10.244.1.7
+    FDB-->>VTEPA: Node B VTEP at 192.168.1.20 VNI=1
+    VTEPA->>NET: UDP encap outer 192.168.1.10 to 192.168.1.20 port 8472 VNI=1
+    NET->>VTEPB: Physical delivery (outer IP routing)
+    VTEPB->>VTEPB: Decap strip outer headers recover inner frame
+    VTEPB->>BRB: Inner frame src=10.244.0.5 dst=10.244.1.7
+    BRB->>PB: Delivered via pod-side veth TCP :8080
+    PB-->>VTEPB: TCP reply ACK
+    VTEPB-->>NET: UDP encap return path
+    NET-->>VTEPA: Physical delivery back
+    VTEPA-->>PA: Inner frame delivered
 ```
 
 ---
@@ -236,20 +236,6 @@ cilium config view | grep tunnel
 # tunnel-protocol: vxlan  (or geneve)
 ```
 
-### VXLAN Configuration Reference
-
-| Parameter | Default | Effect | When to change |
-|-----------|---------|--------|----------------|
-| VNI (`id`) | — | 24-bit segment identifier | Use different VNIs to isolate tenant networks |
-| UDP port (`dstport`) | 4789 (IANA) | Destination UDP port for encapsulated traffic | Use 4789 unless hardware offload requires 8472 (Flannel legacy) |
-| `local` IP | — | Source IP of outer UDP header | Set to the node's primary IP; must be reachable from all other nodes |
-| MTU on vxlan device | inherited | Maximum frame size on the VTEP | Set to `physical_MTU - 50`; CNI must propagate this to pods |
-| `learning` flag | on | VTEP learns remote MAC→VTEP mappings via flood-and-learn | Disable (`nolearning`) when CNI uses explicit FDB population |
-| `proxy` flag | off | Respond to ARP on behalf of remote pods | Enable (`proxy`) with `l2miss`/`l3miss` for ARP suppression |
-| UDP receive buffer | system default | Receive buffer for VTEP socket | Increase `net.core.rmem_max` to `16777216` on high-throughput nodes |
-
----
-
 ## 8. Bare Metal vs Cloud Overlay Considerations
 
 ### Bare Metal
@@ -300,7 +286,32 @@ ethtool -L eth0 combined 8
 
 ---
 
-## 10. Hands-On Lab: Manual VXLAN Tunnel
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| Flannel (on-prem K8s) | Flannel VXLAN mode is the default CNI for most on-premises Kubernetes deployments, connecting pods across nodes that are not on the same L2 | VXLAN encapsulation + FDB with Kubernetes API for MAC-to-VTEP mapping | Simple overlay that works on any IP-routable network; widely deployed as the default in kubeadm clusters |
+| AWS VPC networking | AWS VPC uses VXLAN-like tunneling internally to provide per-VPC isolation across shared physical infrastructure | VXLAN-style L2-over-UDP encapsulation between hypervisors | Millions of VPC tenants share hardware with full L2 isolation; ENIs get dedicated VNIs |
+| WeaveNet CNI | WeaveNet uses VXLAN for multi-host pod networking with its own control plane for FDB population | VXLAN with dynamic FDB population via gossip protocol | No external control plane required; works across cloud providers and on-prem without BGP |
+| Cilium Geneve mode | Cilium uses Geneve (54-byte overhead vs VXLAN 50-byte) for its overlay mode, allowing extensible option headers for future telemetry | Geneve UDP :6081 with extensible VNI header | Supports future metadata embedding in tunnel headers for observability without separate sidecar |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Two terminals:
+# Terminal 1 — minikube Linux node
+minikube ssh
+ip link show | grep -E "vxlan|tunl|cali"
+
+# Terminal 2 — Mac, kubectl
+kubectl get pods -A -o wide   # see pod IPs and nodes
+```
+
+### Hands-On Lab
 
 Build a VXLAN overlay between two Linux hosts (or VMs).
 
@@ -324,7 +335,7 @@ bridge fdb add 00:00:00:00:00:00 dev vxlan10 dst 192.168.1.10
 ip route add 10.0.0.0/24 dev vxlan10
 ```
 
-### Step-by-step Observation
+#### Step-by-step Observation
 
 ```bash
 ### From Host A
@@ -350,7 +361,7 @@ ping -M do -s 1422 10.0.0.2   # → succeeds (1422+28 = 1450 ≤ 1500-50)
 ping -M do -s 1452 10.0.0.2   # → fails: "Frag needed" or message too big
 ```
 
-### Verification
+#### Verification
 
 ```bash
 # After first ping, FDB should have learned remote MAC
@@ -362,6 +373,18 @@ bridge fdb show dev vxlan10
 ip -s link show vxlan10
 # → RX: bytes/packets should match TX with 0 drops
 ```
+
+### Configuration Reference
+
+| Parameter | Default | Effect | When to change |
+|-----------|---------|--------|----------------|
+| VNI (`id`) | — | 24-bit segment identifier | Use different VNIs to isolate tenant networks |
+| UDP port (`dstport`) | 4789 (IANA) | Destination UDP port for encapsulated traffic | Use 4789 unless hardware offload requires 8472 (Flannel legacy) |
+| `local` IP | — | Source IP of outer UDP header | Set to the node's primary IP; must be reachable from all other nodes |
+| MTU on vxlan device | inherited | Maximum frame size on the VTEP | Set to `physical_MTU - 50`; CNI must propagate this to pods |
+| `learning` flag | on | VTEP learns remote MAC→VTEP mappings via flood-and-learn | Disable (`nolearning`) when CNI uses explicit FDB population |
+| `proxy` flag | off | Respond to ARP on behalf of remote pods | Enable (`proxy`) with `l2miss`/`l3miss` for ARP suppression |
+| UDP receive buffer | system default | Receive buffer for VTEP socket | Increase `net.core.rmem_max` to `16777216` on high-throughput nodes |
 
 ---
 
@@ -477,4 +500,4 @@ ip -s link show vxlan10
 
 ---
 
-**Next:** [Lesson 06 — BGP Fundamentals for Kubernetes](06-bgp-fundamentals.md)
+**← Previous:** [Lesson 04 — Network Namespaces Deep Dive](04-network-namespaces-deep-dive.md)   |   **Next:** [Lesson 06 — BGP Fundamentals for Kubernetes](06-bgp-fundamentals.md)

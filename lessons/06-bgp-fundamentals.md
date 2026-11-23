@@ -6,24 +6,13 @@
 
 > **Goal:** Configure Calico with BGP peering to a ToR switch so pod routes are reachable from physical network infrastructure without any overlay tunnel.
 
----
 
-## Practice Setup
 
-```bash
-# Terminal 1 — kubectl (Mac)
-kubectl get pods -n calico-system   # check Calico/BIRD is running
-
-# Terminal 2 — minikube node (Linux)
-minikube ssh
-# Check if BIRD is running (Calico BGP agent)
-sudo ps aux | grep bird
-ip route show proto bird   # routes installed by BGP
-```
-
-> **See also:** [Lesson 07 — Bare Metal Network Infrastructure](07-bare-metal-network-infrastructure.md) covers the ToR/spine-leaf physical layer that BGP peers with.
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. BGP Fundamentals
 
@@ -44,28 +33,32 @@ BGP is a **path-vector protocol**: routers advertise reachability to IP prefixes
 ```mermaid
 flowchart LR
     subgraph node_a["Node A (ASN 65001)"]
-        PA[Pod 10.244.0.5/32]
-        BIRD_A[BIRD daemon]
+        PA["Pod nginx 10.244.0.5/32"]
+        BIRD_A["BIRD daemon :179"]
+        FELIX_A["Felix policy agent"]
     end
     subgraph node_b["Node B (ASN 65002)"]
-        PB[Pod 10.244.1.7/32]
-        BIRD_B[BIRD daemon]
+        PB["Pod redis 10.244.1.7/32"]
+        BIRD_B["BIRD daemon :179"]
+        FELIX_B["Felix policy agent"]
     end
     subgraph tor["ToR Switch (ASN 65000)"]
-        TOR[BGP Router]
+        TOR["BGP Router Cisco/Arista"]
     end
     subgraph rr["Route Reflector (ASN 64512)"]
-        RR[RR Node]
+        RR["RR Node cluster-id=244.0.0.1"]
     end
 
-    BIRD_A -- "eBGP advertise 10.244.0.0/24" --> TOR
-    BIRD_B -- "eBGP advertise 10.244.1.0/24" --> TOR
-    TOR -- "redistribute" --> BIRD_A
-    TOR -- "redistribute" --> BIRD_B
-    BIRD_A -- "iBGP (via RR)" --> RR
-    BIRD_B -- "iBGP (via RR)" --> RR
-    RR -- "reflect routes" --> BIRD_A
-    RR -- "reflect routes" --> BIRD_B
+    BIRD_A --"eBGP TCP :179 advertise 10.244.0.0/24"--> TOR
+    BIRD_B --"eBGP TCP :179 advertise 10.244.1.0/24"--> TOR
+    TOR --"redistribute prefixes"--> BIRD_A
+    TOR --"redistribute prefixes"--> BIRD_B
+    BIRD_A --"iBGP TCP :179"--> RR
+    BIRD_B --"iBGP TCP :179"--> RR
+    RR --"reflect routes back"--> BIRD_A
+    RR --"reflect routes back"--> BIRD_B
+    BIRD_A --- FELIX_A
+    BIRD_B --- FELIX_B
 ```
 
 ---
@@ -100,16 +93,6 @@ vtysh -c "show bgp summary"
 birdc show protocols | grep -c Established   # → number of peers up
 ```
 
-### Configuration Reference
-
-| Parameter | Default | Effect | When to change |
-|-----------|---------|--------|----------------|
-| `holdTime` | 90s | Seconds between keepalives before session resets | Reduce to 9s for faster detection without BFD |
-| `keepaliveTime` | 30s | Interval for KEEPALIVE messages | Usually 1/3 of holdTime |
-| `connectRetryTime` | 120s | Delay before retrying failed connections | Reduce on stable links |
-| `bfdEnabled` | false | Enable BFD for sub-second failure detection | Always true in production |
-| `password` | (none) | MD5 TCP session authentication | Required in multi-tenant environments |
-
 ---
 
 ## 3. How Calico Uses BGP
@@ -131,18 +114,19 @@ No overlay needed — packets go directly at wire speed.
 ```mermaid
 sequenceDiagram
     participant K as kubelet
-    participant CNI as Calico CNI
-    participant BIRD as BIRD daemon
-    participant Peer as BGP Peer (ToR)
-    participant OS as Linux routing
+    participant CNI as Calico CNI plugin
+    participant BIRD as BIRD daemon (bgp speaker)
+    participant Peer as BGP Peer ToR :179
+    participant OS as Linux routing table
 
-    K->>CNI: CNI ADD (new pod)
+    K->>CNI: CNI ADD (new pod 10.244.0.5)
     CNI->>OS: ip route add 10.244.0.5 dev cali1234 scope link
-    CNI->>BIRD: notify via Felix / route update
-    BIRD->>Peer: BGP UPDATE: advertise 10.244.0.5/32
-    Peer->>BIRD: BGP UPDATE ACK
-    Note over Peer: ToR installs route<br/>10.244.0.5 via node-IP
-    BIRD->>OS: install received peer routes
+    CNI->>BIRD: notify via Felix route update
+    BIRD->>Peer: BGP UPDATE NLRI 10.244.0.5/32 NEXT_HOP=192.168.1.10
+    Peer->>BIRD: BGP KEEPALIVE (UPDATE ACK)
+    Note over Peer: ToR installs 10.244.0.5 via node-IP 192.168.1.10
+    Peer->>BIRD: BGP UPDATE reflect peer routes
+    BIRD->>OS: ip route add 10.244.1.7/32 via 192.168.1.20 proto bird
 ```
 
 ---
@@ -355,6 +339,121 @@ BGP is typically not available in public cloud VPCs — cloud providers abstract
 
 ---
 
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| Calico / Tigera (US Air Force) | USAF uses Calico with eBGP peering to Arista ToR switches for classified Kubernetes workloads on bare metal | eBGP with ToR + per-pod /32 host routes + BFD | Wire-speed pod routing without overlay; BFD detects node failure in <1s for mission-critical workloads |
+| Cloudflare | Anycast routing distributes traffic across 300+ PoPs using BGP route injection from edge servers | eBGP route advertisement + BGP community tags + ECMP | Any client IP reaches the closest healthy PoP; communities control route propagation scope |
+| LinkedIn | LinkedIn's data center fabric uses BGP to distribute pod routes across a spine-leaf topology with ECMP across all spine nodes | iBGP with Route Reflectors + BGP multipath ECMP | Scales to thousands of nodes; spine ECMP provides automatic load balancing and fast failover |
+| MetalLB (open source) | Kubernetes-native LoadBalancer implementation that advertises service VIPs via BGP to upstream routers | BGP service advertisement + BGP community + ECMP multipath | Bare-metal clusters get external IP reachability identical to cloud load balancers without cloud dependency |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — inside minikube node (Linux kernel commands)
+minikube ssh
+
+# Terminal 2 — Mac / local (Calico and kubectl commands)
+# Install calicoctl if not present
+curl -L https://github.com/projectcalico/calico/releases/latest/download/calicoctl-linux-amd64 -o calicoctl
+chmod +x calicoctl && sudo mv calicoctl /usr/local/bin/
+```
+
+> **See also:** [Lesson 07 — Bare Metal Network Infrastructure](07-bare-metal-network-infrastructure.md) for how BGP integrates with LACP bonding, VLAN segmentation, and spine-leaf switching fabrics.
+
+### Hands-On Lab
+
+Inspect BGP session state and route advertisement in a running Calico cluster.
+
+```bash
+# --- Terminal 2 (Mac) ---
+
+# Check overall Calico node status including BGP session states
+calicoctl node status
+# Expected output shows each BGP peer with state: Established
+
+# List BGP peers configured in the cluster
+calicoctl get bgppeer -o wide
+
+# Show BGP configuration (AS number, service IP advertisement)
+kubectl get bgpconfiguration default -o yaml
+
+# --- Terminal 1 (minikube ssh) ---
+
+# Check BIRD daemon BGP protocol states
+sudo birdc show protocols
+# Name       Proto    Table    State  Since    Info
+# Node_...   BGP      ---      up     ...      Established
+
+# Show all BGP routes in BIRD's routing table
+sudo birdc show route
+
+# Show the specific route for a pod IP
+sudo birdc show route for 10.244.0.5
+
+# Show routes with full path attributes (AS_PATH, NEXT_HOP, LOCAL_PREF)
+sudo birdc show route all
+
+# View kernel routes injected by BIRD
+ip route show proto bird
+
+# Confirm TCP session on port 179
+ss -tnp | grep 179
+
+# Capture BGP keepalive traffic (should see every 30s)
+sudo tcpdump -i eth0 tcp port 179 -n -c 10
+
+# Test TCP/179 reachability to a peer
+telnet <peer-ip> 179
+```
+
+#### Step-by-step Observation
+
+```bash
+# 1. Watch BGP session state in real time (keep this running)
+watch -n5 'sudo birdc show protocols | grep BGP'
+
+# 2. In another window, delete and recreate a pod
+kubectl delete pod <pod-name> && kubectl run test-pod --image=nginx
+
+# 3. Watch the host routing table update as the new pod gets a /32 route
+ip monitor route | grep proto
+
+# 4. Verify the new pod route appeared via BGP
+ip route show proto bird | grep 10.244
+```
+
+#### Verification
+
+```bash
+# All BGP sessions must be Established
+sudo birdc show protocols | grep -c Established
+# → should equal the number of configured BGP peers
+
+# BGP routes must be present in kernel table
+ip route show proto bird | head -5
+
+# Calico IPAM blocks must align with advertised routes
+calicoctl ipam show --show-blocks
+```
+
+### Configuration Reference
+
+| Parameter | Default | Effect | When to change |
+|-----------|---------|--------|----------------|
+| `holdTime` | 90s | Seconds between keepalives before session resets | Reduce to 9s for faster detection without BFD |
+| `keepaliveTime` | 30s | Interval for KEEPALIVE messages | Usually 1/3 of holdTime |
+| `connectRetryTime` | 120s | Delay before retrying failed connections | Reduce on stable links |
+| `bfdEnabled` | false | Enable BFD for sub-second failure detection | Always true in production |
+| `password` | (none) | MD5 TCP session authentication | Required in multi-tenant environments |
+
+---
+
 ## Troubleshooting
 
 | Symptom | Likely Cause | Diagnostic Command | Fix |
@@ -467,4 +566,4 @@ BGP is typically not available in public cloud VPCs — cloud providers abstract
 
 ---
 
-**Next:** [Lesson 07 — Bare Metal Network Infrastructure for Kubernetes](07-bare-metal-network-infrastructure.md)
+**← Previous:** [Lesson 05 — VXLAN and Overlay Networks](05-vxlan-and-overlay-networks.md)   |   **Next:** [Lesson 07 — Bare Metal Network Infrastructure for Kubernetes](07-bare-metal-network-infrastructure.md)

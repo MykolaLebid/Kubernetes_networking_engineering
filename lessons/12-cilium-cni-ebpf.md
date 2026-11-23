@@ -4,52 +4,44 @@
 
 > **Goal:** Deploy Cilium with kube-proxy replacement, write L7 CiliumNetworkPolicy, and use Hubble to observe and debug live traffic flows.
 
----
 
-## Practice Setup
-
-```bash
-# Terminal 1 — minikube Linux node
-minikube ssh
-sudo bpftool prog list | grep -i cil | head -10
-ip link show | grep -E "cilium|lxc"
-
-# Terminal 2 — Mac (kubectl + cilium CLI)
-cilium status 2>/dev/null || echo "cilium CLI not installed: brew install cilium-cli"
-kubectl get pods -n kube-system | grep -E "cilium|hubble"
-hubble observe --last 10 2>/dev/null || echo "hubble not running"
-```
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. Architecture
 
 ```mermaid
 flowchart LR
     subgraph CP["Kubernetes Control Plane"]
-        API[API Server]
+        API["API Server (kube-apiserver :443)"]
     end
-    subgraph OP["cilium-operator\n1-2 replicas"]
-        O1[IPAM\nCiliumNode mgmt\nCluster Mesh]
+    subgraph OP["cilium-operator (1-2 replicas, not DaemonSet)"]
+        O1["IPAM + CiliumNode mgmt + Cluster Mesh control"]
     end
     subgraph Agent["cilium-agent DaemonSet (every node)"]
-        BPF[eBPF program loader]
-        IDM[Identity management]
-        IPAM[IPAM]
-        KPR[kube-proxy replacement\neBPF service LB]
-        HUB[Hubble server\nflow data export]
+        BPF["eBPF program loader (TC ingress/egress, XDP programs)"]
+        IDM["Identity management (K8s labels to numeric identity)"]
+        IPAM["IPAM (pod CIDR allocation, CiliumNode CRD)"]
+        KPR["kube-proxy replacement (eBPF service LB, socket-level)"]
+        HUB["Hubble server (eBPF ring buffer flow export, gRPC)"]
     end
-    subgraph Envoy["Envoy (L7 policy)"]
-        E1[HTTP / gRPC\npolicy enforcement]
+    subgraph Envoy["Envoy (L7 policy sidecar, managed by cilium-agent)"]
+        E1["HTTP/gRPC policy enforcement (:9090 Envoy admin)"]
     end
-    API --> O1
-    O1 --> BPF
-    BPF --> eBPFmaps[(eBPF Maps\ncilium_lxc\ncilium_policy\ncilium_lb4_services)]
-    Agent --> Envoy
-    HUB --> HubbleRelay[Hubble Relay\nHubble UI]
+    API --"watch CiliumNetworkPolicy / CiliumNode"--> O1
+    O1 --"push BPF config to agents"--> BPF
+    BPF --"writes"--> eBPFmaps[("eBPF Maps cilium_lxc cilium_policy cilium_lb4_services cilium_ct_tcp4")]
+    Agent --"injects + manages Envoy"--> Envoy
+    HUB --"gRPC flows"--> HubbleRelay["Hubble Relay + Hubble UI (:12000/:80)"]
+    IDM --"identity stamped in packet encap header"--> BPF
+    KPR --"replaces kube-proxy iptables"--> eBPFmaps
 ```
 
 > **See also:** [Lesson 10 — eBPF and XDP](10-ebpf-xdp.md) for eBPF program types and BPF map internals referenced throughout this lesson.
+
 
 ---
 
@@ -58,13 +50,13 @@ flowchart LR
 ```mermaid
 flowchart LR
     subgraph Traditional["Traditional: IP-based iptables"]
-        PA1[Pod A\n10.0.0.5] -->|rule: allow 10.0.0.5/32| PB1[Pod B]
-        note1["Problem: IP changes on reschedule"]
+        PA1["Pod A (10.0.0.5)"] -->|"rule: allow 10.0.0.5/32 → stale on reschedule"| PB1["Pod B"]
+        note1["Problem: IP changes on pod reschedule, every rule must be updated"]
     end
     subgraph Cilium["Cilium: Identity-based eBPF"]
-        PA2[Pod A\napp=frontend\nidentity: 1234] -->|TC egress stamps id=1234| TC1[TC egress\nBPF prog]
-        TC1 -->|VXLAN/Geneve\nencap with identity| TC2[TC ingress\nBPF prog]
-        TC2 -->|check id=1234 in policy map| PB2[Pod B\napp=backend]
+        PA2["Pod A (app=frontend, identity: 1234)"] -->|"TC egress stamps id=1234 in encap header"| TC1["TC egress BPF prog (lxc-egress)"]
+        TC1 -->|"VXLAN/Geneve UDP :4789 with identity in header"| TC2["TC ingress BPF prog (lxc-ingress)"]
+        TC2 -->|"check id=1234 in cilium_policy map"| PB2["Pod B (app=backend)"]
     end
 ```
 
@@ -89,12 +81,12 @@ cilium identity get 12345
 
 ```mermaid
 flowchart TD
-    NIC[NIC receive] -->|earliest hook| XDP[XDP\nDDoS / LB offload]
-    XDP --> TCI[TC ingress\nbefore routing decision]
-    TCI --> Route[Kernel routing]
-    Route --> TCE[TC egress\nafter routing, before NIC transmit]
-    TCE --> NIC2[NIC transmit]
-    Route --> SOCK[Socket layer\nL4 bypass for local traffic]
+    NIC["NIC receive (eth0 / bond0)"] -->|"earliest hook, before sk_buff alloc"| XDP["XDP (DDoS drop, L4 LB offload)"]
+    XDP --> TCI["TC ingress (before routing decision, Cilium identity + DNAT)"]
+    TCI --> Route["Kernel routing (FIB lookup, Cilium bpf_redirect)"]
+    Route --> TCE["TC egress (after routing, before NIC transmit, Cilium SNAT + policy)"]
+    TCE --> NIC2["NIC transmit"]
+    Route --> SOCK["Socket layer (L4 bypass for local intra-node traffic, Cilium sock_ops)"]
 ```
 
 ```bash
@@ -135,18 +127,6 @@ helm install cilium cilium/cilium \
 cilium status --wait
 cilium connectivity test   # end-to-end network tests (~5 min)
 ```
-
-### Key Helm Parameters
-
-| Parameter | Default | Effect | When to change |
-|-----------|---------|--------|----------------|
-| `kubeProxyReplacement` | `disabled` | eBPF service LB mode | Set `strict` to fully replace kube-proxy |
-| `tunnel` | `vxlan` | Overlay protocol | Set `disabled` for native routing (needs BGP or same L2) |
-| `autoDirectNodeRoutes` | `false` | Auto-add routes for same-L2 nodes | Enable with `tunnel=disabled` on bare metal |
-| `hubble.relay.enabled` | `false` | Cross-node flow aggregation | Enable for multi-node Hubble visibility |
-| `encryption.enabled` | `false` | WireGuard node-to-node encryption | Enable for untrusted networks |
-| `loadBalancer.acceleration` | `disabled` | XDP-level service LB | Set `native` on supported NICs for best performance |
-| `bpf.masquerade` | `false` | eBPF-based masquerade (replaces iptables MASQ) | Enable when kube-proxy is fully replaced |
 
 ---
 
@@ -242,16 +222,19 @@ Cilium implements Service load-balancing entirely in eBPF — no iptables, no ku
 
 ```mermaid
 sequenceDiagram
-    participant P as Pod / External client
-    participant SK as Socket layer\n(BPF sock_ops)
-    participant LB as cilium_lb4_services\neBPF map
-    participant EP as Backend Pod
+    participant P as Client Pod (app=frontend, identity 1234)
+    participant SK as Socket layer BPF sock_ops (cilium-agent hook)
+    participant LB as cilium_lb4_services eBPF map
+    participant CT as cilium_ct_tcp4 conntrack map
+    participant EP as Backend Pod (app=backend :8080, identity 5678)
 
-    P->>SK: connect to ClusterIP 10.96.0.10:80
-    SK->>LB: lookup service → list of backends
-    LB-->>SK: backend: 10.244.1.5:8080 (hash-selected)
-    SK->>EP: direct socket to backend (no DNAT overhead)
-    EP-->>P: response via conntrack
+    P->>SK: connect() ClusterIP 10.96.0.10:80 (kube-dns or svc annotation)
+    SK->>LB: BPF lookup: svc 10.96.0.10:80 → backends list (3 healthy)
+    LB-->>SK: backend: 10.244.1.5:8080 (Maglev consistent hash selected)
+    SK->>CT: record new TCP flow: src=10.244.0.3:49152 dst=10.244.1.5:8080
+    SK->>EP: direct TCP socket to 10.244.1.5:8080 (no kernel DNAT overhead)
+    EP-->>SK: TCP SYN-ACK from 10.244.1.5:8080
+    SK-->>P: deliver reply via CT reverse lookup (restore src=10.96.0.10:80)
 ```
 
 ```bash
@@ -347,6 +330,106 @@ az aks create \
   --network-plugin-mode overlay \
   --network-dataplane cilium
 ```
+
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| Google GKE Autopilot | Default CNI for all GKE Autopilot clusters since 2022; millions of pods per day | Cilium as CNI with Dataplane v2, identity-based policy, eBPF service LB replacing kube-proxy | Zero-maintenance pod networking at Google cloud scale; Hubble for mandatory audit logging of pod flows |
+| Adobe Creative Cloud | Kubernetes platform serving 20M+ creative subscribers across on-prem and AWS | Cilium CNI with Hubble observability, CiliumNetworkPolicy for microservice isolation | Real-time flow visibility replaced expensive network TAPs; L7 HTTP policy without sidecar proxies |
+| AWS EKS (Amazon.com) | Cilium available as an EKS add-on since 2023, used by customers replacing aws-vpc-cni | Cilium eBPF service LB (kube-proxy replacement), CiliumNetworkPolicy, Tetragon runtime security | 40% lower latency for intra-cluster service calls compared to iptables kube-proxy at high connection rates |
+| Datadog | Runs 1M+ containers in production; migrated from Flannel + kube-proxy to Cilium | kube-proxy replacement with eBPF, Hubble for observability, identity-based policy replacing IP rules | 50% reduction in networking CPU overhead; policy rules survive pod restarts without IP-based rule updates |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — minikube Linux node
+minikube ssh
+sudo bpftool prog list | grep -i cil | head -10
+ip link show | grep -E "cilium|lxc"
+
+# Terminal 2 — Mac (kubectl + cilium CLI)
+cilium status 2>/dev/null || echo "cilium CLI not installed: brew install cilium-cli"
+kubectl get pods -n kube-system | grep -E "cilium|hubble"
+hubble observe --last 10 2>/dev/null || echo "hubble not running"
+```
+
+### Hands-On Lab
+
+```bash
+# Step 1: Install Cilium with kube-proxy replacement
+helm repo add cilium https://helm.cilium.io/
+helm install cilium cilium/cilium \
+  --namespace kube-system \
+  --set kubeProxyReplacement=strict \
+  --set k8sServiceHost=<API_SERVER_IP> \
+  --set k8sServicePort=6443 \
+  --set hubble.relay.enabled=true \
+  --set hubble.ui.enabled=true
+
+# Step 2: Wait for Cilium to be ready and run connectivity tests
+cilium status --wait                                       # → All components OK
+cilium connectivity test                                   # → all tests pass (~5 min)
+
+# Step 3: Inspect eBPF programs and maps
+bpftool prog list | grep cilium | wc -l                   # → ~2 programs per pod
+cilium bpf map list                                        # → cilium_lxc, cilium_lb4_services, etc.
+cilium bpf lb list                                         # → service VIP → backends
+
+# Step 4: Verify identity-based policy
+cilium endpoint list                                       # → identity per pod
+cilium identity list                                       # → all identities in cluster
+cilium policy trace --src-pod default/frontend --dst-pod default/backend --dport 80
+
+# Step 5: Observe live flows with Hubble
+cilium hubble port-forward &
+hubble observe --verdict DROPPED                           # → see which flows are blocked
+hubble observe --from-pod default/frontend --to-pod default/backend
+
+# Step 6: Apply L7 HTTP policy and test enforcement
+kubectl apply -f - <<EOF
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: web-policy
+  namespace: default
+spec:
+  endpointSelector:
+    matchLabels:
+      app: web
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            app: frontend
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+          rules:
+            http:
+              - method: "GET"
+                path: "/api/.*"
+EOF
+hubble observe --protocol http --verdict DROPPED           # → non-GET requests blocked
+```
+
+### Configuration Reference
+
+#### Key Helm Parameters
+
+| Parameter | Default | Effect | When to change |
+|-----------|---------|--------|----------------|
+| `kubeProxyReplacement` | `disabled` | eBPF service LB mode | Set `strict` to fully replace kube-proxy |
+| `tunnel` | `vxlan` | Overlay protocol | Set `disabled` for native routing (needs BGP or same L2) |
+| `autoDirectNodeRoutes` | `false` | Auto-add routes for same-L2 nodes | Enable with `tunnel=disabled` on bare metal |
+| `hubble.relay.enabled` | `false` | Cross-node flow aggregation | Enable for multi-node Hubble visibility |
+| `encryption.enabled` | `false` | WireGuard node-to-node encryption | Enable for untrusted networks |
+| `loadBalancer.acceleration` | `disabled` | XDP-level service LB | Set `native` on supported NICs for best performance |
+| `bpf.masquerade` | `false` | eBPF-based masquerade (replaces iptables MASQ) | Enable when kube-proxy is fully replaced |
 
 ---
 
@@ -463,4 +546,4 @@ az aks create \
 
 ---
 
-**Next:** [Lesson 13 — Kubernetes Services and kube-proxy](13-kubernetes-services-kube-proxy.md)
+**← Previous:** [Lesson 11 — Calico CNI Deep Dive](11-calico-cni-deep-dive.md)   |   **Next:** [Lesson 13 — Kubernetes Services and kube-proxy](13-kubernetes-services-kube-proxy.md)

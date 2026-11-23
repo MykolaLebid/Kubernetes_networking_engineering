@@ -6,31 +6,16 @@
 
 > **Goal:** Create edge, passthrough, and reencrypt Routes on OpenShift, configure a custom IngressController for router sharding, and read HAProxy backend stats to diagnose a 503 error.
 
+
+
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
+
 ---
 
-## Practice Setup
-
-```bash
-# Terminal 1 — verify router is running and has an external IP
-oc get pods -n openshift-ingress
-oc get svc -n openshift-ingress router-default
-# EXTERNAL-IP should be populated (NLB address or IP)
-
-# Terminal 2 — inspect IngressController
-oc get ingresscontroller default -n openshift-ingress-operator -o yaml \
-  | grep -E "domain|replicas|endpointPublishing|conditions" | head -20
-
-# Terminal 3 — peek at live HAProxy config inside the router
-ROUTER=$(oc get pods -n openshift-ingress -o jsonpath='{.items[0].metadata.name}')
-echo "Router pod: $ROUTER"
-oc exec -n openshift-ingress $ROUTER -- \
-  cat /var/lib/haproxy/conf/haproxy.config | head -60
-```
+## Theory
 
 > **See also:** [Lesson 17 — Ingress Controllers](17-ingress-controllers.md) for Kubernetes Ingress API comparison.
 > **See also:** [Lesson 28 — OpenShift Egress](28-openshift-egress.md) for controlling outbound traffic from the same namespace.
-
----
 
 ## 1. Route vs Kubernetes Ingress
 
@@ -55,29 +40,29 @@ flowchart LR
         BR["Browser / Client"]
     end
     subgraph DNS
-        WDNS["*.apps.cluster.example.com\n→ router EXTERNAL-IP"]
+        WDNS["*.apps.cluster.example.com to router EXTERNAL-IP"]
     end
     subgraph OpenShift
-        SVC_LB["LoadBalancer Service\nrouter-default\n(NLB / MetalLB)"]
+        SVC_LB["LoadBalancer Service router-default (NLB / MetalLB) :443/:80"]
         subgraph IC["openshift-ingress namespace"]
-            RP1["router-default-pod-1\nHAProxy"]
-            RP2["router-default-pod-2\nHAProxy"]
+            RP1["router-default-pod-1 HAProxy :80/:443"]
+            RP2["router-default-pod-2 HAProxy :80/:443"]
         end
         subgraph App["application namespace"]
-            SVC["Service\n(ClusterIP)"]
+            SVC["Service (ClusterIP)"]
             POD1["Pod"]
             POD2["Pod"]
         end
-        ROUTE["Route CR\nhost, TLS mode, weight"]
+        ROUTE["Route CR -- host, TLS mode, weight"]
     end
 
-    BR -- "HTTPS web.apps..." --> DNS
-    DNS --> SVC_LB --> RP1
-    SVC_LB --> RP2
-    RP1 -- "watches / reconciles" --> ROUTE
-    RP2 -- "watches / reconciles" --> ROUTE
-    RP1 --> SVC --> POD1
-    RP1 --> SVC --> POD2
+    BR --"HTTPS :443"-->DNS
+    DNS -->SVC_LB -->RP1
+    SVC_LB -->RP2
+    RP1 --"watches / reconciles"-->ROUTE
+    RP2 --"watches / reconciles"-->ROUTE
+    RP1 --"HTTP backend :8080"-->SVC -->POD1
+    RP1 -->SVC -->POD2
 ```
 
 ---
@@ -423,6 +408,86 @@ spec:
                   number: 80
 ```
 
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| Telstra | High-volume carrier services on OpenShift | HAProxy Router handling millions of req/day | Zero-downtime HAProxy soft-reload for Route config changes at scale |
+| Deutsche Bahn | Microservice traffic routing across 100+ services | OpenShift Routes + reencrypt TLS | End-to-end TLS from browser to pod without manual HAProxy config |
+| SAP BTP | Multi-tenant PaaS service routing | OpenShift Router + TLS edge termination + router sharding | Per-tenant IngressController with namespace selector for traffic isolation |
+| Financial services firms | PCI DSS zone separation | Custom IngressControllers with `namespaceOwnership: Strict` | Separate routers for cardholder and non-cardholder traffic with audit logging |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — verify router is running and has an external IP
+oc get pods -n openshift-ingress
+oc get svc -n openshift-ingress router-default
+# EXTERNAL-IP should be populated (NLB address or IP)
+
+# Terminal 2 — inspect IngressController
+oc get ingresscontroller default -n openshift-ingress-operator -o yaml \
+  | grep -E "domain|replicas|endpointPublishing|conditions" | head -20
+
+# Terminal 3 — peek at live HAProxy config inside the router
+ROUTER=$(oc get pods -n openshift-ingress -o jsonpath='{.items[0].metadata.name}')
+echo "Router pod: $ROUTER"
+oc exec -n openshift-ingress $ROUTER -- \
+  cat /var/lib/haproxy/conf/haproxy.config | head -60
+```
+
+### Hands-On Lab
+
+```bash
+# Step 1 — expose a service and verify Route is admitted
+oc expose svc web --hostname=web.apps.cluster.example.com
+oc describe route web | grep -A 15 "Status:"
+# expect: Admitted: True
+
+# Step 2 — check HAProxy backend health via UNIX socket
+oc exec -n openshift-ingress $ROUTER -- \
+  bash -c 'echo "show stat" | socat - /var/lib/haproxy/run/haproxy.sock | \
+  cut -d, -f1,2,18,19 | grep -v "^#"'
+# expect: be_<namespace>_<service>_<port>,pod-name,UP — UP = healthy backend
+
+# Step 3 — test route internally (bypass DNS)
+oc run -it --rm test --image=nicolaka/netshoot -- \
+  curl -Hv "Host: web.apps.cluster.example.com" \
+  http://router-default.openshift-ingress.svc
+# expect: HTTP 200 response from the backend pod
+
+# Step 4 — verify weighted A/B split in HAProxy config
+oc exec -n openshift-ingress $ROUTER -- \
+  grep -A5 "web.apps.cluster.example.com" /var/lib/haproxy/conf/haproxy.config \
+  | grep "weight"
+# expect: weight 256 (80%) and weight 64 (20%) for alternateBackends split
+
+# Step 5 — check router logs for 5xx errors
+oc logs -n openshift-ingress $ROUTER | grep " 5[0-9][0-9] " | tail -20
+
+# Step 6 — check all route admission status
+oc get routes -A -o json \
+  | jq '.items[] | select(.status.ingress[0].conditions[0].status != "True") | .metadata.name'
+```
+
+### Configuration Reference
+
+| Parameter | Default | Effect | When to change |
+|-----------|---------|--------|---------------|
+| `spec.replicas` | `2` | Number of HAProxy router pods | Increase for high throughput |
+| `spec.domain` | cluster install value | Wildcard DNS base for auto-generated hostnames | Set at install; changing disrupts all routes |
+| `endpointPublishingStrategy.type` | `LoadBalancerService` | How the router is exposed (LB, NodePort, HostNetwork) | Use `HostNetwork` on bare metal |
+| `tuningOptions.maxConnections` | `50000` | HAProxy global maxconn | Increase for high-connection workloads |
+| `tuningOptions.threadCount` | auto | HAProxy worker threads | Set to vCPU count of infra nodes |
+| `httpHeaders.forwardedHeaderPolicy` | `Append` | Handling of `X-Forwarded-For` | Set `Replace` if upstream proxy already sets it |
+| `logging.access.destination.type` | `Container` | Access log destination | Use `Syslog` for centralized logging |
+| `routeAdmission.wildcardPolicy` | `WildcardsDisallowed` | Whether `*.example.com` routes are accepted | Set `WildcardsAllowed` for multi-tenant platforms |
+| `routeAdmission.namespaceOwnership` | `InterNamespaceAllowed` | Whether routes can claim hostnames across namespaces | Set `Strict` for tenant isolation |
+
 ---
 
 ## Troubleshooting
@@ -555,4 +620,4 @@ oc get routes -A -o json \
 
 ---
 
-**Next:** [Lesson 28 — OpenShift EgressIP and EgressFirewall](28-openshift-egress.md)
+**← Previous:** [Lesson 26 — OVN-Kubernetes: OpenShift's Default CNI](26-ovn-kubernetes.md)   |   **Next:** [Lesson 28 — OpenShift EgressIP and EgressFirewall](28-openshift-egress.md)

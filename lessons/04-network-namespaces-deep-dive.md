@@ -4,22 +4,12 @@
 
 > **Goal:** Reproduce the complete pod network namespace lifecycle — from `clone(CLONE_NEWNET)` through CNI wiring — and debug a running pod's network state from the host using `nsenter`.
 
----
 
-## Practice Setup
-
-```bash
-# Run all commands inside minikube
-minikube ssh
-
-# See real pod namespaces
-ip netns list
-
-# Inspect a pod's namespace (find the pause PID first)
-sudo crictl ps | head -5
-```
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. What a Network Namespace Contains
 
@@ -69,27 +59,29 @@ lsns -t net
 ```mermaid
 flowchart LR
     subgraph node [Host network namespace]
-        K[kubelet]
-        CRI[containerd / CRI-O]
-        CNI[CNI plugin binary]
-        HOST_VETH[veth-host-side\ne.g. cali1a2b3c]
-        BRIDGE[bridge / VTEP\ne.g. cni0 or flannel.1]
+        K["kubelet (node agent)"]
+        CRI["containerd/CRI-O runtime"]
+        CNI["CNI plugin binary /opt/cni/bin/"]
+        HOST_VETH["veth-host-side cali1a2b3c"]
+        BRIDGE["bridge/VTEP cni0 or flannel.1"]
+        PROXY["kube-proxy iptables/eBPF"]
         HOST_VETH --- BRIDGE
     end
 
     subgraph pod [Pod network namespace]
-        PAUSE[pause container\nholds namespace open]
-        APP[app container\nshares namespace]
-        ETH0[eth0\n10.244.0.10/24]
+        PAUSE["pause container holds namespace"]
+        APP["app container shares namespace"]
+        ETH0["eth0 10.244.0.10/24"]
         PAUSE --- ETH0
         APP --- ETH0
     end
 
-    K -->|1. schedules pod| CRI
-    CRI -->|2. creates namespace via clone CLONE_NEWNET| pod
-    CRI -->|3. calls CNI ADD| CNI
-    CNI -->|4. creates veth pair| HOST_VETH
-    HOST_VETH <-->|veth pair| ETH0
+    K -->|"1. schedules pod via CRI gRPC"| CRI
+    CRI -->|"2. clone CLONE_NEWNET"| pod
+    CRI -->|"3. exec CNI ADD"| CNI
+    CNI -->|"4. ip link add veth pair"| HOST_VETH
+    HOST_VETH <-->|"veth pair bidirectional"| ETH0
+    BRIDGE --- PROXY
 
     style node fill:#1a3a5c,color:#fff
     style pod fill:#2d5a27,color:#fff
@@ -143,28 +135,6 @@ kubectl exec -it <pod-name> -- sh
 # Then: ip addr, ip route, ss, nslookup, curl
 ```
 
-### Namespace / Runtime Configuration Reference
-
-| Item | Location / Command | Notes |
-|------|-------------------|-------|
-| Named namespace bind-mount | `/var/run/netns/<name>` | Created by `ip netns add`; CNI uses this path |
-| Pod namespace (containerd) | `/proc/<pause_pid>/ns/net` | Accessed via `nsenter -t <pid> -n` |
-| List namespaces (kernel) | `lsns -t net` | Shows PID, NSID, and process name |
-| Namespace inode ID | `stat /proc/<pid>/ns/net` | Same inode = same namespace |
-| Pause container image | `registry.k8s.io/pause:3.x` | Configured in kubelet `--pod-infra-container-image` |
-| CNI binary directory | `/opt/cni/bin/` | CNI plugins must be executable here |
-| CNI config directory | `/etc/cni/net.d/` | JSON config files; first sorted file is used |
-
-### Kernel Namespace Limit Parameters
-
-| Parameter | Default | Effect | When to change |
-|-----------|---------|--------|----------------|
-| `user.max_net_namespaces` | `unlimited` (varies by distro) | Maximum network namespaces the user namespace can create | Set a cap on shared nodes to prevent namespace exhaustion attacks |
-| `user.max_user_namespaces` | `7182` (distro-dependent) | Caps nested user namespaces (affects rootless containers) | Raise if rootless container runtimes are used (Podman, rootless containerd) |
-| `net.core.default_qdisc` | `pfifo_fast` | Default queueing discipline applied to new veth interfaces | Set to `fq_codel` or `noqueue` on Kubernetes nodes for lower pod latency |
-| `net.ipv4.conf.default.rp_filter` | `1` | rp_filter value applied to newly created interfaces | Set to `0` before CNI creates veths if CNI uses asymmetric routing |
-| `net.ipv4.conf.default.forwarding` | `0` | IP forwarding default for new interfaces | Set to `1` so veth pairs created by CNI forward without per-interface config |
-
 ---
 
 ## 5. Network Namespace Lifecycle with CNI
@@ -173,26 +143,30 @@ When a pod is scheduled, this sequence occurs:
 
 ```mermaid
 sequenceDiagram
-    participant K as kubelet
-    participant CRI as containerd / CRI-O
-    participant CNI as CNI plugin
-    participant NS as Pod namespace
-    participant HOST as Host namespace
+    participant K as kubelet (node agent)
+    participant CRI as containerd/CRI-O
+    participant CNI as CNI plugin (calico/flannel)
+    participant NS as Pod network namespace
+    participant HOST as Host network namespace
+    participant IPAM as IPAM store
 
-    K->>CRI: Create pod sandbox
-    CRI->>NS: clone(CLONE_NEWNET) — new namespace
-    CRI->>HOST: Bind-mount namespace at /var/run/netns/cni-UUID
-    CRI->>CNI: Exec CNI binary with ADD + namespace path
+    K->>CRI: Create pod sandbox (gRPC RunPodSandbox)
+    CRI->>NS: clone(CLONE_NEWNET) new network namespace
+    CRI->>HOST: Bind-mount namespace /var/run/netns/cni-UUID
+    CRI->>CNI: Exec CNI binary ADD + namespace path + config
+    CNI->>IPAM: Allocate pod IP from pool
+    IPAM-->>CNI: IP=10.244.0.10/24 gw=10.244.0.1
     CNI->>HOST: ip link add eth0-host type veth peer name eth0
-    CNI->>NS: ip link set eth0 netns <ns-path>
-    CNI->>NS: ip addr add <pod-ip>/24 dev eth0
-    CNI->>NS: ip route add default via <gateway>
+    CNI->>NS: ip link set eth0 netns /var/run/netns/cni-UUID
+    CNI->>NS: ip addr add 10.244.0.10/24 dev eth0
+    CNI->>NS: ip route add default via 10.244.0.1
     CNI->>HOST: ip link set eth0-host master cni0 (bridge)
-    CNI-->>CRI: Return result JSON (pod IP, gateway)
+    CNI-->>CRI: Return result JSON (podIP, gateway, routes)
     CRI->>NS: Start app containers sharing namespace
     Note over NS: Pod is Running
-    K->>CRI: Delete pod
-    CRI->>CNI: Exec CNI binary with DEL + namespace path
+    K->>CRI: Delete pod (gRPC StopPodSandbox)
+    CRI->>CNI: Exec CNI binary DEL + namespace path
+    CNI->>IPAM: Release IP 10.244.0.10
     CNI->>HOST: ip link del eth0-host (destroys veth pair)
     CRI->>HOST: Unlink /var/run/netns/cni-UUID
     Note over NS: Namespace freed by kernel
@@ -224,6 +198,7 @@ Risks: a compromised `hostNetwork` pod can see and modify all host network state
 Pods can share a namespace using `shareProcessNamespace` + init container tricks, but the standard model is one namespace per pod.
 
 > **See also:** [Lesson 03 — iptables and Netfilter](03-iptables-and-netfilter.md) for how iptables rules are namespace-scoped — each pod namespace has its own iptables state independent of the host, though kube-proxy rules only exist in the host namespace.
+
 
 ---
 
@@ -274,7 +249,33 @@ crictl pods --no-trunc -o json | jq -r '.items[] | .metadata.name + " " + .statu
 
 ---
 
-## 9. Hands-On Lab: Full Pod Namespace Simulation
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| containerd (all runtimes) | Every container runtime (containerd, CRI-O, Docker) creates one network namespace per pod at scheduling time via clone(CLONE_NEWNET) | network namespaces + pause container + bind-mount persistence | Provides complete network isolation between pods without VMs; enables independent IP, route, and iptables state per pod |
+| AWS Fargate | Fargate uses Linux network namespaces to isolate each task; no VMs involved for the customer | network namespaces + ENI injection via VPC CNI | Customer workloads run in isolated namespaces on shared hardware with AWS-managed firewall separation |
+| Google GKE Autopilot | GKE Autopilot creates pod namespaces at scale using containerd; Calico CNI wires veth pairs via CNI ADD | network namespaces + CNI lifecycle (ADD/DEL) | Full pod isolation at Google scale; namespace lifecycle tracked in etcd for cluster-wide consistency |
+| Cilium eBPF | Cilium attaches eBPF programs to the veth endpoint inside each pod namespace for per-pod policy enforcement | namespace isolation boundary + veth as eBPF attach point | Microsecond-latency policy enforcement without iptables traversal per connection |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Run all commands inside minikube
+minikube ssh
+
+# See real pod namespaces
+ip netns list
+
+# Inspect a pod's namespace (find the pause PID first)
+sudo crictl ps | head -5
+```
+
+### Hands-On Lab
 
 Reproduce the entire pod network namespace lifecycle manually.
 
@@ -300,7 +301,7 @@ ip netns exec cni-pod-sim ip addr add 10.244.0.100/24 dev eth0
 ip netns exec cni-pod-sim ip route add default via 10.244.0.1
 ```
 
-### Step-by-step Observation
+#### Step-by-step Observation
 
 ```bash
 # Verify the namespace was created
@@ -332,7 +333,7 @@ readlink /proc/$(ip netns exec cni-pod-sim sh -c 'echo $$')/ns/net
 # → net:[<different-inode>]  ← proves separate namespace
 ```
 
-### Verification
+#### Verification
 
 ```bash
 # Confirm full setup
@@ -348,6 +349,26 @@ ip netns del cni-pod-sim
 ip netns list   # → (empty or no cni-pod-sim)
 lsns -t net     # → only host namespace remains
 ```
+
+### Configuration Reference
+
+| Item | Location / Command | Notes |
+|------|-------------------|-------|
+| Named namespace bind-mount | `/var/run/netns/<name>` | Created by `ip netns add`; CNI uses this path |
+| Pod namespace (containerd) | `/proc/<pause_pid>/ns/net` | Accessed via `nsenter -t <pid> -n` |
+| List namespaces (kernel) | `lsns -t net` | Shows PID, NSID, and process name |
+| Namespace inode ID | `stat /proc/<pid>/ns/net` | Same inode = same namespace |
+| Pause container image | `registry.k8s.io/pause:3.x` | Configured in kubelet `--pod-infra-container-image` |
+| CNI binary directory | `/opt/cni/bin/` | CNI plugins must be executable here |
+| CNI config directory | `/etc/cni/net.d/` | JSON config files; first sorted file is used |
+
+| Parameter | Default | Effect | When to change |
+|-----------|---------|--------|----------------|
+| `user.max_net_namespaces` | `unlimited` (varies by distro) | Maximum network namespaces the user namespace can create | Set a cap on shared nodes to prevent namespace exhaustion attacks |
+| `user.max_user_namespaces` | `7182` (distro-dependent) | Caps nested user namespaces (affects rootless containers) | Raise if rootless container runtimes are used (Podman, rootless containerd) |
+| `net.core.default_qdisc` | `pfifo_fast` | Default queueing discipline applied to new veth interfaces | Set to `fq_codel` or `noqueue` on Kubernetes nodes for lower pod latency |
+| `net.ipv4.conf.default.rp_filter` | `1` | rp_filter value applied to newly created interfaces | Set to `0` before CNI creates veths if CNI uses asymmetric routing |
+| `net.ipv4.conf.default.forwarding` | `0` | IP forwarding default for new interfaces | Set to `1` so veth pairs created by CNI forward without per-interface config |
 
 ---
 
@@ -462,4 +483,4 @@ lsns -t net     # → only host namespace remains
 
 ---
 
-**Next:** [Lesson 05 — VXLAN and Overlay Networks](05-vxlan-and-overlay-networks.md)
+**← Previous:** [Lesson 03 — iptables and Netfilter Architecture](03-iptables-and-netfilter.md)   |   **Next:** [Lesson 05 — VXLAN and Overlay Networks](05-vxlan-and-overlay-networks.md)

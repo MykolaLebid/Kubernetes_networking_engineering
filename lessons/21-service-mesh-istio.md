@@ -4,27 +4,12 @@
 
 > **Goal:** Configure Istio sidecar injection, enforce mTLS between services, and control traffic with VirtualService and DestinationRule policies.
 
----
 
-## Practice Setup
-
-```bash
-# Terminal 1 — Mac (istioctl + kubectl)
-istioctl version 2>/dev/null || echo "Install: curl -L https://istio.io/downloadIstio | sh -"
-kubectl get pods -n istio-system 2>/dev/null
-istioctl proxy-status 2>/dev/null | head -10   # expect: SYNCED for each pod
-
-# Terminal 2 — Mac
-kubectl get peerauthentication -A 2>/dev/null           # check mTLS mode
-kubectl get authorizationpolicy -A 2>/dev/null          # check access rules
-kubectl get virtualservice,destinationrule -A 2>/dev/null  # check traffic config
-
-# Verify sidecar injection label
-kubectl get namespace default --show-labels | grep istio-injection
-# expect: istio-injection=enabled
-```
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. Architecture
 
@@ -33,24 +18,24 @@ kubectl get namespace default --show-labels | grep istio-injection
 ```mermaid
 flowchart LR
     subgraph ClusterControl["Control Plane (istio-system)"]
-        istiod["istiod\n(Pilot + CA + Galley)"]
+        istiod["istiod v1.20 (Pilot + CA + Galley) :15010 xDS gRPC :15012 mTLS webhook"]
     end
 
-    subgraph PodA["Pod A"]
+    subgraph PodA["Pod A ns:default sa:frontend"]
         appA["App :8080"]
-        envoyA["Envoy sidecar\n:15001 out / :15006 in"]
+        envoyA["Envoy sidecar v1.28 :15001 outbound :15006 inbound :15020 health"]
         appA <--> envoyA
     end
 
-    subgraph PodB["Pod B"]
+    subgraph PodB["Pod B ns:default sa:backend"]
         appB["App :8080"]
-        envoyB["Envoy sidecar\n:15001 out / :15006 in"]
+        envoyB["Envoy sidecar v1.28 :15001 outbound :15006 inbound :15020 health"]
         envoyB <--> appB
     end
 
-    istiod -- "xDS config + certs" --> envoyA
-    istiod -- "xDS config + certs" --> envoyB
-    envoyA -- "mTLS (SPIFFE/X.509)" --> envoyB
+    istiod --"xDS gRPC :15010 LDS+RDS+CDS+EDS"--> envoyA
+    istiod --"xDS gRPC :15010 LDS+RDS+CDS+EDS"--> envoyB
+    envoyA --"mTLS SPIFFE :8080 spiffe://cluster.local/ns/default/sa/frontend"--> envoyB
 
     style ClusterControl fill:#e8f4fd,stroke:#2196F3
     style PodA fill:#f3e5f5,stroke:#9C27B0
@@ -61,19 +46,19 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    subgraph Node1["Node 1"]
-        zt1["ztunnel\n(per-node, L4 mTLS)"]
-        wp["waypoint proxy\n(per-namespace, L7)"]
-        p1["Pod"]
-        p1 --> zt1
-        zt1 --> wp
+    subgraph Node1["Node 1 worker-1"]
+        zt1["ztunnel v1.20 per-node L4 mTLS HBONE :15008"]
+        wp["waypoint proxy per-namespace L7 VirtualService + AuthorizationPolicy"]
+        p1["Pod app:frontend"]
+        p1 --"iptables redirect"--> zt1
+        zt1 --"L7 policy"--> wp
     end
-    subgraph Node2["Node 2"]
-        zt2["ztunnel\n(per-node, L4 mTLS)"]
-        p2["Pod"]
-        zt2 --> p2
+    subgraph Node2["Node 2 worker-2"]
+        zt2["ztunnel v1.20 per-node L4 mTLS HBONE :15008"]
+        p2["Pod app:backend"]
+        zt2 --"deliver to pod"--> p2
     end
-    wp -- "mTLS HBONE tunnel" --> zt2
+    wp --"mTLS HBONE tunnel :15008"--> zt2
     style Node1 fill:#e8f5e9,stroke:#4CAF50
     style Node2 fill:#e8f5e9,stroke:#4CAF50
 ```
@@ -84,27 +69,27 @@ Ambient mode eliminates sidecar overhead; ztunnel handles mTLS transparently.
 
 ```mermaid
 sequenceDiagram
-    participant K as kubectl apply
-    participant API as API Server
-    participant MWC as MutatingWebhook (istiod)
+    participant K as kubectl apply Deployment
+    participant API as Kubernetes API Server
+    participant MWC as MutatingWebhookConfiguration istiod (istio-sidecar-injector)
     participant POD as Pod (running)
-    participant ISTIOD as istiod CA
-    participant ENVOY_A as Envoy A (sidecar)
-    participant ENVOY_B as Envoy B (sidecar)
+    participant ISTIOD as istiod CA :15012
+    participant ENVOY_A as Envoy A sidecar :15001/:15006
+    participant ENVOY_B as Envoy B sidecar :15001/:15006
 
-    K->>API: Create pod spec
-    API->>MWC: Admission webhook call
-    MWC-->>API: Mutated spec + istio-proxy container + init container
-    API->>POD: Schedule pod
-    POD->>ISTIOD: CSR for SPIFFE cert (spiffe://cluster.local/ns/default/sa/frontend)
-    ISTIOD-->>POD: X.509 SVID cert issued
-    ENVOY_A->>ENVOY_B: TLS ClientHello + SPIFFE cert
+    K->>API: Create pod spec app:frontend sa:frontend
+    API->>MWC: Admission webhook POST /inject
+    MWC-->>API: Mutated spec + istio-proxy container + istio-init initContainer
+    API->>POD: Schedule pod with sidecar
+    POD->>ISTIOD: CSR for SPIFFE cert spiffe://cluster.local/ns/default/sa/frontend via xDS SDS :15012
+    ISTIOD-->>POD: X.509 SVID cert issued valid 24h
+    ENVOY_A->>ENVOY_B: TLS ClientHello + SPIFFE cert spiffe://...sa/frontend
     ENVOY_B->>ISTIOD: Verify cert against CA bundle
     ISTIOD-->>ENVOY_B: Valid
-    ENVOY_B-->>ENVOY_A: TLS ServerHello + own SPIFFE cert
+    ENVOY_B-->>ENVOY_A: TLS ServerHello + SPIFFE cert spiffe://...sa/backend
     ENVOY_A->>ISTIOD: Verify cert against CA bundle
     ISTIOD-->>ENVOY_A: Valid
-    ENVOY_A-->>ENVOY_B: mTLS session established — data flows
+    ENVOY_A-->>ENVOY_B: mTLS session established data flows on :8080
 ```
 
 ---
@@ -426,6 +411,61 @@ kubectl get svc istio-ingressgateway -n istio-system
 
 ---
 
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| Airbnb | Securing service-to-service communication across 1000+ microservices without code changes | PeerAuthentication STRICT mesh-wide; AuthorizationPolicy per-service; Istio sidecar injection | Zero-trust mTLS between all services; identity-based access control replaces network-level firewall rules |
+| SAP BTP | Service-to-service mTLS within BTP Kyma runtime across shared Kubernetes clusters | Istio mesh with SPIFFE X.509 certs; PeerAuthentication STRICT per namespace; VirtualService for A/B testing | Tenant workloads cryptographically isolated; routing policies expressed in YAML without application changes |
+| eBay | A/B testing and canary releases across payment services processing millions of transactions/day | VirtualService with weighted routes (95/5 split) + DestinationRule subsets (v1/v2 label selectors) | Traffic gradually shifted to new payment logic; instant rollback by updating weights without redeployment |
+| Microsoft (Azure Service Fabric + Istio) | Migrating legacy on-prem microservices to AKS with gradual mTLS adoption | PeerAuthentication PERMISSIVE during migration; switched to STRICT per namespace after sidecar coverage reached 100% | Zero downtime migration; services coexisted with and without mTLS during the transition period |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — Mac (istioctl + kubectl)
+istioctl version 2>/dev/null || echo "Install: curl -L https://istio.io/downloadIstio | sh -"
+kubectl get pods -n istio-system 2>/dev/null
+istioctl proxy-status 2>/dev/null | head -10   # expect: SYNCED for each pod
+
+# Terminal 2 — Mac
+kubectl get peerauthentication -A 2>/dev/null           # check mTLS mode
+kubectl get authorizationpolicy -A 2>/dev/null          # check access rules
+kubectl get virtualservice,destinationrule -A 2>/dev/null  # check traffic config
+
+# Verify sidecar injection label
+kubectl get namespace default --show-labels | grep istio-injection
+# expect: istio-injection=enabled
+```
+
+### Hands-On Lab
+
+Work through the Theory sections to build a fully configured Istio service mesh:
+
+1. Install Istio with the default profile (Section 2) and verify istiod + ingressgateway are `Running`
+2. Label the `default` namespace for sidecar injection, deploy two services, and confirm sidecars are injected
+3. Apply `PeerAuthentication PERMISSIVE`, then `STRICT` (Section 3); use `istioctl authn tls-check` to confirm
+4. Create an `AuthorizationPolicy` default-deny + explicit ALLOW (Section 4) and test that blocked paths return 403
+5. Apply a `VirtualService` with 90/10 weighted routing + a `DestinationRule` (Section 5) and verify traffic split
+6. Configure the Istio Gateway + VirtualService for HTTPS ingress (Section 6) with a TLS certificate
+7. Deploy observability stack (Section 7) and inspect traffic topology in Kiali
+
+### Configuration Reference
+
+Key parameter tables are embedded in the Theory sections above:
+
+| Section | Table |
+|---------|-------|
+| Section 2 — Installation | Istio Profile Reference: `profile`, `traceSampling`, `proxy.resources`, `accessLogFile` |
+| Section 3 — mTLS | PeerAuthentication Mode Reference: STRICT vs PERMISSIVE vs DISABLE |
+| Section 5 — Traffic Management | VirtualService / DestinationRule Key Parameters: `retries`, `outlierDetection`, `connectionPool` |
+
+---
+
 ## Troubleshooting
 
 | Symptom | Likely Cause | Diagnostic Command | Fix |
@@ -480,6 +520,7 @@ istioctl experimental envoy-stats <pod>
 ```
 
 > **See also:** [Lesson 16 — Network Policies](16-network-policies.md) for base NetworkPolicy before layering Istio AuthorizationPolicy.
+
 
 ---
 
@@ -581,4 +622,4 @@ istioctl experimental envoy-stats <pod>
 
 ---
 
-**Next:** [Lesson 22 — Multi-Cluster Networking](22-multi-cluster-networking.md)
+**← Previous:** [Lesson 20 — Cloud Provider Load Balancers](20-cloud-load-balancers.md)   |   **Next:** [Lesson 22 — Multi-Cluster Networking](22-multi-cluster-networking.md)

@@ -6,62 +6,39 @@
 
 > **Goal:** Explain how the AWS VPC CNI assigns real VPC IPs to pods via ENI secondary IPs, calculate the pod density limit for a given instance type, enable prefix delegation to increase that limit, and assign per-pod Security Groups using SecurityGroupPolicy.
 
----
 
-## Practice Setup
 
-```bash
-# Terminal 1 — verify aws-node DaemonSet is running
-kubectl get ds -n kube-system aws-node -o wide
-kubectl get pods -n kube-system -l k8s-app=aws-node -o wide
-# One pod per node — all should be Running
-
-# Terminal 2 — check cluster identity
-aws sts get-caller-identity
-kubectl config current-context
-
-# Terminal 3 — view ENIs attached to a node
-NODE=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
-INSTANCE_TYPE=$(kubectl get node $NODE \
-  -o jsonpath='{.metadata.labels.node\.kubernetes\.io/instance-type}')
-echo "Node: $NODE  Instance type: $INSTANCE_TYPE"
-
-aws ec2 describe-network-interfaces \
-  --filters "Name=description,Values=aws-K8s-*" \
-  --query 'NetworkInterfaces[*].[NetworkInterfaceId,PrivateIpAddresses[*].PrivateIpAddress]' \
-  --output table 2>/dev/null || echo "Configure AWS CLI with EKS cluster credentials first"
-```
-
-> **See also:** [Lesson 09 — CNI Specification](09-cni-specification.md) for how CNI plugins attach to the kubelet.
-> **See also:** [Lesson 30 — AWS VPC Design](30-aws-vpc-design.md) for subnet sizing and secondary CIDR configuration.
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---
+
+## Theory
 
 ## 1. EKS Architecture
 
 ```mermaid
 flowchart TD
     subgraph AWS_Account["AWS Account"]
-        subgraph VPC["VPC 10.0.0.0/16"]
-            subgraph Pub["Public Subnets"]
-                NAT["NAT Gateway"]
-                NLB["NLB / ALB"]
+        subgraph VPC["VPC 10.0.0.0/16 + secondary 100.64.0.0/16"]
+            subgraph Pub["Public Subnets us-east-1a/b/c"]
+                NAT["NAT Gateway (Elastic IP per AZ)"]
+                NLB["AWS NLB / ALB (internet-facing)"]
             end
-            subgraph Priv["Private Subnets (nodes + pods)"]
-                subgraph Node1["EC2 Worker Node"]
-                    ETH0["Primary ENI eth0\n10.0.10.5 (node IP)\n10.0.10.11 (pod IP)\n10.0.10.12 (pod IP)"]
-                    ETH1["Secondary ENI eth1\n10.0.10.50 (primary)\n10.0.10.51 (pod IP)\n10.0.10.52 (pod IP)"]
-                    AWSNODE["aws-node\n(IPAMD)"]
+            subgraph Priv["Private Subnets 10.0.10.0/22"]
+                subgraph Node1["EC2 Worker Node m5.xlarge"]
+                    ETH0["Primary ENI eth0 10.0.10.5 node 10.0.10.11 pod-1 10.0.10.12 pod-2"]
+                    ETH1["Secondary ENI eth1 10.0.10.50 primary 10.0.10.51 pod-3 10.0.10.52 pod-4"]
+                    AWSNODE["aws-node IPAMD (IP pool manager)"]
                 end
             end
             subgraph CP_NET["AWS-managed VPC (EKS Control Plane)"]
-                CP["EKS Control Plane\n(API server, etcd)"]
-                CPENI["Cross-account ENI\n→ customer VPC"]
+                CP["EKS Control Plane (API server etcd)"]
+                CPENI["Cross-account ENI to customer VPC"]
             end
         end
     end
-    CP -- "cross-account ENI" --> CPENI --> Node1
-    AWSNODE -- "EC2 API:\nAttach ENI,\nAssign secondary IPs" --> ETH1
+    CP --"cross-account ENI TCP :443"--> CPENI --> Node1
+    AWSNODE --"EC2 API HTTPS :443 AttachENI AssignSecondaryIPs"--> ETH1
 ```
 
 **Control Plane:** Managed by AWS — lives in an AWS-owned VPC, connected to your VPC via a cross-account ENI per subnet. You do not manage control plane nodes.
@@ -89,7 +66,7 @@ sequenceDiagram
     K->>CNI: ADD (pod name, namespace, netns)
     CNI->>IPAMD: Request IP from warm pool
     IPAMD->>CNI: 10.0.10.11 (from warm pool)
-    CNI->>CNI: Create veth pair\nMove one end to pod netns\nAssign 10.0.10.11\nAdd /32 host route on node
+    CNI->>CNI: Create veth pair, move end to pod netns, assign 10.0.10.11, add /32 host route on node
     CNI->>K: Result: IP=10.0.10.11
 ```
 
@@ -156,22 +133,6 @@ Formula (prefix delegation): `(ENIs × prefixes_per_ENI × 16) − ENIs`
 
 ---
 
-## 5. VPC CNI Environment Variables
-
-| Variable | Default | Effect | When to change |
-|----------|---------|--------|---------------|
-| `WARM_IP_TARGET` | `1` | Min unused IPs to keep in warm pool | Increase (e.g. 5) for bursty workloads to reduce IP attach latency |
-| `MINIMUM_IP_TARGET` | `0` | Absolute minimum IPs to maintain | Set to expected pod count for stable baseline |
-| `WARM_ENI_TARGET` | `1` | Min unused ENIs to keep attached | Set to `0` on small instances to avoid wasting IPs |
-| `WARM_PREFIX_TARGET` | `1` | Min unused /28 prefixes (prefix delegation only) | Set to `2` for burst tolerance |
-| `ENABLE_PREFIX_DELEGATION` | `false` | Assign /28 CIDR blocks instead of individual IPs | Set `true` for large clusters — 16x more IPs per ENI slot |
-| `ENABLE_POD_ENI` | `false` | Enable trunk ENI for Security Groups for Pods | Set `true` to use SecurityGroupPolicy CRD |
-| `AWS_VPC_K8S_CNI_CUSTOM_NETWORK_CFG` | `false` | Use ENIConfig CRD for pod subnet selection | Set `true` for custom networking / secondary CIDR |
-| `ENI_CONFIG_LABEL_DEF` | `k8s.amazonaws.com/eniConfig` | Node label to match ENIConfig | Set to `topology.kubernetes.io/zone` for per-AZ config |
-| `ENABLE_NETWORK_POLICY_CONTROLLER` | `false` | Enable eBPF-based network policy enforcement | Set `true` to replace kube-proxy NetworkPolicy (v1.14+) |
-
----
-
 ## 6. Prefix Delegation
 
 Assign /28 CIDR blocks (16 IPs) per ENI slot instead of individual secondary IPs. Dramatically increases pod density.
@@ -207,20 +168,20 @@ By default all pods on a node share the **node's Security Group**. With Security
 ```mermaid
 flowchart LR
     subgraph Standard["Standard (node SG shared)"]
-        N1["Node SG\nsg-node-xxx"]
-        P1["Pod A"]
-        P2["Pod B"]
-        P3["Pod C"]
+        N1["Node SG sg-node-xxx (all pods share)"]
+        P1["Pod A (DB client)"]
+        P2["Pod B (web server)"]
+        P3["Pod C (worker)"]
         N1 --- P1
         N1 --- P2
         N1 --- P3
     end
-    subgraph SGPods["Security Groups for Pods"]
-        TRUNK["Trunk ENI\n(one per node)"]
-        BRANCH1["Branch ENI\n+ sg-db-xxx\n→ Pod A (DB client)"]
-        BRANCH2["Branch ENI\n+ sg-web-xxx\n→ Pod B (web)"]
-        TRUNK --- BRANCH1
-        TRUNK --- BRANCH2
+    subgraph SGPods["Security Groups for Pods (ENI trunking)"]
+        TRUNK["Trunk ENI (one per node)"]
+        BRANCH1["Branch ENI sg-db-xxx TCP :5432 Pod A DB client"]
+        BRANCH2["Branch ENI sg-web-xxx TCP :443 Pod B web"]
+        TRUNK --"IEEE 802.1Q VLAN tag"--> BRANCH1
+        TRUNK --"IEEE 802.1Q VLAN tag"--> BRANCH2
     end
 ```
 
@@ -363,6 +324,90 @@ helm install cilium cilium/cilium \
   --set egressMasqueradeInterfaces=eth0 \
   --set tunnel=disabled
 ```
+
+### Industry Applications
+
+| Company / Project | Context | Technology from this lesson | Outcome |
+|---|---|---|---|
+| Robinhood | Financial trading platform on EKS | VPC CNI real VPC IPs for low-latency order routing | Direct pod IPs eliminate NAT for sub-millisecond trade execution |
+| Capital One | Cloud-native banking on EKS at scale | Prefix delegation (/28 CIDR blocks per ENI slot) | 3x pod density increase on m5.xlarge without changing instance type |
+| Amazon.com | Thousands of EKS clusters for Prime Day traffic | IRSA (IAM Roles for Service Accounts) per microservice | Zero static credentials; each pod scope-limited to its own IAM role |
+| Shopify | E-commerce platform on EKS | SecurityGroupPolicy (Security Groups for Pods) for PCI-DSS isolation | Per-pod SGs restrict DB access to only payment-processing pods |
+
+---
+
+## Practice
+
+### Environment Setup
+
+```bash
+# Terminal 1 — verify aws-node DaemonSet is running
+kubectl get ds -n kube-system aws-node -o wide
+kubectl get pods -n kube-system -l k8s-app=aws-node -o wide
+# One pod per node — all should be Running
+
+# Terminal 2 — check cluster identity
+aws sts get-caller-identity
+kubectl config current-context
+
+# Terminal 3 — view ENIs attached to a node
+NODE=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
+INSTANCE_TYPE=$(kubectl get node $NODE \
+  -o jsonpath='{.metadata.labels.node\.kubernetes\.io/instance-type}')
+echo "Node: $NODE  Instance type: $INSTANCE_TYPE"
+
+aws ec2 describe-network-interfaces \
+  --filters "Name=description,Values=aws-K8s-*" \
+  --query 'NetworkInterfaces[*].[NetworkInterfaceId,PrivateIpAddresses[*].PrivateIpAddress]' \
+  --output table 2>/dev/null || echo "Configure AWS CLI with EKS cluster credentials first"
+```
+
+> **See also:** [Lesson 09 — CNI Specification](09-cni-specification.md) for how CNI plugins attach to the kubelet.
+> **See also:** [Lesson 30 — AWS VPC Design](30-aws-vpc-design.md) for subnet sizing and secondary CIDR configuration.
+
+### Hands-On Lab
+
+```bash
+# 1. Check IPAMD warm pool health on the first aws-node pod
+kubectl exec -n kube-system $(kubectl get pod -n kube-system -l k8s-app=aws-node \
+  -o jsonpath='{.items[0].metadata.name}') -c aws-node -- \
+  curl -s http://localhost:61678/v1/nodeIPStats | jq .
+# Key fields: totalIPAddresses, assignedIPAddresses, coolDownIPs
+
+# 2. Enable prefix delegation (increases pod density 16x per ENI slot)
+kubectl set env ds aws-node -n kube-system \
+  ENABLE_PREFIX_DELEGATION=true \
+  WARM_PREFIX_TARGET=1
+kubectl describe node $NODE | grep "pods:"
+# Before: pods: 27  (m5.large standard)
+# After:  pods: 48  (m5.large with prefix delegation)
+
+# 3. Enable Security Groups for Pods
+kubectl set env ds aws-node -n kube-system ENABLE_POD_ENI=true
+# Then apply a SecurityGroupPolicy (see Section 7)
+
+# 4. Enable eBPF network policy enforcement (VPC CNI v1.14+)
+kubectl set env ds aws-node -n kube-system ENABLE_NETWORK_POLICY_CONTROLLER=true
+
+# 5. Associate IRSA OIDC provider with cluster
+eksctl utils associate-iam-oidc-provider \
+  --cluster my-cluster --approve
+kubectl get sa s3-reader -n production -o yaml | grep eks.amazonaws.com
+```
+
+### Configuration Reference
+
+| Variable | Default | Effect | When to change |
+|----------|---------|--------|---------------|
+| `WARM_IP_TARGET` | `1` | Min unused IPs to keep in warm pool | Increase (e.g. 5) for bursty workloads to reduce IP attach latency |
+| `MINIMUM_IP_TARGET` | `0` | Absolute minimum IPs to maintain | Set to expected pod count for stable baseline |
+| `WARM_ENI_TARGET` | `1` | Min unused ENIs to keep attached | Set to `0` on small instances to avoid wasting IPs |
+| `WARM_PREFIX_TARGET` | `1` | Min unused /28 prefixes (prefix delegation only) | Set to `2` for burst tolerance |
+| `ENABLE_PREFIX_DELEGATION` | `false` | Assign /28 CIDR blocks instead of individual IPs | Set `true` for large clusters — 16x more IPs per ENI slot |
+| `ENABLE_POD_ENI` | `false` | Enable trunk ENI for Security Groups for Pods | Set `true` to use SecurityGroupPolicy CRD |
+| `AWS_VPC_K8S_CNI_CUSTOM_NETWORK_CFG` | `false` | Use ENIConfig CRD for pod subnet selection | Set `true` for custom networking / secondary CIDR |
+| `ENI_CONFIG_LABEL_DEF` | `k8s.amazonaws.com/eniConfig` | Node label to match ENIConfig | Set to `topology.kubernetes.io/zone` for per-AZ config |
+| `ENABLE_NETWORK_POLICY_CONTROLLER` | `false` | Enable eBPF-based network policy enforcement | Set `true` to replace kube-proxy NetworkPolicy (v1.14+) |
 
 ---
 
@@ -508,4 +553,4 @@ kubectl run -it --rm debug --image=nicolaka/netshoot -- \
 
 ---
 
-**Next:** [Lesson 30 — AWS VPC Design for Kubernetes](30-aws-vpc-design.md)
+**← Previous:** [Lesson 28 — OpenShift EgressIP and EgressFirewall](28-openshift-egress.md)   |   **Next:** [Lesson 30 — AWS VPC Design for Kubernetes](30-aws-vpc-design.md)
