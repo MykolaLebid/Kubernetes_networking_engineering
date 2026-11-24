@@ -118,9 +118,9 @@ flowchart LR
 | Book | EPUB | PDF |
 |------|------|-----|
 | Kubernetes Networking (34 lessons) | [EPUB 4.7 MB](https://github.com/MykolaLebid/Kubernetes_networking_engineering/raw/main/kubernetes-network-engineering.epub) | [PDF 13 MB](https://github.com/MykolaLebid/Kubernetes_networking_engineering/raw/main/kubernetes-network-engineering.pdf) |
-| Cloud Foundry Networking (20 lessons + migration) | [EPUB 3.1 MB](https://github.com/MykolaLebid/Kubernetes_networking_engineering/raw/main/cf-networking.epub) | — |
+| Cloud Foundry Networking (20 lessons + migration) | [EPUB 3.1 MB](https://github.com/MykolaLebid/Kubernetes_networking_engineering/raw/main/cf-networking.epub) | [PDF 8.7 MB](https://github.com/MykolaLebid/Kubernetes_networking_engineering/raw/main/cf-networking.pdf) |
 
-All EPUB files reflow on reMarkable and e-readers.
+EPUB files reflow on reMarkable and e-readers. PDF files are print-ready with page breaks.
 
 ---
 
