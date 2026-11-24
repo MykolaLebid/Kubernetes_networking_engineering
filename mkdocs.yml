@@ -1,5 +1,5 @@
-site_name: Kubernetes Network Engineering
-site_description: 34-lesson course on Kubernetes and Linux networking — from bare metal to AI GPU platforms
+site_name: Platform Network Engineering
+site_description: "Three books in one: Kubernetes networking (34 lessons), Cloud Foundry networking (20 lessons), and CF-to-Kubernetes migration — from Linux primitives to AI GPU clusters, with cheat sheets for every topic."
 site_url: https://mykolalibid.github.io/Kubernetes_networking_engineering/
 repo_url: https://github.com/MykolaLebid/Kubernetes_networking_engineering
 repo_name: MykolaLebid/Kubernetes_networking_engineering
@@ -78,50 +78,107 @@ extra:
       link: https://github.com/MykolaLebid/Kubernetes_networking_engineering
 
 nav:
-  - Home: index.md
-  - Course Map: course-map.md
-  - Version Matrix: version-matrix.md
-  - Resources: RESOURCES.md
-  - "Track A — Linux Foundations":
-    - "01 · Linux Networking Fundamentals": lessons/01-linux-networking-fundamentals.md
-    - "02 · IP Routing and Forwarding": lessons/02-ip-routing-and-forwarding.md
-    - "03 · iptables and Netfilter": lessons/03-iptables-and-netfilter.md
-    - "04 · Network Namespaces Deep Dive": lessons/04-network-namespaces-deep-dive.md
-    - "05 · VXLAN and Overlay Networks": lessons/05-vxlan-and-overlay-networks.md
-    - "06 · BGP Fundamentals": lessons/06-bgp-fundamentals.md
-    - "07 · Bare Metal Network Infrastructure": lessons/07-bare-metal-network-infrastructure.md
-  - "Track B — CNI Plugins and eBPF":
-    - "08 · Cloud Provider Networking": lessons/08-cloud-provider-networking.md
-    - "09 · CNI Specification": lessons/09-cni-specification.md
-    - "10 · eBPF and XDP": lessons/10-ebpf-xdp.md
-    - "11 · Calico CNI Deep Dive": lessons/11-calico-cni-deep-dive.md
-    - "12 · Cilium CNI and eBPF Dataplane": lessons/12-cilium-cni-ebpf.md
-  - "Track C — Kubernetes Networking":
-    - "13 · Kubernetes Services and kube-proxy": lessons/13-kubernetes-services-kube-proxy.md
-    - "14 · CoreDNS and Service Discovery": lessons/14-coredns-service-discovery.md
-    - "15 · IPv6 and Dual-Stack": lessons/15-ipv6-dual-stack.md
-    - "16 · Network Policies": lessons/16-network-policies.md
-  - "Track D — Ingress and Load Balancing":
-    - "17 · Ingress Controllers": lessons/17-ingress-controllers.md
-    - "18 · Gateway API": lessons/18-gateway-api.md
-    - "19 · MetalLB and kube-vip": lessons/19-metallb-kube-vip.md
-    - "20 · Cloud Provider Load Balancers": lessons/20-cloud-load-balancers.md
-  - "Track E — Advanced Topics":
-    - "21 · Service Mesh with Istio": lessons/21-service-mesh-istio.md
-    - "22 · Multi-Cluster Networking": lessons/22-multi-cluster-networking.md
-    - "23 · Network Security Hardening": lessons/23-network-security-hardening.md
-    - "24 · Network Observability and Troubleshooting": lessons/24-network-observability-troubleshooting.md
-  - "Track F — OpenShift Networking":
-    - "25 · OpenShift Networking Overview": lessons/25-openshift-networking-overview.md
-    - "26 · OVN-Kubernetes": lessons/26-ovn-kubernetes.md
-    - "27 · OpenShift Routes and HAProxy": lessons/27-openshift-routes-haproxy.md
-    - "28 · OpenShift EgressIP and EgressFirewall": lessons/28-openshift-egress.md
-  - "Track G — AWS Networking":
-    - "29 · AWS EKS Networking Deep Dive": lessons/29-aws-eks-networking.md
-    - "30 · AWS VPC Design for Kubernetes": lessons/30-aws-vpc-design.md
-    - "31 · AWS Load Balancer Controller": lessons/31-aws-load-balancer-controller.md
-    - "32 · AWS Hybrid and Multi-Cluster": lessons/32-aws-hybrid-multicluster.md
-  - "Track H — GitOps":
-    - "33 · ArgoCD and GitOps": lessons/33-argocd-gitops.md
-  - "Track I — AI Platform":
-    - "34 · AI Platform Networking": lessons/34-ai-platform-networking.md
+  - "K8s Networking":
+    - Overview: k8s-overview.md
+    - Home: index.md
+    - Course Map: course-map.md
+    - Version Matrix: version-matrix.md
+    - Resources: RESOURCES.md
+    - "Track A — Linux Foundations":
+      - "01 · Linux Networking Fundamentals": lessons/01-linux-networking-fundamentals.md
+      - "02 · IP Routing and Forwarding": lessons/02-ip-routing-and-forwarding.md
+      - "03 · iptables and Netfilter": lessons/03-iptables-and-netfilter.md
+      - "04 · Network Namespaces Deep Dive": lessons/04-network-namespaces-deep-dive.md
+      - "05 · VXLAN and Overlay Networks": lessons/05-vxlan-and-overlay-networks.md
+      - "06 · BGP Fundamentals": lessons/06-bgp-fundamentals.md
+      - "07 · Bare Metal Network Infrastructure": lessons/07-bare-metal-network-infrastructure.md
+    - "Track B — CNI Plugins and eBPF":
+      - "08 · Cloud Provider Networking": lessons/08-cloud-provider-networking.md
+      - "09 · CNI Specification": lessons/09-cni-specification.md
+      - "10 · eBPF and XDP": lessons/10-ebpf-xdp.md
+      - "11 · Calico CNI Deep Dive": lessons/11-calico-cni-deep-dive.md
+      - "12 · Cilium CNI and eBPF Dataplane": lessons/12-cilium-cni-ebpf.md
+    - "Track C — Kubernetes Networking":
+      - "13 · Kubernetes Services and kube-proxy": lessons/13-kubernetes-services-kube-proxy.md
+      - "14 · CoreDNS and Service Discovery": lessons/14-coredns-service-discovery.md
+      - "15 · IPv6 and Dual-Stack": lessons/15-ipv6-dual-stack.md
+      - "16 · Network Policies": lessons/16-network-policies.md
+    - "Track D — Ingress and Load Balancing":
+      - "17 · Ingress Controllers": lessons/17-ingress-controllers.md
+      - "18 · Gateway API": lessons/18-gateway-api.md
+      - "19 · MetalLB and kube-vip": lessons/19-metallb-kube-vip.md
+      - "20 · Cloud Provider Load Balancers": lessons/20-cloud-load-balancers.md
+    - "Track E — Advanced Topics":
+      - "21 · Service Mesh with Istio": lessons/21-service-mesh-istio.md
+      - "22 · Multi-Cluster Networking": lessons/22-multi-cluster-networking.md
+      - "23 · Network Security Hardening": lessons/23-network-security-hardening.md
+      - "24 · Network Observability and Troubleshooting": lessons/24-network-observability-troubleshooting.md
+    - "Track F — OpenShift Networking":
+      - "25 · OpenShift Networking Overview": lessons/25-openshift-networking-overview.md
+      - "26 · OVN-Kubernetes": lessons/26-ovn-kubernetes.md
+      - "27 · OpenShift Routes and HAProxy": lessons/27-openshift-routes-haproxy.md
+      - "28 · OpenShift EgressIP and EgressFirewall": lessons/28-openshift-egress.md
+    - "Track G — AWS Networking":
+      - "29 · AWS EKS Networking Deep Dive": lessons/29-aws-eks-networking.md
+      - "30 · AWS VPC Design for Kubernetes": lessons/30-aws-vpc-design.md
+      - "31 · AWS Load Balancer Controller": lessons/31-aws-load-balancer-controller.md
+      - "32 · AWS Hybrid and Multi-Cluster": lessons/32-aws-hybrid-multicluster.md
+    - "Track H — GitOps":
+      - "33 · ArgoCD and GitOps": lessons/33-argocd-gitops.md
+    - "Track I — AI Platform":
+      - "34 · AI Platform Networking": lessons/34-ai-platform-networking.md
+
+  - "CF Networking":
+    - Overview: cf/cf-00-overview.md
+    - "Track CF-A — Platform Foundations":
+      - cf/cf-01-platform-architecture.md
+      - cf/cf-02-garden-container-networking.md
+      - cf/cf-03-bosh-dns-service-discovery.md
+      - cf/cf-04-ipam.md
+    - "Track CF-B — Container Runtime & Policy":
+      - cf/cf-05-silk-cni-vxlan.md
+      - cf/cf-06-vxlan-policy-agent.md
+      - cf/cf-07-application-security-groups.md
+      - cf/cf-08-garden-namespaces-deep-dive.md
+    - "Track CF-C — Routing":
+      - cf/cf-09-gorouter.md
+      - cf/cf-10-tcp-router.md
+      - cf/cf-11-routes-domains.md
+      - cf/cf-12-service-discovery.md
+    - "Track CF-D — Security & Isolation":
+      - cf/cf-13-c2c-network-policies.md
+      - cf/cf-14-tls-certificates.md
+      - cf/cf-15-org-space-isolation.md
+    - "Track CF-E — Observability":
+      - cf/cf-16-observability-troubleshooting.md
+      - cf/cf-17-logging-metrics-performance.md
+    - "Track CF-F — Migration & Korifi":
+      - cf/cf-18-korifi-cf-on-kubernetes.md
+      - cf/cf-19-cf-to-k8s-migration-patterns.md
+    - "Track CF-G — Comparison":
+      - cf/cf-20-cf-vs-k8s-comparison.md
+
+  - "Migration":
+    - Decision Guide: migration/mig-00-guide.md
+    - "01 · Strategy": migration/mig-01-strategy.md
+    - "02 · Translation Cookbook": migration/mig-02-translation-cookbook.md
+    - "03 · Coexistence & Cutover": migration/mig-03-coexistence-cutover.md
+    - "CF vs K8s Comparison": shared/cf-vs-k8s-comparison.md
+
+  - "Cheat Sheets":
+    - Index: cheatsheets/cs-00-index.md
+    - cheatsheets/cs-01-linux-primitives.md
+    - cheatsheets/cs-02-overlay-networks.md
+    - cheatsheets/cs-03-cni-overview.md
+    - cheatsheets/cs-04-k8s-services-dns.md
+    - cheatsheets/cs-05-cf-routing.md
+    - cheatsheets/cs-06-network-policy-compare.md
+    - cheatsheets/cs-07-ingress-compare.md
+    - cheatsheets/cs-08-service-mesh.md
+    - cheatsheets/cs-09-observability.md
+    - cheatsheets/cs-10-security-hardening.md
+    - cheatsheets/cs-11-aws-eks.md
+    - cheatsheets/cs-12-openshift.md
+    - cheatsheets/cs-13-migration-cheatsheet.md
+    - cheatsheets/cs-14-ebpf-quick-ref.md
+    - cheatsheets/cs-15-ai-gpu-networking.md

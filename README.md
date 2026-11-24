@@ -1,6 +1,8 @@
-# Kubernetes Network Engineering
+# Platform Network Engineering
 
 ## Overview
+
+Three books: K8s Networking (34 lessons) · CF Networking (20 lessons) · Migration Guide — plus 16 cheat sheets.
 
 Kubernetes Network Engineering covers the design, implementation, and operation of networking within and around Kubernetes clusters. It bridges traditional network engineering with cloud-native infrastructure, requiring knowledge of CNI plugins, service meshes, and the underlying Linux networking primitives that power them — from bare metal spine-leaf fabrics to AI GPU clusters.
 
@@ -26,7 +28,7 @@ Cluster commands (`kubectl`, `calicoctl`, `cilium`) run from your Mac terminal.
 
 ---
 
-## Course: 34 Lessons
+## Book 1: Kubernetes Networking — 34 Lessons
 
 ### Track A — Linux & Bare Metal Foundations
 
@@ -109,6 +111,99 @@ Cluster commands (`kubectl`, `calicoctl`, `cilium`) run from your Mac terminal.
 
 ---
 
+## Book 2: CF Networking — 20 Lessons
+
+### Track CF-A — Platform Foundations
+
+| # | Lesson | Topics |
+|---|--------|--------|
+| cf-01 | [Platform Architecture](lessons/cf-01-platform-architecture.md) | CF components, Diego, Garden, BBS, routing architecture overview |
+| cf-02 | [Garden Container Networking](lessons/cf-02-garden-container-networking.md) | Garden-runC, container lifecycle, network setup hooks |
+| cf-03 | [BOSH DNS](lessons/cf-03-bosh-dns.md) | BOSH DNS service discovery, aliases, health checks, Consul replacement |
+| cf-04 | [IPAM](lessons/cf-04-ipam.md) | Subnet allocation, container IP assignment, Silk IPAM internals |
+
+### Track CF-B — Overlay & Policy
+
+| # | Lesson | Topics |
+|---|--------|--------|
+| cf-05 | [Silk CNI and VXLAN](lessons/cf-05-silk-cni-vxlan.md) | Silk CNI plugin, VXLAN overlay, VTEP setup, cross-cell traffic |
+| cf-06 | [VXLAN Policy Agent](lessons/cf-06-vxlan-policy-agent.md) | Policy enforcement via iptables, container-to-container policy rules |
+| cf-07 | [Application Security Groups](lessons/cf-07-application-security-groups.md) | ASG egress rules, staging vs running ASGs, platform defaults |
+| cf-08 | [Garden Namespaces](lessons/cf-08-garden-namespaces.md) | Linux namespace isolation, user namespaces, rootless containers |
+
+### Track CF-C — Routing Layer
+
+| # | Lesson | Topics |
+|---|--------|--------|
+| cf-09 | [Gorouter](lessons/cf-09-gorouter.md) | HTTP/WebSocket routing, route table, sticky sessions, TLS termination |
+| cf-10 | [TCP Router](lessons/cf-10-tcp-router.md) | TCP routing tier, port allocation, HAProxy integration |
+| cf-11 | [Routes and Domains](lessons/cf-11-routes-domains.md) | Shared/private domains, route mapping, blue-green routing patterns |
+| cf-12 | [Service Discovery](lessons/cf-12-service-discovery.md) | Internal routes, `apps.internal` domain, container-to-container DNS |
+
+### Track CF-D — Security & Isolation
+
+| # | Lesson | Topics |
+|---|--------|--------|
+| cf-13 | [Container-to-Container Network Policies](lessons/cf-13-c2c-network-policies.md) | C2C policy API, Silk policy enforcement, allow-list model |
+| cf-14 | [TLS Certificates](lessons/cf-14-tls-certificates.md) | CredHub, certificate rotation, mTLS between platform components |
+| cf-15 | [Org and Space Isolation](lessons/cf-15-org-space-isolation.md) | Multi-tenancy model, isolation segments, dedicated routers and cells |
+
+### Track CF-E — Observability
+
+| # | Lesson | Topics |
+|---|--------|--------|
+| cf-16 | [Observability](lessons/cf-16-observability.md) | Loggregator, metrics-discovery, network flow visibility |
+| cf-17 | [Logging and Metrics](lessons/cf-17-logging-metrics.md) | Log cache, syslog drains, Prometheus scraping, Grafana dashboards |
+
+### Track CF-F — Korifi / CF on K8s
+
+| # | Lesson | Topics |
+|---|--------|--------|
+| cf-18 | [Korifi](lessons/cf-18-korifi.md) | CF API on Kubernetes, Korifi controllers, kpack, networking CRDs |
+
+### Track CF-G — Migration & Comparison
+
+| # | Lesson | Topics |
+|---|--------|--------|
+| cf-19 | [CF-to-K8s Migration Patterns](lessons/cf-19-cf-to-k8s-migration-patterns.md) | Lift-and-shift, strangler fig, networking equivalence mapping |
+| cf-20 | [CF vs K8s Comparison](lessons/cf-20-cf-vs-k8s-comparison.md) | Side-by-side: routing, networking, isolation, observability, ops model |
+
+---
+
+## Book 3: Migration Guide
+
+| # | Chapter | Topics |
+|---|---------|--------|
+| mig-00 | [Migration Overview](lessons/mig-00-migration-overview.md) | Scope, goals, decision framework for CF-to-K8s migration |
+| mig-01 | [Networking Equivalence Map](lessons/mig-01-networking-equivalence-map.md) | ASG → NetworkPolicy, Gorouter → Ingress/Gateway API, C2C → NetworkPolicy |
+| mig-02 | [Migration Runbook](lessons/mig-02-migration-runbook.md) | Step-by-step runbook: DNS cutover, traffic shifting, rollback procedure |
+| mig-03 | [Hybrid CF + K8s Operations](lessons/mig-03-hybrid-cf-k8s-operations.md) | Running CF and K8s in parallel, shared observability, joint on-call |
+
+---
+
+## Cheat Sheets
+
+| # | Cheat Sheet | Topics |
+|---|-------------|--------|
+| cs-00 | [Linux Networking Quick Reference](cheatsheets/cs-00-linux-networking.md) | ip, ss, netns, veth, bridge, tc commands |
+| cs-01 | [iptables / nftables](cheatsheets/cs-01-iptables-nftables.md) | Chains, tables, common rules, conntrack |
+| cs-02 | [eBPF and BPF Tools](cheatsheets/cs-02-ebpf-bpftools.md) | bpftool, bpftrace, XDP programs, map inspection |
+| cs-03 | [CNI Plugins Comparison](cheatsheets/cs-03-cni-comparison.md) | Flannel, Calico, Cilium, Weave — feature matrix |
+| cs-04 | [Kubernetes Services](cheatsheets/cs-04-k8s-services.md) | ClusterIP, NodePort, LB, ExternalName, headless |
+| cs-05 | [Network Policy Patterns](cheatsheets/cs-05-network-policy-patterns.md) | Default-deny, namespace isolation, egress FQDN |
+| cs-06 | [Ingress and Gateway API](cheatsheets/cs-06-ingress-gateway-api.md) | Ingress rules, GatewayClass, HTTPRoute, TCPRoute |
+| cs-07 | [CoreDNS](cheatsheets/cs-07-coredns.md) | Corefile syntax, plugins, ndots, NodeLocal DNSCache |
+| cs-08 | [Istio / Service Mesh](cheatsheets/cs-08-istio-service-mesh.md) | VirtualService, DestinationRule, PeerAuthentication, ambient |
+| cs-09 | [AWS EKS Networking](cheatsheets/cs-09-aws-eks-networking.md) | VPC CNI, ENI limits, NLB/ALB annotations, IRSA |
+| cs-10 | [OpenShift Networking](cheatsheets/cs-10-openshift-networking.md) | OVN-K, Routes, EgressIP, EgressFirewall |
+| cs-11 | [CF Networking](cheatsheets/cs-11-cf-networking.md) | Gorouter, Silk, ASGs, C2C policy, BOSH DNS |
+| cs-12 | [CF vs K8s Networking](cheatsheets/cs-12-cf-vs-k8s-networking.md) | Side-by-side equivalence table |
+| cs-13 | [Observability Tools](cheatsheets/cs-13-observability-tools.md) | Hubble, tcpdump, netshoot, conntrack, Loggregator |
+| cs-14 | [AI / GPU Cluster Networking](cheatsheets/cs-14-ai-gpu-networking.md) | RDMA, SR-IOV, Multus, RoCE, rail topology, EFA |
+| cs-15 | [Troubleshooting Runbook](cheatsheets/cs-15-troubleshooting-runbook.md) | L1→L7→K8s→CNI methodology, common failure patterns |
+
+---
+
 ## Learning Path
 
 ```
@@ -135,6 +230,12 @@ Phase 7 — AWS (Lessons 29–32)
 
 Phase 8 — GitOps & AI (Lessons 33–34)
   ArgoCD sync waves → AI cluster networking (RDMA, SR-IOV, rail topology)
+
+Phase 9 — CF Networking (cf-01–cf-20)
+  Platform architecture → Garden/Silk → Gorouter → ASGs → C2C → Korifi → Migration
+
+Phase 10 — Migration & Cheat Sheets
+  CF-to-K8s migration patterns → Hybrid ops → 16 quick-reference cheat sheets
 ```
 
 ---
@@ -147,6 +248,8 @@ Phase 8 — GitOps & AI (Lessons 33–34)
 | IPv6 (15) after DNS (14), before Network Policy (16) | IPv6 is a CNI/Service configuration concern, not an "advanced" topic |
 | ArgoCD (33) as GitOps track | Network engineers manage multi-cluster configs via GitOps; sync waves are critical for CNI→policy→app ordering |
 | AI Networking (34) as final lesson | Requires all earlier concepts: SR-IOV (CNI), RDMA (bare metal), Multus (CNI spec), eBPF (observability) |
+| CF Networking after K8s book | CF concepts build on the networking primitives (VXLAN, namespaces, iptables) covered in the K8s book |
+| Migration Guide after both books | Requires fluency in both CF and K8s networking models |
 
 ---
 
@@ -171,6 +274,9 @@ Lessons with detailed network diagrams:
 | 32 | Transit Gateway hub-and-spoke vs VPC peering |
 | 33 | ArgoCD component architecture + sync wave ordering |
 | 34 | Rail-optimized GPU cluster topology |
+| cf-05 | Silk VXLAN overlay — container to VTEP to cell |
+| cf-09 | Gorouter route table lookup + TLS termination flow |
+| cf-13 | C2C policy enforcement via iptables on Garden cells |
 
 ---
 
@@ -267,6 +373,16 @@ Lessons with detailed network diagrams:
 - NCCL AllReduce tuning; PFC + ECN for lossless RoCE
 - AWS EFA for P4d/P5 EKS clusters
 
+### 15. CF Networking
+- Garden container networking and Silk CNI
+- VXLAN overlay with VTEP-per-cell model
+- Gorouter and TCP Router for HTTP and TCP ingress
+- Application Security Groups (ASG) for egress control
+- Container-to-container (C2C) policy with iptables enforcement
+- BOSH DNS for service discovery within the platform
+- Org/space isolation and isolation segments
+- Korifi: CF API layer on top of Kubernetes
+
 ---
 
 ## Key Tools & Projects
@@ -284,6 +400,9 @@ Lessons with detailed network diagrams:
 | `goldpinger` | Pod connectivity health checker |
 | `argocd` CLI | ArgoCD application management |
 | `dcgm-exporter` | GPU metrics for Prometheus |
+| `cf` CLI | Cloud Foundry application management |
+| `bosh` CLI | BOSH deployment and VM management |
+| `korifi` CLI | CF API on Kubernetes |
 
 ---
 
@@ -297,3 +416,6 @@ Lessons with detailed network diagrams:
 - [NVIDIA Network Operator](https://github.com/Mellanox/network-operator)
 - [SR-IOV Network Operator](https://github.com/k8snetworkplumbingwg/sriov-network-operator)
 - [ArgoCD Documentation](https://argo-cd.readthedocs.io/)
+- [CF Silk CNI](https://github.com/cloudfoundry/silk)
+- [CF Networking Release](https://github.com/cloudfoundry/cf-networking-release)
+- [Korifi](https://github.com/cloudfoundry/korifi)

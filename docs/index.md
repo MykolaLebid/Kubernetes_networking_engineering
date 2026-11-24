@@ -1,10 +1,34 @@
-# Kubernetes Network Engineering
+# Platform Network Engineering
 
-> A 34-lesson course covering Linux networking foundations through Kubernetes CNI, service meshes, OpenShift, AWS, GitOps, and AI GPU cluster networking.
+> Three books in one — Kubernetes Networking · Cloud Foundry Networking · Migration Guide
 
 ---
 
-## Start Learning
+## Books
+
+<div class="grid cards" markdown>
+
+- :fontawesome-brands-kubernetes: **Kubernetes Networking**  
+  34 lessons from Linux foundations through CNI, service meshes, OpenShift, AWS, GitOps, and AI GPU cluster networking.  
+  [Start Track A →](lessons/01-linux-networking-fundamentals.md)
+
+- :fontawesome-solid-cloud: **Cloud Foundry Networking**  
+  20 lessons covering Diego, Silk CNI, GoRouter, CF-to-CF mTLS, BTP Private Link, and hybrid connectivity.  
+  [Start CF Book →](cf/cf-00-overview.md)
+
+- :fontawesome-solid-arrows-left-right: **K8s ↔ CF Migration Guide**  
+  Side-by-side networking concepts, migration patterns, and decision frameworks for teams moving workloads.  
+  [Open Migration Guide →](migration/mig-00-guide.md)
+
+- :fontawesome-solid-table-list: **Cheat Sheets**  
+  Quick-reference cards for kubectl, calicoctl, cilium, cf CLI networking commands, and iptables.  
+  [Browse Cheat Sheets →](cheatsheets/cs-00-index.md)
+
+</div>
+
+---
+
+## Kubernetes Networking — 9 Tracks
 
 <div class="grid cards" markdown>
 
@@ -80,8 +104,8 @@ flowchart LR
 
 | Metric | Value |
 |--------|-------|
-| Lessons | 34 |
-| Tracks | 9 |
+| Lessons | 34 (K8s) + 20 (CF) |
+| Tracks | 9 (K8s) + 5 (CF) |
 | Mermaid diagrams | 90+ |
 | Troubleshooting entries | 230+ |
 | Practice commands | 400+ |
