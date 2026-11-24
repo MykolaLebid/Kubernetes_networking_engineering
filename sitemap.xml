@@ -2,154 +2,330 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/RESOURCES/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/course-map/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/k8s-overview/</loc>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/version-matrix/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cf/cf-00-overview/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cf/cf-01-platform-architecture/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cf/cf-02-garden-container-networking/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cf/cf-03-bosh-dns-service-discovery/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cf/cf-04-ipam/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cf/cf-05-silk-cni-vxlan/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cf/cf-06-vxlan-policy-agent/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cf/cf-07-application-security-groups/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cf/cf-08-garden-namespaces-deep-dive/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cf/cf-09-gorouter/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cf/cf-10-tcp-router/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cf/cf-11-routes-domains/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cf/cf-12-service-discovery/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cf/cf-13-c2c-network-policies/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cf/cf-14-tls-certificates/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cf/cf-15-org-space-isolation/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cf/cf-16-observability-troubleshooting/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cf/cf-17-logging-metrics-performance/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cf/cf-18-korifi-cf-on-kubernetes/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cf/cf-19-cf-to-k8s-migration-patterns/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cf/cf-20-cf-vs-k8s-comparison/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cheatsheets/cs-00-index/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cheatsheets/cs-01-linux-primitives/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cheatsheets/cs-02-overlay-networks/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cheatsheets/cs-03-cni-overview/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cheatsheets/cs-04-k8s-services-dns/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cheatsheets/cs-05-cf-routing/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cheatsheets/cs-06-network-policy-compare/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cheatsheets/cs-07-ingress-compare/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cheatsheets/cs-08-service-mesh/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cheatsheets/cs-09-observability/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cheatsheets/cs-10-security-hardening/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cheatsheets/cs-11-aws-eks/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cheatsheets/cs-12-openshift/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cheatsheets/cs-13-migration-cheatsheet/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cheatsheets/cs-14-ebpf-quick-ref/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/cheatsheets/cs-15-ai-gpu-networking/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/00-k8s-concepts-visual-overview/</loc>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/01-linux-networking-fundamentals/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/02-ip-routing-and-forwarding/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/03-iptables-and-netfilter/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/04-network-namespaces-deep-dive/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/05-vxlan-and-overlay-networks/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/06-bgp-fundamentals/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/07-bare-metal-network-infrastructure/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/08-cloud-provider-networking/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/09-cni-specification/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/10-ebpf-xdp/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/11-calico-cni-deep-dive/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/12-cilium-cni-ebpf/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/13-kubernetes-services-kube-proxy/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/14-coredns-service-discovery/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/15-ipv6-dual-stack/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/16-network-policies/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/17-ingress-controllers/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/18-gateway-api/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/19-metallb-kube-vip/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/20-cloud-load-balancers/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/21-service-mesh-istio/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/22-multi-cluster-networking/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/23-network-security-hardening/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/24-network-observability-troubleshooting/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/25-openshift-networking-overview/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/26-ovn-kubernetes/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/27-openshift-routes-haproxy/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/28-openshift-egress/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/29-aws-eks-networking/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/30-aws-vpc-design/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/31-aws-load-balancer-controller/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/32-aws-hybrid-multicluster/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/33-argocd-gitops/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
     </url>
     <url>
          <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/lessons/34-ai-platform-networking/</loc>
-         <lastmod>2026-11-23</lastmod>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/migration/mig-00-guide/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/migration/mig-01-strategy/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/migration/mig-02-translation-cookbook/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/migration/mig-03-coexistence-cutover/</loc>
+         <lastmod>2026-11-24</lastmod>
+    </url>
+    <url>
+         <loc>https://mykolalibid.github.io/Kubernetes_networking_engineering/shared/cf-vs-k8s-comparison/</loc>
+         <lastmod>2026-11-24</lastmod>
     </url>
 </urlset>
