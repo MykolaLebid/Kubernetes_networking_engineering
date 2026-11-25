@@ -627,6 +627,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#opentelemetry-version-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OpenTelemetry Version Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#minikube-lab-environment" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4632,6 +4643,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#opentelemetry-version-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OpenTelemetry Version Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#minikube-lab-environment" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4704,6 +4726,24 @@
 <td>1.28</td>
 <td>18</td>
 <td>GatewayClass, HTTPRoute stable</td>
+</tr>
+<tr>
+<td>Gateway API v1.3 (request mirroring, CORS, retry budgets)</td>
+<td>1.30</td>
+<td>18</td>
+<td>GatewayClass merging, Inference Extension</td>
+</tr>
+<tr>
+<td>kube-proxy nftables mode (alpha)</td>
+<td>1.29</td>
+<td>13</td>
+<td><code>--proxy-mode=nftables</code>; kernel 5.13+</td>
+</tr>
+<tr>
+<td>kube-proxy nftables mode (beta)</td>
+<td>1.33</td>
+<td>13</td>
+<td>IPVS deprecation announced Nov 2026</td>
 </tr>
 <tr>
 <td>NetworkPolicy (GA)</td>
@@ -4799,9 +4839,15 @@
 </tr>
 <tr>
 <td>Cilium</td>
-<td>1.12</td>
-<td>Gateway API support</td>
-<td>12, 18</td>
+<td>1.15</td>
+<td>Hubble OTLP export</td>
+<td>24, 40</td>
+</tr>
+<tr>
+<td>Cilium</td>
+<td>1.20</td>
+<td>Current stable; remote node workload info in Hubble flows</td>
+<td>12, 24, 40</td>
 </tr>
 <tr>
 <td>Cilium</td>
@@ -4865,7 +4911,7 @@
 </tr>
 <tr>
 <td>Ambient mode (GA)</td>
-<td>1.22</td>
+<td>1.24</td>
 <td>21</td>
 </tr>
 <tr>
@@ -5040,6 +5086,50 @@
 </tbody>
 </table>
 <hr />
+<h2 id="opentelemetry-version-requirements">OpenTelemetry Version Requirements<a class="headerlink" href="#opentelemetry-version-requirements" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Min Version</th>
+<th>Feature</th>
+<th>Lesson</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OTel Collector</td>
+<td>0.100+</td>
+<td>OTTL v1 stable (transform/filter processors)</td>
+<td>40</td>
+</tr>
+<tr>
+<td>OBI (formerly Beyla)</td>
+<td>1.0</td>
+<td>GA — HTTP/gRPC/SQL/Redis/Kafka/MongoDB/GraphQL/Elasticsearch/S3; kernel 4.18+</td>
+<td>40</td>
+</tr>
+<tr>
+<td>K8s OTel Operator</td>
+<td>0.95+</td>
+<td>Instrumentation CRD for Python/Java/Node/Go/.NET/NGINX</td>
+<td>40</td>
+</tr>
+<tr>
+<td>Cilium</td>
+<td>1.15</td>
+<td>Hubble OTLP export</td>
+<td>24, 40</td>
+</tr>
+<tr>
+<td>nftables kernel</td>
+<td>5.13</td>
+<td>kube-proxy nftables mode</td>
+<td>13</td>
+</tr>
+</tbody>
+</table>
+<hr />
 <h2 id="minikube-lab-environment">minikube / Lab Environment<a class="headerlink" href="#minikube-lab-environment" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -5077,7 +5167,7 @@
 </tr>
 <tr>
 <td>istioctl</td>
-<td>≥ 1.18 (for ambient)</td>
+<td>≥ 1.24 (for ambient GA)</td>
 <td>21</td>
 </tr>
 <tr>

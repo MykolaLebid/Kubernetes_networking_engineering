@@ -5839,6 +5839,9 @@
 </span></code></pre></div>
 <hr />
 <h2 id="13-network-policy-considerations-for-ai-clusters">13. Network Policy Considerations for AI Clusters<a class="headerlink" href="#13-network-policy-considerations-for-ai-clusters" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>Gateway API Inference Extension:</strong> For HTTP-based LLM inference serving (vLLM, Triton), use the <code>InferencePool</code> and <code>InferenceModel</code> CRDs from the Gateway API Inference Extension project. These provide kv-cache-aware endpoint selection, session affinity for long-running requests, and criticality-based load shedding — without custom Lua/WASM filters. Compatible with Envoy Gateway, kgateway, and GKE Gateway. See <a href="../18-gateway-api/#9-gateway-api-inference-extension">Lesson 18 — Gateway API §9</a> for full details and YAML examples.</p>
+</blockquote>
 <p>AI training pods have different network requirements than web services:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Allow all-to-all within the training job (NCCL needs direct pod-to-pod)</span>
 </span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">networking.k8s.io/v1</span>
