@@ -60,7 +60,9 @@ Example: 0.0005 × 2592000s = 1296s = 21.6 min
 | `cilium_policy_count` | Active network policies |
 | `cilium_endpoint_state` | Endpoint health state counts |
 | `cilium_bpf_map_ops_total` | eBPF map operation rate |
+| `cilium_agent_memory_bytes` | Agent memory usage by component (1.20+) |
 | `hubble_flows_processed_total` | Flows processed by Hubble Relay |
+| `hubble_drop_total` | Drops by reason and protocol (Hubble) |
 | `container_network_receive_bytes_total` | Pod inbound bytes |
 | `container_network_transmit_bytes_total` | Pod outbound bytes |
 | `coredns_dns_requests_total` | DNS query rate |
@@ -198,8 +200,9 @@ Symptom: network fault
 | **Tetragon → Loki** | Process/network security events as structured JSON logs with trace context |
 | **Grafana Tempo** | Trace storage; correlate Cilium network-hop spans with app spans |
 
-**Key OTel semantic conventions for network events:**  
-`network.type` (ipv4/ipv6) · `network.transport` (tcp/udp) · `net.peer.ip` · `server.address` · `server.port`
+**Key OTel semantic conventions for network events (stable):**  
+`network.type` (ipv4/ipv6) · `network.transport` (tcp/udp) · `network.peer.address` · `network.peer.port` · `network.protocol.name` · `network.protocol.version`  
+RC (not yet stable): `network.connection.state` · `network.interface.name` · `network.io.direction`
 
 ---
 

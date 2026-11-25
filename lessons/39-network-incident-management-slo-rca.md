@@ -132,7 +132,7 @@ flowchart LR
 | Capability | What changed | Why it matters |
 |---|---|---|
 | **Cilium native OTel export** | Cilium 1.15+ exports Hubble flows as OTLP traces | Network hops appear as spans in Grafana Tempo — no sidecar |
-| **OTel network semantic conventions (stable)** | `network.type`, `network.transport`, `net.peer.ip` are stable attributes | Cross-vendor correlation: Cilium spans + app spans share the same attribute names |
+| **OTel network semantic conventions (stable)** | `network.type`, `network.transport`, `network.peer.address`, `network.peer.port` are stable; `network.connection.state`, `network.interface.name` are RC | Cross-vendor correlation: Cilium spans + app spans share the same attribute names |
 | **eBPF OTel Collector receiver** | OTel Collector gains an eBPF receiver (kernel 5.8+) | L4 TCP events become OTel spans without code changes |
 | **Tetragon + OTel** | Tetragon 1.1+ emits process/network events as OTel logs | Security events and network events in the same trace context |
 | **Continuous profiling (Parca/Pyroscope)** | eBPF CPU profiles linked to trace IDs | Correlate a network latency spike with a CPU-bound kernel function |

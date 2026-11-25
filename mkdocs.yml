@@ -1,5 +1,5 @@
 site_name: Platform Network Engineering
-site_description: "CKNE & CCA exam prep + sector-specific compliance (HIPAA, PCI-DSS, IEC 62443, GDPR): 38 K8s networking lessons, CF networking, migration guide, and cheat sheets — from Linux primitives to AI GPU clusters."
+site_description: "CKNE & CCA exam prep + sector-specific compliance (HIPAA, PCI-DSS, IEC 62443, GDPR): 39 K8s networking lessons, CF networking, migration guide, and cheat sheets — from Linux primitives to AI GPU clusters."
 site_url: https://mykolalibid.github.io/Kubernetes_networking_engineering/
 repo_url: https://github.com/MykolaLebid/Kubernetes_networking_engineering
 repo_name: MykolaLebid/Kubernetes_networking_engineering
