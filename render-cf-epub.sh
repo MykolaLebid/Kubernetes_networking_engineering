@@ -18,7 +18,7 @@ echo "==> Temp dir: $TMPDIR"
   cat <<'HEADER'
 ---
 title: Cloud Foundry Networking Engineering
-subtitle: 20-Lesson Course — Garden, Silk CNI, Gorouter, CF-to-K8s Migration
+subtitle: 22-Lesson Course — Garden, Silk CNI, Gorouter, Compliance, SAP BTP
 author: Cloud Foundry Networking Engineering Course
 date: November 2026
 lang: en

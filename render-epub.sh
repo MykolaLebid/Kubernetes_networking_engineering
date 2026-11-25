@@ -19,7 +19,7 @@ echo "==> Temp dir: $TMPDIR"
   cat <<'HEADER'
 ---
 title: Kubernetes Network Engineering
-subtitle: 34-Lesson Complete Course
+subtitle: 38-Lesson Complete Course
 author: Kubernetes Network Engineering Course
 date: November 2026
 lang: en

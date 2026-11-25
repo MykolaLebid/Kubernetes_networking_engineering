@@ -1,0 +1,65 @@
+# PCI-DSS CDE segmentation NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pci-default-deny
+  namespace: payment-cde
+  annotations:
+    compliance.pci-dss/requirement: "1.3.1, 1.3.2"
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# Allow payment API (from DMZ) to reach card processor
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pci-allow-payment-api
+  namespace: payment-cde
+  annotations:
+    compliance.pci-dss/requirement: "1.3.1"
+spec:
+  podSelector:
+    matchLabels:
+      app: card-processor
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          zone: dmz
+      podSelector:
+        matchLabels:
+          app: payment-api
+    ports:
+    - port: 8443
+      protocol: TCP
+---
+# CDE egress FQDN control — requires Cilium
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: pci-cde-egress-fqdn
+  namespace: payment-cde
+  annotations:
+    compliance.pci-dss/requirement: "1.3.2"
+spec:
+  endpointSelector:
+    matchLabels:
+      app: card-processor
+  egress:
+  - toFQDNs:
+    - matchPattern: "*.visa.net"
+    - matchPattern: "*.mastercard.com"
+    - matchName: "api.stripe.com"
+    toPorts:
+    - ports:
+      - port: "443"
+        protocol: TCP
+  - toEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: kube-system
+        k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP

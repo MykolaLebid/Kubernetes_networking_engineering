@@ -1,0 +1,29 @@
+# Tetragon TracingPolicy — egress enforcement by binary identity
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: restrict-egress-by-binary
+spec:
+  kprobes:
+  - call: "tcp_connect"
+    syscall: false
+    args:
+    - index: 0
+      type: "sock"
+    selectors:
+    - matchArgs:
+      - index: 0
+        operator: "DPort"
+        values:
+        - "443"
+      matchBinaries:
+      - operator: NotIn
+        values:
+        - "/usr/sbin/nginx"
+        - "/usr/bin/curl"
+      matchNamespaces:
+      - operator: In
+        values:
+        - "production"
+      matchActions:
+      - action: Sigkill

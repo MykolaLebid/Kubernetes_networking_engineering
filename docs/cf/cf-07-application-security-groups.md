@@ -522,6 +522,70 @@ cf curl /v3/security_groups?per_page=100
 
 ---
 
+## ASGs as Compliance Controls
+
+ASGs are the CF equivalent of Kubernetes NetworkPolicy. The same regulated-sector requirements apply — and ASGs satisfy them when configured correctly.
+
+### PCI-DSS Req 1.3 — CDE Network Segmentation
+
+PCI-DSS requires that the Cardholder Data Environment (CDE) can only send and receive traffic that is necessary for payment processing. The pattern:
+
+1. **Unbind** the global `public_networks` ASG from the CDE space
+2. **Create** an explicit allow-list ASG with only the payment gateway CIDR and port
+3. **Bind** that ASG only to the CDE space (never globally)
+
+```json
+// asg-pci-cde.json — PCI-DSS Req 1.3.1 / 1.3.2
+[
+  {
+    "protocol": "tcp",
+    "destination": "192.168.10.5",
+    "ports": "8443",
+    "description": "PCI Req 1.3: CDE egress to payment gateway only",
+    "log": true
+  },
+  {
+    "protocol": "tcp",
+    "destination": "10.0.1.53",
+    "ports": "53",
+    "description": "PCI Req 1.3: DNS only",
+    "log": false
+  }
+]
+```
+
+```bash
+cf unbind-running-security-group public_networks   # remove wildcard
+cf create-security-group pci-cde asg-pci-cde.json
+cf bind-security-group pci-cde payment-org cde-production --lifecycle running
+```
+
+**Auditor evidence:** `cf space-security-groups cde-production` — must show no `0.0.0.0/0` destination.
+
+### HIPAA §164.312(a)(1) — ePHI Access Control
+
+Same pattern for healthcare: space-scoped ASG restricting egress from ePHI-handling containers to only the ePHI datastore IP:port. Set `"log": true` on all rules touching ePHI destinations to satisfy §164.312(b) (audit controls).
+
+### GDPR Art. 25 — Privacy by Design
+
+For spaces processing EU personal data: verify no wildcard ASG is bound. The mere presence of `public_networks` on a space processing personal data is a GDPR Art. 25 finding — there is no technical necessity for unrestricted internet egress from a data-processing container.
+
+```bash
+# Quick audit: find any space with a wildcard-destination ASG
+cf curl /v3/security_groups?per_page=100 | \
+  python3 -c "
+import json,sys
+for sg in json.load(sys.stdin)['resources']:
+    for r in sg.get('rules',[]):
+        if r.get('destination','') == '0.0.0.0/0':
+            print('WILDCARD:', sg['name'])
+"
+```
+
+> **Full compliance mapping:** See [CF-21 — Compliance Networking](cf-21-compliance-networking.md) for the complete HIPAA/PCI-DSS/IEC 62443/GDPR control matrix with exact ASG JSON for each framework.
+
+---
+
 ## See Also
 
 **Related K8s lessons in this course:**

@@ -1,0 +1,40 @@
+# KubeEdge — DeviceModel and Device instance for IoT sensor
+apiVersion: devices.kubeedge.io/v1beta1
+kind: DeviceModel
+metadata:
+  name: temperature-sensor
+  namespace: iot
+spec:
+  properties:
+  - name: temperature
+    description: "Current temperature reading"
+    type:
+      int:
+        accessMode: ReadOnly
+        defaultValue: 25
+        unit: "°C"
+  - name: status
+    description: "Sensor operational status"
+    type:
+      string:
+        accessMode: ReadOnly
+        defaultValue: "online"
+---
+apiVersion: devices.kubeedge.io/v1beta1
+kind: Device
+metadata:
+  name: factory-temp-sensor-01
+  namespace: iot
+  labels:
+    zone: "assembly-line-1"
+spec:
+  deviceModelRef:
+    name: temperature-sensor
+  nodeName: edge-node
+  protocol:
+    mqtt:
+      topic: "factory/sensors/temp/01"
+  propertyVisitors:
+  - propertyName: temperature
+    mqtt:
+      topic: "factory/sensors/temp/01/data"

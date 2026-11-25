@@ -1,0 +1,31 @@
+# SR-IOV NetworkNodePolicy — configure SR-IOV VFs on GPU nodes
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: rdma-sriov-policy
+  namespace: sriov-network-operator
+spec:
+  nodeSelector:
+    feature.node.kubernetes.io/network-sriov.capable: "true"
+  resourceName: sriov_rdma
+  numVfs: 8
+  nicSelector:
+    pfNames:
+    - "ens2f0"           # physical function (PF) NIC name — adjust per your hardware
+  deviceType: netdevice
+  isRdma: true           # enable RDMA mode for RoCE v2
+---
+# SR-IOV Network — binds the SR-IOV resource to a Multus NetworkAttachmentDefinition
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetwork
+metadata:
+  name: sriov-rdma-net
+  namespace: sriov-network-operator
+spec:
+  resourceName: sriov_rdma
+  networkNamespace: gpu-workloads
+  ipam: |
+    {
+      "type": "host-local",
+      "subnet": "192.168.200.0/24"
+    }

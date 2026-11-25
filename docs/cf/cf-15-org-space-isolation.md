@@ -648,6 +648,78 @@ cf update-space-quota my-space-quota --memory 20G
 
 ---
 
+## Org/Space Isolation as Compliance Zones
+
+The CF org/space hierarchy maps directly to regulated-sector security zone models. This is not coincidental — CF's multi-tenancy design satisfies the same isolation requirements that IEC 62443 zones and PCI-DSS network segmentation demand.
+
+### IEC 62443 Zone → CF Org/Space Mapping
+
+IEC 62443 defines **zones** (groups of assets with the same security level) and **conduits** (controlled communication paths between zones). CF orgs and spaces implement this model natively:
+
+| IEC 62443 concept | CF equivalent | Enforcement mechanism |
+|---|---|---|
+| Zone (SL 1–4) | CF Org | Org-level quota + ASG scope |
+| Sub-zone | CF Space | Space-scoped ASG |
+| Conduit | ASG rule between spaces + C2C policy | iptables / VXLAN Policy Agent |
+| Zone boundary | Diego Cell network namespace | Silk CNI overlay isolation |
+| Security Level (SL) | CF org metadata annotation | Operator-defined convention |
+
+```bash
+# Annotate orgs with IEC 62443 security level (CF v3 metadata)
+cf curl -X PATCH /v3/organizations/$(cf org operations-zone --guid) \
+  -d '{"metadata":{"annotations":{"iec62443/zone":"operations","iec62443/sl":"2"}}}'
+
+cf curl -X PATCH /v3/organizations/$(cf org enterprise-it --guid) \
+  -d '{"metadata":{"annotations":{"iec62443/zone":"enterprise","iec62443/sl":"1"}}}'
+
+# Verify
+cf curl /v3/organizations?per_page=100 | \
+  python3 -c "
+import json,sys
+for o in json.load(sys.stdin)['resources']:
+    ann = o.get('metadata',{}).get('annotations',{})
+    if 'iec62443/zone' in ann:
+        print(o['name'], '→', ann)
+"
+```
+
+### PCI-DSS Req 7.2 — Need-to-Know Access Control
+
+PCI-DSS Req 7.2.1 requires access to system components and cardholder data be restricted to only those individuals whose job requires such access. In CF:
+
+- Each CF **org** maps to a business unit or compliance boundary
+- Each CF **space** maps to an environment (production, staging) within that boundary
+- **SpaceDeveloper** role grants app deployment access; **SpaceAuditor** grants read-only compliance review access
+- Cross-org access does not exist in CF's RBAC model — an auditor with SpaceAuditor in `cde-production` cannot see apps in `finance-reporting`
+
+```bash
+# Assign minimum-privilege roles for PCI audit access
+# Auditor gets read-only view of CDE space — cannot deploy or change ASGs
+cf set-space-role auditor@example.com payment-org cde-production SpaceAuditor
+
+# Verify no SpaceDeveloper access for non-developers in regulated spaces
+cf space-users payment-org cde-production
+# Review: SpaceDeveloper list must match approved developer roster
+```
+
+### GDPR Art. 25 — Org/Space as Data Residency Boundary
+
+For GDPR data residency: each CF **org** that processes EU personal data should be deployed on a CF foundation in an EU region (e.g. BTP CF eu10/eu20). The org itself is not a geographic control — the foundation's hyperscaler region is. But org/space structure should reflect data classification:
+
+```
+Global Account
+├── Subaccount: EU-Production (cf.eu10.hana.ondemand.com)
+│   ├── Org: personal-data-eu          ← EU personal data only
+│   │   └── Space: production
+│   └── Org: non-personal              ← operational data, no GDPR scope
+└── Subaccount: US-Production (cf.us10.hana.ondemand.com)
+    └── Org: hipaa-phi                 ← US healthcare data, separate subaccount
+```
+
+> **Full compliance mapping:** See [CF-21 — Compliance Networking](cf-21-compliance-networking.md) for the complete control matrix with CF CLI commands as auditor evidence for each framework.
+
+---
+
 ## See Also
 
 **Related K8s lessons in this course:**

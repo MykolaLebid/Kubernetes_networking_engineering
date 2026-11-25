@@ -1,0 +1,40 @@
+# KubeEdge — edge workload deployment
+# Targets edge nodes via nodeSelector
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sensor-aggregator
+  namespace: iot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sensor-aggregator
+  template:
+    metadata:
+      labels:
+        app: sensor-aggregator
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/edge: ""
+      tolerations:
+      - key: "node-role.kubernetes.io/edge"
+        operator: "Exists"
+        effect: "NoSchedule"
+      containers:
+      - name: aggregator
+        image: busybox:1.36
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          while true; do
+            echo "$(date): sensor reading: $((RANDOM % 100))°C"
+            sleep 5
+          done
+        resources:
+          requests:
+            memory: "16Mi"
+            cpu: "10m"
+          limits:
+            memory: "32Mi"
+            cpu: "50m"

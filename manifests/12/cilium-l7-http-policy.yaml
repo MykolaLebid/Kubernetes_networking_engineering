@@ -1,0 +1,25 @@
+# CiliumNetworkPolicy — L7 HTTP policy
+# Allows only GET /api/* from frontend pods; blocks all other HTTP methods/paths
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: l7-http-policy
+  namespace: demo
+spec:
+  endpointSelector:
+    matchLabels:
+      app: backend
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        app: frontend
+    toPorts:
+    - ports:
+      - port: "8080"
+        protocol: TCP
+      rules:
+        http:
+        - method: GET
+          path: "/api/.*"
+        - method: GET
+          path: "/health"

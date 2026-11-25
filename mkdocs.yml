@@ -1,5 +1,5 @@
 site_name: Platform Network Engineering
-site_description: "Three books in one: Kubernetes networking (34 lessons), Cloud Foundry networking (20 lessons), and CF-to-Kubernetes migration — from Linux primitives to AI GPU clusters, with cheat sheets for every topic."
+site_description: "CKNE & CCA exam prep + sector-specific compliance (HIPAA, PCI-DSS, IEC 62443, GDPR): 38 K8s networking lessons, CF networking, migration guide, and cheat sheets — from Linux primitives to AI GPU clusters."
 site_url: https://mykolalibid.github.io/Kubernetes_networking_engineering/
 repo_url: https://github.com/MykolaLebid/Kubernetes_networking_engineering
 repo_name: MykolaLebid/Kubernetes_networking_engineering
@@ -127,6 +127,15 @@ nav:
       - "33 · ArgoCD and GitOps": lessons/33-argocd-gitops.md
     - "Track I — AI Platform":
       - "34 · AI Platform Networking": lessons/34-ai-platform-networking.md
+    - "Track J — Security & Compliance":
+      - "35 · Tetragon: eBPF Runtime Security": lessons/35-tetragon-ebpf-runtime-security.md
+      - "36 · KubeEdge and Industrial Edge Networking": lessons/36-kubeedge-industrial-edge-networking.md
+      - "37 · Compliance Networking (HIPAA/PCI-DSS/IEC 62443/GDPR)": lessons/37-compliance-networking.md
+      - "38 · Multus CNI and Multi-Homed Pods": lessons/38-multus-cni.md
+    - "Certifications":
+      - "CKNE + CCA Exam Prep": ckne-prep.md
+      - "CKA + CKS Exam Prep": cka-cks-prep.md
+      - "Compliance Learning Paths": compliance-paths.md
 
   - "CF Networking":
     - Overview: cf/cf-00-overview.md
@@ -157,6 +166,9 @@ nav:
       - cf/cf-19-cf-to-k8s-migration-patterns.md
     - "Track CF-G — Comparison":
       - cf/cf-20-cf-vs-k8s-comparison.md
+    - "Track CF-H — Security & Compliance":
+      - "CF-21 · Compliance Networking (HIPAA/PCI-DSS/IEC 62443/GDPR)": cf/cf-21-compliance-networking.md
+      - "CF-22 · SAP BTP Networking Deep Dive": cf/cf-22-sap-btp-networking.md
 
   - "Migration":
     - Decision Guide: migration/mig-00-guide.md

@@ -1,0 +1,42 @@
+# GDPR data residency egress policy — EU endpoints only
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: gdpr-eu-only-egress
+  namespace: user-data
+  annotations:
+    compliance.gdpr/article: "44"
+spec:
+  endpointSelector:
+    matchLabels:
+      gdpr/personal-data: "true"
+  egress:
+  - toFQDNs:
+    - matchPattern: "*.eu-central-1.amazonaws.com"
+    - matchPattern: "*.europe-west3.gcp.com"
+    - matchPattern: "*.northeurope.azure.com"
+    - matchPattern: "*.westeurope.azure.com"
+    toPorts:
+    - ports:
+      - port: "443"
+        protocol: TCP
+  - toEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: kube-system
+        k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP
+---
+# GDPR privacy by design — default deny for personal data namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gdpr-default-deny
+  namespace: user-data
+  annotations:
+    compliance.gdpr/article: "25"
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]

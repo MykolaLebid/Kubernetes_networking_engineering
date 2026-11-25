@@ -1,0 +1,27 @@
+# CiliumNetworkPolicy — FQDN egress filtering
+# Allows only HTTPS to approved external domains; blocks everything else
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: fqdn-egress-policy
+  namespace: demo
+spec:
+  endpointSelector:
+    matchLabels:
+      app: payment-processor
+  egress:
+  - toFQDNs:
+    - matchPattern: "*.stripe.com"
+    - matchName: "api.paypal.com"
+    toPorts:
+    - ports:
+      - port: "443"
+        protocol: TCP
+  - toEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: kube-system
+        k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP
