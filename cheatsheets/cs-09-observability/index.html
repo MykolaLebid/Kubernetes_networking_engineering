@@ -2027,7 +2027,7 @@
   <span class="md-ellipsis">
     
   
-    Track I — AI Platform
+    Track I — AI Platform & Observability
   
 
     
@@ -2043,7 +2043,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Track I — AI Platform
+    Track I — AI Platform & Observability
   
 
           </label>
@@ -2064,6 +2064,34 @@
     
   
     34 · AI Platform Networking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../lessons/40-opentelemetry-network-observability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    40 · OpenTelemetry for Network Engineers
   
 
     
@@ -4770,9 +4798,9 @@
 </tr>
 <tr>
 <td>eBPF auto-instrumentation</td>
-<td>Beyla / OTel eBPF Instrumentation (OBI)</td>
+<td>OBI v1.0 (OpenTelemetry eBPF Instrumentation, formerly Beyla)</td>
 <td>—</td>
-<td>Grafana donated Beyla to OTel project 2025</td>
+<td>GA 2026; zero-code, 10 protocol categories</td>
 </tr>
 <tr>
 <td>Metrics scraping</td>
@@ -5154,11 +5182,15 @@ Example: 0.0005 × 2592000s = 1296s = 21.6 min</p>
 </tr>
 <tr>
 <td><strong>OTel eBPF Instrumentation (OBI)</strong></td>
-<td>Beyla donated to OTel project 2025; eBPF auto-instrumentation without code changes</td>
+<td><strong>v1.0 GA (2026)</strong> — formerly Beyla (donated to OTel/CNCF); zero-code eBPF auto-instrumentation; protocols: HTTP/HTTPS, HTTP/2, gRPC, SQL, Redis, MongoDB, Kafka, GraphQL, Elasticsearch/OpenSearch, AWS S3</td>
 </tr>
 <tr>
 <td><strong>OTel Collector</strong></td>
-<td>Receives OTLP from Cilium + app SDKs; fans out to Prometheus/Tempo/Loki</td>
+<td>Receives OTLP from Cilium + app SDKs; fans out to Prometheus/Tempo/Loki; <strong>OTTL v1 (stable)</strong> — transform/filter query language for processors: drop high-cardinality attrs, rename metrics, filter health-check spans</td>
+</tr>
+<tr>
+<td><strong>K8s Operator</strong></td>
+<td><code>OpenTelemetryCollector</code> CRD — declarative Collector deployment; <code>Instrumentation</code> CRD — auto-injects SDK via pod annotation (<code>instrumentation.opentelemetry.io/inject-python: "true"</code>); supports .NET, Java, Node.js, Python, Go, NGINX, Apache HTTPD; no code change needed</td>
 </tr>
 <tr>
 <td><strong>Tetragon → Loki</strong></td>
@@ -5171,8 +5203,12 @@ Example: 0.0005 × 2592000s = 1296s = 21.6 min</p>
 </tbody>
 </table>
 <p><strong>Key OTel semantic conventions for network events (stable):</strong><br />
-<code>network.type</code> (ipv4/ipv6) · <code>network.transport</code> (tcp/udp) · <code>network.peer.address</code> · <code>network.peer.port</code> · <code>network.protocol.name</code> · <code>network.protocol.version</code><br />
-RC (not yet stable): <code>network.connection.state</code> · <code>network.interface.name</code> · <code>network.io.direction</code></p>
+<code>network.type</code> (ipv4/ipv6) · <code>network.transport</code> (tcp/udp) · <code>network.local.address</code> · <code>network.local.port</code> · <code>network.peer.address</code> · <code>network.peer.port</code> · <code>network.protocol.name</code> · <code>network.protocol.version</code><br />
+RC (not yet stable): <code>network.connection.state</code> · <code>network.interface.name</code> · <code>network.io.direction</code><br />
+Experimental (BGP context): <code>network.peer.as.number</code> · <code>network.peer.as.organization</code> · <code>network.local.as.number</code> (BGP AS number/org — see K8s lesson 06)</p>
+<blockquote>
+<p><strong>OTel Profiles signal is Alpha</strong> (pprof-based data model). Parca and Grafana Pyroscope are standalone tools — not yet integrated into the OTel spec pipeline.</p>
+</blockquote>
 <hr />
 <h2 id="postmortem-sections-checklist">Postmortem Sections Checklist<a class="headerlink" href="#postmortem-sections-checklist" title="Permanent link">&para;</a></h2>
 <ul class="task-list">

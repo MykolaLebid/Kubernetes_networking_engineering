@@ -2057,7 +2057,7 @@
   <span class="md-ellipsis">
     
   
-    Track I — AI Platform
+    Track I — AI Platform & Observability
   
 
     
@@ -2073,7 +2073,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Track I — AI Platform
+    Track I — AI Platform & Observability
   
 
           </label>
@@ -2094,6 +2094,34 @@
     
   
     34 · AI Platform Networking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../40-opentelemetry-network-observability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    40 · OpenTelemetry for Network Engineers
   
 
     
@@ -5217,7 +5245,7 @@
     style Node fill:#1a3a5c,color:#fff
     style Signals fill:#2d5a27,color:#fff
     style Backend fill:#3d1a5a,color:#fff</code></pre>
-<p><strong>Key 2025 developments that change the picture:</strong></p>
+<p><strong>Key 2025/2026 developments that change the picture:</strong></p>
 <table>
 <thead>
 <tr>
@@ -5229,18 +5257,18 @@
 <tbody>
 <tr>
 <td><strong>Cilium native OTel export</strong></td>
-<td>Cilium 1.15+ exports Hubble flows as OTLP traces</td>
+<td>Cilium 1.15+ (OTLP export introduced); current stable: 1.20.x; exports Hubble flows as OTLP traces</td>
 <td>Network hops appear as spans in Grafana Tempo — no sidecar</td>
 </tr>
 <tr>
 <td><strong>OTel network semantic conventions (stable)</strong></td>
-<td><code>network.type</code>, <code>network.transport</code>, <code>network.peer.address</code>, <code>network.peer.port</code> are stable; <code>network.connection.state</code>, <code>network.interface.name</code> are RC</td>
+<td><code>network.type</code>, <code>network.transport</code>, <code>network.local.address</code>, <code>network.local.port</code>, <code>network.peer.address</code>, <code>network.peer.port</code> are stable; <code>network.connection.state</code>, <code>network.interface.name</code> are RC</td>
 <td>Cross-vendor correlation: Cilium spans + app spans share the same attribute names</td>
 </tr>
 <tr>
 <td><strong>eBPF OTel Collector receiver</strong></td>
-<td>OTel Collector gains an eBPF receiver (kernel 5.8+)</td>
-<td>L4 TCP events become OTel spans without code changes</td>
+<td>OTel Collector gains an eBPF receiver (kernel 5.8+); <strong>OBI v1.0 GA (2026)</strong> — 10 protocol categories: HTTP/HTTPS/2, gRPC, SQL, Redis, MongoDB, Kafka, GraphQL, Elasticsearch, AWS S3</td>
+<td>L4 TCP events and app-layer events become OTel spans without code changes</td>
 </tr>
 <tr>
 <td><strong>Tetragon + OTel</strong></td>
@@ -5249,7 +5277,7 @@
 </tr>
 <tr>
 <td><strong>Continuous profiling (Parca/Pyroscope)</strong></td>
-<td>eBPF CPU profiles linked to trace IDs</td>
+<td>eBPF CPU profiles linked to trace IDs. <strong>Note:</strong> OTel Profiles signal is Alpha (pprof-based); Parca and Grafana Pyroscope are standalone tools — not yet spec-compliant OTel profiling; integration planned but not GA</td>
 <td>Correlate a network latency spike with a CPU-bound kernel function</td>
 </tr>
 </tbody>
