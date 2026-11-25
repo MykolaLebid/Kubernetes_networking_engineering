@@ -14,12 +14,12 @@ mkdir -p "$ARTIFACTS"
 
 echo "==> Temp dir: $TMPDIR"
 
-# 1. Combine all 34 lessons
+# 1. Combine all 41 lessons (00–40)
 {
   cat <<'HEADER'
 ---
 title: Kubernetes Network Engineering
-subtitle: 39-Lesson Complete Course — with Diagrams
+subtitle: 41-Lesson Complete Course — with Diagrams
 date: November 2026
 toc: true
 ---

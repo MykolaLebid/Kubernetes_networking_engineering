@@ -184,6 +184,8 @@ iptables -t nat -L KUBE-SEP-AAAA -n
 
 ## 5. kube-proxy: IPVS Mode
 
+> **⚠️ Deprecation:** IPVS mode is deprecated since K8s **v1.35** (Dec 2025). It will be disabled by default from v1.40 (re-enable with `KubeProxyIPVS` feature gate) and **fully removed in v1.43**. Migrate to `nftables` mode — see [§ nftables Mode](#nftables-proxy-mode-alpha-k8s-v137) below.
+
 IPVS is a kernel load balancer — O(1) hash lookup vs O(N) iptables rule scan.
 
 ```bash
@@ -205,13 +207,118 @@ ip addr show kube-ipvs0
 
 ### Mode Comparison
 
-| Aspect | iptables | IPVS |
-|--------|----------|------|
-| Lookup complexity | O(N) — linear chain scan | O(1) — kernel hash table |
-| Scheduling options | Random, probabilistic | rr, lc, dh, sh, lblc, lblcr |
-| Connection tracking | Linux conntrack | Linux conntrack |
-| Health checking | None (relies on endpoints) | None (relies on endpoints) |
-| Best for | <1000 services | >1000 services / high throughput |
+| Aspect | iptables | IPVS (deprecated v1.35) | nftables (Alpha v1.37) |
+|--------|----------|--------------------------|------------------------|
+| Lookup complexity | O(N) — linear chain scan | O(1) — kernel hash table | O(1) — nftables map lookup |
+| Scheduling options | Random, probabilistic | rr, lc, dh, sh, lblc, lblcr | Random, probabilistic |
+| Connection tracking | Linux conntrack | Linux conntrack | Linux conntrack |
+| Health checking | None (relies on endpoints) | None (relies on endpoints) | None (relies on endpoints) |
+| Atomic rule updates | No (rule-by-rule) | N/A | Yes (transaction-based) |
+| Kernel requirement | Any | requires ip_vs modules | 5.13+ |
+| Best for | <1000 services | >1000 services (deprecated) | All new deployments |
+
+---
+
+### nftables Proxy Mode (Alpha, K8s v1.37+)
+
+nftables is the modern Linux packet-filtering framework that supersedes iptables (see [Lesson 03](03-iptables-and-netfilter.md)). kube-proxy's nftables mode uses the kernel's nftables API instead of legacy iptables chains — same semantics, cleaner atomic updates, better performance at scale.
+
+**Status:** Alpha since K8s **v1.37** (August 2026); disabled by default. The default proxy mode remains `iptables` in v1.37 but will switch to `nftables` in a future release. Explicitly set your mode now to avoid unexpected changes on upgrade.
+
+**Kernel requirement:** Linux kernel **5.13 or later** (nftables requires the `nf_tables` subsystem with set/map support).
+
+```bash
+# Check kernel version — must be ≥5.13
+uname -r
+
+# Check nftables support
+nft list tables 2>/dev/null && echo "nftables available" || echo "nftables unavailable"
+```
+
+**Enable nftables mode — kube-proxy ConfigMap:**
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kube-proxy
+  namespace: kube-system
+data:
+  config.conf: |
+    apiVersion: kubeproxy.config.k8s.io/v1alpha1
+    kind: KubeProxyConfiguration
+    mode: "nftables"       # replaces "iptables" or "ipvs"
+    featureGates:
+      NFTablesProxyMode: true   # required while Alpha
+```
+
+**Enable via kubeadm cluster config:**
+
+```yaml
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: ClusterConfiguration
+---
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
+kind: KubeProxyConfiguration
+mode: "nftables"
+featureGates:
+  NFTablesProxyMode: true
+```
+
+**Inspect nftables rules set by kube-proxy:**
+
+```bash
+# List all nftables tables (kube-proxy creates table 'kube-proxy' in inet family)
+nft list tables
+
+# Dump all kube-proxy rules
+nft list table inet kube-proxy
+
+# Inspect the service verdict map (ClusterIP → endpoint set)
+nft list table inet kube-proxy | grep -A5 'map service'
+
+# Count rules (nftables uses sets/maps — far fewer rules than iptables chains)
+nft list table inet kube-proxy | wc -l
+```
+
+**nftables chain structure for K8s services:**
+
+```mermaid
+flowchart TD
+    PKT["Incoming packet"] --> PRE["inet kube-proxy\nchain prerouting\n(DNAT)"]
+    PKT2["Outgoing packet"] --> OUT["inet kube-proxy\nchain output\n(local traffic DNAT)"]
+    PRE --> MAP["map: service-ips\nClusterIP:port → endpoint-set"]
+    OUT --> MAP
+    MAP --> SET["set: endpoints\n(weighted load balance)"]
+    SET --> EP1["pod1:port"]
+    SET --> EP2["pod2:port"]
+    SET --> EP3["pod3:port"]
+    PKT3["Post-routing"] --> POST["chain postrouting\n(SNAT/masquerade)"]
+```
+
+Key differences from iptables:
+- **One map lookup** instead of walking a chain of DNAT rules — O(1) regardless of service count
+- **Atomic transactions** — all rules for a service update in a single commit; no partial state
+- **Fewer kernel objects** — a single `map` per service replaces dozens of `KUBE-SVC-*` / `KUBE-SEP-*` chains
+
+**Performance:**
+
+Benchmarks from the K8s community show nftables mode processes service rule updates 30–60% faster than iptables mode at large scale (>5000 services), because:
+- Rule sets are updated atomically via nftables transactions rather than appending/deleting individual iptables rules
+- Packet path uses O(1) hash map lookups rather than O(N) chain traversal
+
+> **K8s Engineer's Translation:** nftables replaces iptables as the kernel packet-filtering backend for kube-proxy — same end result (DNAT to a pod IP), but cleaner atomic rule updates and significantly faster convergence when services change. At <100 services the difference is imperceptible; at >5000 services nftables converges in milliseconds vs seconds. Start using it now while Alpha so you're ahead of the default-mode switch.
+
+**IPVS deprecation timeline:**
+
+| K8s Version | IPVS status |
+|-------------|-------------|
+| v1.35 (Dec 2025) | Deprecated |
+| v1.37 (Aug 2026) | Still functional; nftables Alpha |
+| v1.40 (~2027) | Disabled by default; re-enable with `KubeProxyIPVS` gate |
+| v1.43 (~2028) | Fully removed |
+
+If you are currently using IPVS mode, plan your migration to nftables now.
 
 ---
 
@@ -437,7 +544,8 @@ ip addr show kube-ipvs0 | head -10
 | `sessionAffinity: ClientIP` | None | Routes same source IP to same pod for the timeout window | Stateful applications that require session persistence |
 | `trafficDistribution: PreferClose` | — | Routes to same-zone pods when available (K8s 1.27+) | Minimize cross-AZ bandwidth costs in multi-zone clusters |
 | `clusterIP: None` | — | Headless service — DNS returns pod IPs directly | StatefulSets or client-side load balancing scenarios |
-| kube-proxy `mode: ipvs` | iptables | O(1) hash table lookup instead of O(N) chain scan | Clusters with >1000 services or high endpoint churn |
+| kube-proxy `mode: ipvs` | iptables | O(1) hash table lookup instead of O(N) chain scan | **Deprecated v1.35 — migrate to nftables** |
+| kube-proxy `mode: nftables` | iptables | Atomic rule updates, O(1) map lookups, kernel 5.13+ | New clusters on K8s v1.37+ |
 
 ---
 
@@ -457,7 +565,8 @@ ip addr show kube-ipvs0 | head -10
 
 ## Production Checklist
 
-- [ ] Switch to IPVS mode for clusters with >1000 services or high churn
+- [ ] Use `nftables` proxy mode on K8s v1.37+ (kernel 5.13+); do NOT switch to IPVS (deprecated v1.35, removed v1.43)
+- [ ] If currently on IPVS mode: plan migration to nftables before K8s v1.40
 - [ ] Set `externalTrafficPolicy: Local` on ingress-facing services to preserve client IPs for access logs
 - [ ] Use `trafficDistribution: PreferClose` to minimize cross-AZ bandwidth costs (K8s 1.27+)
 - [ ] Ensure NodePort range (30000-32767) is opened in node security groups / firewall rules
@@ -488,7 +597,9 @@ ip addr show kube-ipvs0 | head -10
 | View EndpointSlices for a service | `kubectl get endpointslices -l kubernetes.io/service-name=<svc>` |
 | View kube-proxy mode | `kubectl get cm -n kube-system kube-proxy -o yaml \| grep mode` |
 | Trace iptables DNAT chain | `iptables -t nat -L KUBE-SVC-XXXX -n` |
-| View IPVS virtual servers | `ipvsadm -L -n` |
+| View IPVS virtual servers | `ipvsadm -L -n` (**deprecated** — migrate to nftables) |
+| Dump nftables kube-proxy rules | `nft list table inet kube-proxy` |
+| Enable nftables mode | Set `mode: nftables` + `NFTablesProxyMode: true` in kube-proxy ConfigMap |
 | Watch kube-proxy logs | `kubectl logs -n kube-system -l k8s-app=kube-proxy --tail=50 -f` |
 | Test ClusterIP from debug pod | `kubectl run -it --rm debug --image=nicolaka/netshoot -- curl http://<clusterIP>:<port>` |
 | Test NodePort from outside | `curl http://<node-ip>:<nodePort>` |

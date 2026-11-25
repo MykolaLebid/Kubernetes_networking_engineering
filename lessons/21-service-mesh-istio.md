@@ -42,28 +42,173 @@ flowchart LR
     style PodB fill:#f3e5f5,stroke:#9C27B0
 ```
 
-### Ambient Mode (sidecar-less, Istio 1.18+)
+### Ambient Mode — GA since Istio 1.24 (November 2024)
+
+Ambient mode reached **General Availability in Istio v1.24 (November 7, 2024)** — ztunnel, waypoint proxies, and all ambient APIs are now Stable. It is the recommended deployment model for new Istio installations.
+
+#### Why Ambient Exists
+
+Traditional sidecar mesh adds ~50–100 MB RAM and an extra network hop per pod. At 1,000 pods that is 50–100 GB of sidecar memory alone. Ambient eliminates the sidecar entirely: users report slashing 45%+ of running containers and >90% resource reduction in some workloads after migrating from sidecar mesh.
+
+#### Two-Layer Architecture
+
+Ambient splits mesh functions into two layers:
+
+| Layer | Component | Scope | Responsibilities |
+|-------|-----------|-------|-----------------|
+| L4 | **ztunnel** (Rust DaemonSet) | Per node | mTLS, SPIFFE cert exchange, L4 AuthorizationPolicy, telemetry |
+| L7 | **Waypoint proxy** (Envoy Deployment) | Per namespace / per service | HTTP routing, retries, JWT auth, L7 AuthorizationPolicy, VirtualService |
+
+**ztunnel** intercepts all pod traffic on a node via iptables/eBPF redirection. It tunnels inter-node traffic using **HBONE** (HTTP-Based Overlay Network Environment) — HTTP/2 CONNECT over port **15008**, carrying the original TCP stream with SPIFFE identity in headers. No sidecar is injected; ztunnel is shared across all pods on the node.
+
+**Waypoint proxies** are optional. If you only need mTLS and L4 policy, deploy nothing extra. Add a waypoint only when you need L7 features (traffic splitting, retries, JWT validation).
 
 ```mermaid
 flowchart LR
-    subgraph Node1["Node 1 worker-1"]
-        zt1["ztunnel v1.20 per-node L4 mTLS HBONE :15008"]
-        wp["waypoint proxy per-namespace L7 VirtualService + AuthorizationPolicy"]
-        p1["Pod app:frontend"]
-        p1 --"iptables redirect"--> zt1
-        zt1 --"L7 policy"--> wp
+    subgraph Node1["Node 1 — worker-1"]
+        p1["Pod: frontend"]
+        zt1["ztunnel (DaemonSet)\nRust · L4 mTLS · HBONE :15008"]
+        wp["Waypoint Proxy\nEnvoy · L7 VirtualService\nAuthorizationPolicy (HTTP)"]
+        p1 --"iptables/eBPF redirect"--> zt1
+        zt1 --"L7 needed?"--> wp
     end
-    subgraph Node2["Node 2 worker-2"]
-        zt2["ztunnel v1.20 per-node L4 mTLS HBONE :15008"]
-        p2["Pod app:backend"]
-        zt2 --"deliver to pod"--> p2
+    subgraph Node2["Node 2 — worker-2"]
+        zt2["ztunnel (DaemonSet)\nRust · L4 mTLS · HBONE :15008"]
+        p2["Pod: backend"]
+        zt2 --> p2
     end
-    wp --"mTLS HBONE tunnel :15008"--> zt2
+    wp --"HBONE mTLS tunnel :15008"--> zt2
+    zt1 --"HBONE mTLS tunnel :15008 (L4-only path)"--> zt2
     style Node1 fill:#e8f5e9,stroke:#4CAF50
     style Node2 fill:#e8f5e9,stroke:#4CAF50
 ```
 
-Ambient mode eliminates sidecar overhead; ztunnel handles mTLS transparently.
+> **K8s Engineer's Translation:** ztunnel is a per-node kernel-bypass proxy — think of it like a CNI plugin that adds mTLS. Waypoint is an on-demand L7 Envoy you deploy only where needed. The old sidecar model injected an Envoy into every pod; ambient gives you the same security guarantees with a fraction of the overhead.
+
+#### Enable Ambient Mode
+
+```bash
+# 1. Install Istio with ambient profile (requires K8s 1.33+)
+istioctl install --set profile=ambient -y
+
+# Verify — you should see ztunnel DaemonSet, istiod, and CNI
+kubectl get pods -n istio-system
+# istiod-*         Running
+# ztunnel-*        Running  (one per node)
+# istio-cni-node-* Running  (one per node)
+
+# 2. Enroll a namespace — no pod restart required
+kubectl label namespace default istio.io/dataplane-mode=ambient
+
+# Verify pods are captured by ztunnel
+kubectl get pods -n default -o wide
+# Note: no istio-proxy container — ztunnel handles it transparently
+```
+
+#### Deploy a Waypoint Proxy (L7 features)
+
+```bash
+# Deploy a waypoint for a namespace
+istioctl waypoint apply --enroll-namespace --namespace default
+
+# Or target a specific service account (service-scoped waypoint)
+istioctl waypoint apply --name backend-waypoint --for service --namespace default
+
+# Annotate the namespace to use the waypoint
+kubectl annotate ns default istio.io/use-waypoint=waypoint
+
+# Verify
+istioctl waypoint list -n default
+# NAME      TRAFFIC TYPE  PROGRAMMED
+# waypoint  service       True
+
+kubectl get gateway -n default
+# waypoint  istio  ...  True
+```
+
+#### L4 Policy (no waypoint needed)
+
+```yaml
+# L4 AuthorizationPolicy — works with ztunnel only, no waypoint required
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-frontend-to-backend
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: backend
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals:
+        - "cluster.local/ns/default/sa/frontend"
+```
+
+#### L7 Policy (waypoint required)
+
+```yaml
+# L7 AuthorizationPolicy — requires waypoint proxy in the path
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-get-only
+  namespace: default
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: waypoint           # targets the waypoint, not the pod
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/default/sa/frontend"]
+    to:
+    - operation:
+        methods: ["GET"]
+        paths: ["/api/*"]
+```
+
+#### Sidecar vs Ambient — When to Use Which
+
+| Dimension | Sidecar | Ambient |
+|-----------|---------|---------|
+| Memory per pod | ~50–100 MB | ~0 (shared ztunnel) |
+| L4 mTLS | ✓ | ✓ (ztunnel) |
+| L7 policy / VirtualService | ✓ (always) | ✓ (waypoint only where needed) |
+| Pod restart on mesh join | Yes (injection) | **No** |
+| Upgrade mesh without restarting apps | No | **Yes** |
+| Multicluster | GA | **Active support** (multi-primary + failover documented) |
+| K8s requirement | 1.28+ | **1.33+** |
+| Recommended for new installs | Legacy | **Yes (default 2025+)** |
+
+#### Troubleshooting Ambient Mode
+
+```bash
+# Check which workloads ztunnel is tracking
+istioctl ztunnel-config workload -n default
+
+# Check which services are in the mesh
+istioctl ztunnel-config service -n default
+
+# Inspect waypoint status
+istioctl waypoint status -n default
+
+# Check envoy stats for the waypoint proxy
+kubectl exec -n default deploy/waypoint -- curl -s localhost:15020/stats/prometheus | grep downstream
+
+# Analyze config for ambient-specific issues
+istioctl analyze -n default
+
+# Check ztunnel logs for connection issues
+kubectl logs -n istio-system -l app=ztunnel --tail=50 | grep -i error
+
+# Verify HBONE tunnels are established
+kubectl exec -n istio-system -l app=ztunnel -- ss -tnp | grep 15008
+```
 
 ### Sidecar Injection + mTLS Handshake Flow
 
@@ -520,7 +665,7 @@ EOF
 istioctl experimental envoy-stats <pod>
 ```
 
-> **See also:** [Lesson 16 — Network Policies](16-network-policies.md) for base NetworkPolicy before layering Istio AuthorizationPolicy.
+> **See also:** [Lesson 16 — Network Policies](16-network-policies.md) for base NetworkPolicy before layering Istio AuthorizationPolicy. · [Lesson 40 — OpenTelemetry for K8s Network Engineers](40-opentelemetry-network-observability.md) — OTel Collector + Istio trace integration, OTTL filtering
 
 
 ---
@@ -553,6 +698,11 @@ istioctl experimental envoy-stats <pod>
 
 | Use Case | Command |
 |----------|---------|
+| Enable ambient mode on namespace | `kubectl label ns <ns> istio.io/dataplane-mode=ambient` |
+| Check ztunnel workload capture | `istioctl ztunnel-config workload -n <ns>` |
+| Deploy waypoint proxy | `istioctl waypoint apply --enroll-namespace -n <ns>` |
+| List waypoints | `istioctl waypoint list -n <ns>` |
+| Check waypoint status | `istioctl waypoint status -n <ns>` |
 | Check sidecar injection status for all pods | `istioctl proxy-status` |
 | Inspect Envoy cluster config for a pod | `istioctl proxy-config cluster <pod>.default` |
 | Check mTLS status for a service | `istioctl authn tls-check <pod>.default` |
@@ -577,7 +727,7 @@ istioctl experimental envoy-stats <pod>
 | Traffic splitting | VirtualService weights |
 | Circuit breaker | DestinationRule outlierDetection |
 | Tracing | Envoy propagates B3/W3C trace headers |
-| Ambient mode | ztunnel (L4) + waypoint (L7), no sidecar |
+| Ambient mode | ztunnel (L4, per-node Rust DaemonSet) + optional waypoint (L7 Envoy); **GA Istio 1.24** |
 
 ---
 

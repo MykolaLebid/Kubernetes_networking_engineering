@@ -195,7 +195,7 @@ Symptom: network fault
 | Component | Role |
 |---|---|
 | **Cilium Hubble OTLP export** | Hubble flows → OTLP traces (network hops as spans in Tempo) |
-| **OTel eBPF Instrumentation (OBI)** | **v1.0 GA (2026)** — formerly Beyla (donated to OTel/CNCF); zero-code eBPF auto-instrumentation; protocols: HTTP/HTTPS, HTTP/2, gRPC, SQL, Redis, MongoDB, Kafka, GraphQL, Elasticsearch/OpenSearch, AWS S3 |
+| **OTel eBPF Instrumentation (OBI)** | **v1.0 GA (Oct 2026)** — the OTel project's eBPF auto-instrumentation tool (OBI, `open-telemetry/opentelemetry-ebpf-instrumentation`); zero-code, out-of-process; protocols: HTTP/HTTPS, HTTP/2, gRPC, SQL, Redis, MongoDB, Kafka, GraphQL, Elasticsearch/OpenSearch, AWS S3 |
 | **OTel Collector** | Receives OTLP from Cilium + app SDKs; fans out to Prometheus/Tempo/Loki; **OTTL v1 (stable)** — transform/filter query language for processors: drop high-cardinality attrs, rename metrics, filter health-check spans |
 | **K8s Operator** | `OpenTelemetryCollector` CRD — declarative Collector deployment; `Instrumentation` CRD — auto-injects SDK via pod annotation (`instrumentation.opentelemetry.io/inject-python: "true"`); supports .NET, Java, Node.js, Python, Go, NGINX, Apache HTTPD; no code change needed |
 | **Tetragon → Loki** | Process/network security events as structured JSON logs with trace context |

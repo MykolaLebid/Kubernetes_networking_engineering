@@ -12,6 +12,9 @@ Minimum versions required for features covered in each lesson.
 | Dual-stack (GA) | 1.23 | 15 | Both IPv4 + IPv6 pod/service CIDRs |
 | Gateway API (beta) | 1.24 | 18 | Requires separate Gateway API CRDs install |
 | Gateway API (GA) | 1.28 | 18 | GatewayClass, HTTPRoute stable |
+| Gateway API v1.3 (request mirroring, CORS, retry budgets) | 1.30 | 18 | GatewayClass merging, Inference Extension |
+| kube-proxy nftables mode (alpha) | 1.29 | 13 | `--proxy-mode=nftables`; kernel 5.13+ |
+| kube-proxy nftables mode (beta) | 1.33 | 13 | IPVS deprecation announced Nov 2026 |
 | NetworkPolicy (GA) | 1.7 | 16 | Requires CNI enforcement (not built-in) |
 | PodDisruptionBudget | 1.21 | 17 | For ingress controller HA |
 | IPVS kube-proxy mode | 1.11 | 13 | Requires kernel ipvs modules |
@@ -32,7 +35,8 @@ Minimum versions required for features covered in each lesson.
 | Calico | 3.21 | eBPF dataplane (GA) | 11 |
 | Calico | 3.14 | WireGuard node-to-node encryption | 11 |
 | Calico | 3.11 | IPAM block size tuning | 11 |
-| Cilium | 1.12 | Gateway API support | 12, 18 |
+| Cilium | 1.15 | Hubble OTLP export | 24, 40 |
+| Cilium | 1.20 | Current stable; remote node workload info in Hubble flows | 12, 24, 40 |
 | Cilium | 1.11 | Cluster Mesh (stable) | 22 |
 | Cilium | 1.10 | kube-proxy replacement (GA) | 12 |
 | Cilium | 1.9 | WireGuard node-to-node encryption | 23 |
@@ -48,7 +52,7 @@ Minimum versions required for features covered in each lesson.
 | Feature | Min Istio Version | Lesson |
 |---------|------------------|--------|
 | Ambient mode (beta) | 1.18 | 21 |
-| Ambient mode (GA) | 1.22 | 21 |
+| Ambient mode (GA) | 1.24 | 21 |
 | Gateway API support | 1.16 | 21 |
 | Telemetry API | 1.12 | 21 |
 | ProxyConfig API | 1.12 | 21 |
@@ -99,6 +103,18 @@ Minimum versions required for features covered in each lesson.
 
 ---
 
+## OpenTelemetry Version Requirements
+
+| Component | Min Version | Feature | Lesson |
+|-----------|-------------|---------|--------|
+| OTel Collector | 0.100+ | OTTL v1 stable (transform/filter processors) | 40 |
+| OBI (formerly Beyla) | 1.0 | GA — HTTP/gRPC/SQL/Redis/Kafka/MongoDB/GraphQL/Elasticsearch/S3; kernel 4.18+ | 40 |
+| K8s OTel Operator | 0.95+ | Instrumentation CRD for Python/Java/Node/Go/.NET/NGINX | 40 |
+| Cilium | 1.15 | Hubble OTLP export | 24, 40 |
+| nftables kernel | 5.13 | kube-proxy nftables mode | 13 |
+
+---
+
 ## minikube / Lab Environment
 
 | Requirement | Version / Notes | Lesson |
@@ -108,6 +124,6 @@ Minimum versions required for features covered in each lesson.
 | bpftool | kernel 5.x+ | 10 |
 | calicoctl | matches Calico version | 11 |
 | cilium CLI | ≥ 0.15 | 12 |
-| istioctl | ≥ 1.18 (for ambient) | 21 |
+| istioctl | ≥ 1.24 (for ambient GA) | 21 |
 | argocd CLI | ≥ 2.8 | 33 |
 | Podman / Docker | for minikube driver | All |

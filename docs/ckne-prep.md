@@ -29,7 +29,7 @@ Both are hands-on, job-posting–recognized credentials in SRE, platform enginee
 | **Network Security & Policy** | 25% | [16](lessons/16-network-policies.md), [23](lessons/23-network-security-hardening.md), [35](lessons/35-tetragon-ebpf-runtime-security.md) | default-deny NetworkPolicy, WireGuard node encryption, mTLS, pod-level auth, TLS certs for Gateways |
 | **Advanced Traffic Management** | 20% | [17](lessons/17-ingress-controllers.md), [18](lessons/18-gateway-api.md), [21](lessons/21-service-mesh-istio.md), [22](lessons/22-multi-cluster-networking.md) | Ingress/Gateway routing, egress gateways, cross-cluster service discovery, load distribution |
 | **Core Infrastructure & CNI** | 15% | [09](lessons/09-cni-specification.md), [11](lessons/11-calico-cni-deep-dive.md), [12](lessons/12-cilium-cni-ebpf.md), [38](lessons/38-multus-cni.md) | CNI plugin installation, IPAM, multi-interface pods (Multus), pod connectivity troubleshooting |
-| **Observability** | 15% | [24](lessons/24-network-observability-troubleshooting.md), [12](lessons/12-cilium-cni-ebpf.md) | Hubble flow inspection, L7 protocol visibility, metrics, end-to-end tracing, traffic audit logs |
+| **Observability** | 15% | [24](lessons/24-network-observability-troubleshooting.md), [12](lessons/12-cilium-cni-ebpf.md), [40](lessons/40-opentelemetry-network-observability.md) | Hubble flow inspection, L7 protocol visibility, metrics, end-to-end tracing, OTel/OBI zero-code instrumentation, traffic audit logs |
 
 ### Recommended study path
 
@@ -52,6 +52,7 @@ Week 3 — Traffic + Multi-cluster
 
 Week 4 — Observability + Practice
   Lesson 24 (Observability, Hubble)
+  Lesson 40 (OpenTelemetry: OBI v1.0, K8s Operator, Hubble OTLP, OTTL v1)
   Lab scripts: validate-13, validate-16, validate-09
   Full mock: deploy Cilium, write NetworkPolicy, configure Gateway, trace with Hubble
 ```

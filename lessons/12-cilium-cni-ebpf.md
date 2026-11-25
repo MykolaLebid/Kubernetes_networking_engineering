@@ -547,6 +547,6 @@ hubble observe --protocol http --verdict DROPPED           # → non-GET request
 
 ---
 
-See also: [Lesson 35 — Tetragon](35-tetragon-ebpf-runtime-security.md) · [Lesson 37 — Compliance Networking](37-compliance-networking.md)
+See also: [Lesson 35 — Tetragon](35-tetragon-ebpf-runtime-security.md) · [Lesson 37 — Compliance Networking](37-compliance-networking.md) · [Lesson 40 — OpenTelemetry for K8s Network Engineers](40-opentelemetry-network-observability.md) — OBI v1.0 eBPF auto-instrumentation, Hubble OTLP integration
 
 **← Previous:** [Lesson 11 — Calico CNI Deep Dive](11-calico-cni-deep-dive.md)   |   **Next:** [Lesson 13 — Kubernetes Services and kube-proxy](13-kubernetes-services-kube-proxy.md)

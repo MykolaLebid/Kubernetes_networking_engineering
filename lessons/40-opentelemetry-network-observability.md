@@ -98,7 +98,7 @@ graph TD
 |------|-------|
 | 2023 | Grafana releases Beyla — eBPF auto-instrumentation for Go/HTTP |
 | 2024 | Beyla 1.x adds gRPC, Redis, SQL, Kafka support |
-| 2025 | Grafana donates Beyla to CNCF; project moves into OTel project; renamed **OBI** (OpenTelemetry eBPF Instrumentation) |
+| 2025–2026 | The OTel project develops **OBI** (`opentelemetry-ebpf-instrumentation`) as its native eBPF auto-instrumentation component; adds gRPC, SQL, Kafka, Redis, GraphQL, AWS SDK support |
 | 2026 | **OBI v1.0 GA** — 10 protocol categories, full trace context propagation for Go/Node/Python/NGINX/PHP |
 
 ### How it works

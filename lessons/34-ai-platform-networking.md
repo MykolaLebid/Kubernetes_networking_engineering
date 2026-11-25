@@ -541,6 +541,8 @@ spec:
 
 ## 13. Network Policy Considerations for AI Clusters
 
+> **Gateway API Inference Extension:** For HTTP-based LLM inference serving (vLLM, Triton), use the `InferencePool` and `InferenceModel` CRDs from the Gateway API Inference Extension project. These provide kv-cache-aware endpoint selection, session affinity for long-running requests, and criticality-based load shedding — without custom Lua/WASM filters. Compatible with Envoy Gateway, kgateway, and GKE Gateway. See [Lesson 18 — Gateway API §9](18-gateway-api.md#9-gateway-api-inference-extension) for full details and YAML examples.
+
 AI training pods have different network requirements than web services:
 
 ```yaml

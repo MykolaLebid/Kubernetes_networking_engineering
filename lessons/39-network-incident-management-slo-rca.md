@@ -588,4 +588,4 @@ Complete alert rule set for network SLOs — apply to all production clusters:
 ---
 
 **Previous:** [Lesson 38 — Multus CNI and Multi-Homed Pods](38-multus-cni.md)  
-**See also:** [Lesson 24 — Network Observability and Troubleshooting](24-network-observability-troubleshooting.md) · [Lesson 35 — Tetragon: eBPF Runtime Security](35-tetragon-ebpf-runtime-security.md) · [Lesson 37 — Compliance Networking](37-compliance-networking.md) · [docs/compliance-paths.md](../compliance-paths.md)
+**See also:** [Lesson 24 — Network Observability and Troubleshooting](24-network-observability-troubleshooting.md) · [Lesson 35 — Tetragon: eBPF Runtime Security](35-tetragon-ebpf-runtime-security.md) · [Lesson 37 — Compliance Networking](37-compliance-networking.md) · [docs/compliance-paths.md](../compliance-paths.md) · [Lesson 40 — OpenTelemetry for K8s Network Engineers](40-opentelemetry-network-observability.md) — full OBI + Hubble + Collector reference implementation

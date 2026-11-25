@@ -241,9 +241,11 @@ rules:
 
 ## 7. TCPRoute and GRPCRoute
 
+> **Status update (v1.6+):** TCPRoute and UDPRoute graduated to **v1 GA** in Gateway API v1.6 (June 2024) — use `gateway.networking.k8s.io/v1` API version. GRPCRoute is Standard channel. No longer requires experimental CRDs.
+
 ```yaml
-# TCPRoute — route raw TCP (databases, message queues)
-apiVersion: gateway.networking.k8s.io/v1alpha2
+# TCPRoute — v1 GA as of Gateway API v1.6
+apiVersion: gateway.networking.k8s.io/v1
 kind: TCPRoute
 metadata:
   name: postgres-route
@@ -479,8 +481,8 @@ Key parameter tables are embedded in the Theory sections above:
 | Describe Gateway (check status conditions) | `kubectl describe gateway <name> -n <ns>` |
 | Describe HTTPRoute (check Accepted/ResolvedRefs) | `kubectl describe httproute <name> -n <ns>` |
 | List ReferenceGrants | `kubectl get referencegrant -A` |
-| Install standard Gateway API CRDs | `kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml` |
-| Install experimental CRDs (TCPRoute, UDPRoute, GRPCRoute) | `kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/experimental-install.yaml` |
+| Install standard Gateway API CRDs | `kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/standard-install.yaml` |
+| Install experimental CRDs | `kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/experimental-install.yaml` |
 | Test weighted traffic split (20 requests) | `for i in $(seq 1 20); do curl -s -H "Host: web.example.com" http://<gw-ip>/; done` |
 | Test header-based canary routing | `curl -H "X-Canary: true" -H "Host: web.example.com" http://<gw-ip>/` |
 | Get Gateway API conformance test results | `kubectl get gatewayclass <name> -o jsonpath='{.status.conditions}'` |
@@ -497,6 +499,175 @@ Key parameter tables are embedded in the Theory sections above:
 | TCPRoute | Namespace | TCP routing rules |
 | GRPCRoute | Namespace | gRPC routing rules |
 | ReferenceGrant | Namespace | Grants cross-namespace routing permission |
+
+---
+
+## 8. Gateway API v1.3–v1.7: What's New
+
+Gateway API has released rapidly since v1.2. Here is what graduated to Standard (stable) and what entered experimental by version:
+
+| Version | Released | Graduated to Standard | New Experimental |
+|---------|----------|-----------------------|-----------------|
+| **v1.3** | April 2025 | Percentage-based request mirroring (`HTTPRoute`/`GRPCRoute`) | `XListenerSet` (listener merging); `XBackendTrafficPolicy` (retry budgets + session persistence); CORS filter |
+| **v1.4** | Oct 2025 | `BackendTLSPolicy`; `SupportedFeatures` status | Mesh resource; Default Gateways; HTTP External Auth |
+| **v1.5** | Feb 2026 | `TLSRoute` v1 GA; CORS filter; `ListenerSet`; `ReferenceGrant` v1; Gateway client-cert validation | Gateway + HTTPRoute-level authentication |
+| **v1.6** | Jun 2024 | **TCPRoute + UDPRoute v1 GA** (use `gateway.networking.k8s.io/v1`); CORS → standard | `XBackend` resource |
+| **v1.7** | Oct 2024 | HTTPRoute Retries (`codes`/`attempts`/`backoff`); BackendTLSPolicy SANs/TLS options | `XTelemetryPolicy` (OTel tracing config); Pre-routing Filters (ext-auth, payload inspection); Session Persistence on Backend |
+
+**Current stable: v1.5.1** (March 14, 2026). Install:
+```bash
+# Standard channel (HTTPRoute, Gateway, GRPCRoute, TCPRoute, UDPRoute, TLSRoute all included)
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/standard-install.yaml
+
+# Experimental channel (adds XListenerSet, XBackendTrafficPolicy, XTelemetryPolicy, etc.)
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/experimental-install.yaml
+```
+
+### HTTPRoute Retries (Standard since v1.7)
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-with-retries
+spec:
+  parentRefs:
+    - name: prod-gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api
+      retry:
+        codes: [503, 504]      # retry on these HTTP status codes
+        attempts: 3
+        backoff: 250ms
+      backendRefs:
+        - name: api-service
+          port: 8080
+```
+
+### CORS Filter (Standard since v1.5)
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: api-cors
+spec:
+  rules:
+    - filters:
+        - type: ExtensionRef
+          extensionRef:
+            group: gateway.networking.k8s.io
+            kind: HTTPRouteFilter
+      # CORS via filter — implementation-specific per controller
+      backendRefs:
+        - name: api-service
+          port: 8080
+```
+
+### XTelemetryPolicy — OTel Tracing (Experimental, v1.7+)
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: XTelemetryPolicy
+metadata:
+  name: tracing-policy
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: prod-gateway
+  tracing:
+    provider: zipkin      # or otel
+    endpoint: otel-collector.monitoring:4317
+    samplingRate: 100     # percentage
+```
+
+> **K8s Engineer's Translation:** `XTelemetryPolicy` replaces the vendor-specific `EnvoyPatchPolicy` / annotation-based tracing configs. One CRD works across any conformant Gateway API implementation (Cilium, Envoy Gateway, NGINX). The attribute dictionary is based on OTel semantic conventions — same attrs as lesson 40.
+
+---
+
+## 9. Gateway API Inference Extension
+
+The **Gateway API Inference Extension** (official CNCF project, 2025) extends any ext-proc–capable gateway into an *inference gateway* for AI/ML workloads. It introduces two new CRDs under `inference.networking.k8s.io/v1`:
+
+- **`InferencePool`** — a labeled set of model-server Pods (e.g., vLLM replicas) with an optional Endpoint Picker for smart routing
+- **`InferenceModel`** — a logical model identifier that maps client requests to an `InferencePool`
+
+### Why it matters for network engineers
+
+Standard L7 load balancing (round-robin, least-connections) is a poor fit for LLM inference:
+- Requests are **long-running** (seconds to minutes) — sticky routing avoids KV-cache misses
+- Model servers expose **real-time metrics** (KV-cache fill %, queue depth) — the Endpoint Picker uses these to pick the optimal replica
+- **Multiple LoRA adapters** may run on one base model — `InferenceModel` routes to the right adapter without separate Services
+
+```mermaid
+graph LR
+    C[Client] -->|HTTP POST /v1/completions| GW[Gateway<br/>Envoy Gateway / kgateway]
+    GW -->|ext-proc| EPP[Endpoint Picker<br/>kv-cache aware]
+    EPP -->|pick replica| IP[InferencePool<br/>vLLM pods]
+    IP --> R1[Replica 1<br/>:8000]
+    IP --> R2[Replica 2<br/>:8000]
+    IP --> R3[Replica 3<br/>:8000]
+```
+
+### InferencePool YAML
+
+```yaml
+apiVersion: inference.networking.k8s.io/v1
+kind: InferencePool
+metadata:
+  name: vllm-llama3-pool
+  namespace: ai
+spec:
+  selector:
+    matchLabels:
+      app: vllm-llama3
+  targetPorts:
+    - number: 8000          # port on model-server pods
+  endpointPickerRef:        # optional: smart routing via Endpoint Picker
+    name: vllm-llama3-epp
+    port:
+      number: 9002
+    failureMode: FailOpen   # fall back to random if EPP unavailable
+```
+
+### HTTPRoute + InferencePool
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: llama3-route
+  namespace: ai
+spec:
+  parentRefs:
+    - name: inference-gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1/completions
+      backendRefs:
+        - group: inference.networking.k8s.io
+          kind: InferencePool
+          name: vllm-llama3-pool
+          port: 8000
+```
+
+### Supported gateways
+
+| Gateway | Inference Extension support |
+|---------|---------------------------|
+| Envoy Gateway | Yes (ext-proc native) |
+| kgateway | Yes |
+| GKE Gateway | Yes |
+| Cilium Gateway API | Planned |
+| NGINX Gateway Fabric | Planned |
+
+> **K8s Engineer's Translation:** Think of `InferencePool` as a smarter `Service` for LLM backends — it knows which replica has spare KV-cache capacity instead of blindly round-robining. For GPU cluster networking, pair with RoCE/RDMA for data-plane throughput (see [Lesson 34 — AI Platform Networking](34-ai-platform-networking.md)) and OTel tracing (see [Lesson 40](40-opentelemetry-network-observability.md)) to observe per-request latency across the routing chain.
 
 ---
 

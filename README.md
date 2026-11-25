@@ -10,7 +10,7 @@ Two complete courses + cert prep guides + cheat sheets, covering Kubernetes and 
 
 | Course | Lessons | Tracks |
 |--------|---------|--------|
-| **K8s Networking** | 39 lessons (00–39) | A–J |
+| **K8s Networking** | 41 lessons (00–40) | A–J |
 | **CF Networking** | 23 lessons (cf-00–cf-22) | CF-A–CF-H |
 | **Cheat sheets** | 16 | K8s vs CF side-by-side, eBPF, AWS, OpenShift, AI/GPU |
 | **Migration guide** | 4 chapters | CF→K8s strategy, translation cookbook, coexistence |
@@ -38,7 +38,7 @@ Validation scripts for each track are in `labs/` — run after completing a trac
 
 ---
 
-## K8s Networking — 39 lessons
+## K8s Networking — 41 lessons
 
 ### Track A — Linux Foundations
 
@@ -113,11 +113,12 @@ Validation scripts for each track are in `labs/` — run after completing a trac
 |---|--------|--------|
 | 33 | [ArgoCD and GitOps](lessons/33-argocd-gitops.md) | App CRD, sync waves, multi-cluster deploy, NetworkPolicy drift |
 
-### Track I — AI Platform
+### Track I — AI Platform & Observability
 
 | # | Lesson | Topics |
 |---|--------|--------|
 | 34 | [AI Platform Networking](lessons/34-ai-platform-networking.md) | RDMA, SR-IOV, Multus, RoCE v2, GPU Operator, rail topology |
+| 40 | [OpenTelemetry for K8s Network Engineers](lessons/40-opentelemetry-network-observability.md) | OBI v1.0, K8s Operator, Hubble OTLP, network sem-convs, OTTL v1, profiling |
 
 ### Track J — Security and Compliance
 
@@ -219,6 +220,7 @@ Phase 6  OpenShift                25–28   OVN-K, Routes, EgressIP
 Phase 7  AWS                      29–32   EKS, VPC design, LB Controller, hybrid
 Phase 8  GitOps & AI              33–34   ArgoCD, RDMA/SR-IOV/rail topology
 Phase 9  Security & Compliance    35–39   Tetragon, KubeEdge, HIPAA/PCI/IEC/GDPR, Multus, Incident Management/SLOs/RCA
+Phase 10 OTel & Observability     40      OBI v1.0, K8s OTel Operator, Hubble OTLP, OTTL v1
 Phase 10 CF Networking            cf-01–cf-22   Garden, Silk, Gorouter, ASGs, BTP, compliance
 Phase 11 Migration & Cheat Sheets           CF→K8s patterns, 16 quick-reference sheets
 ```

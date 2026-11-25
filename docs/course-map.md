@@ -1,6 +1,6 @@
 # Course Map
 
-Visual dependency graph of all 34 lessons. Follow the arrows to understand prerequisites.
+Visual dependency graph of all 41 lessons. Follow the arrows to understand prerequisites.
 
 ---
 
@@ -42,6 +42,7 @@ flowchart TD
     32["32\nAWS Hybrid\nMulti-Cluster"]
     33["33\nArgoCD\nGitOps"]
     34["34\nAI Platform\nNetworking"]
+    40["40\nOpenTelemetry\nfor K8s Engineers"]
 
     01 --> 02
     01 --> 03
@@ -91,6 +92,11 @@ flowchart TD
     30 --> 31
     31 --> 32
     33 --> 34
+    10 --> 40
+    12 --> 40
+    21 --> 40
+    24 --> 40
+    39 --> 40
 
     style 01 fill:#1565C0,color:#fff
     style 02 fill:#1565C0,color:#fff
@@ -126,6 +132,7 @@ flowchart TD
     style 32 fill:#E65100,color:#fff
     style 33 fill:#4527A0,color:#fff
     style 34 fill:#880E4F,color:#fff
+    style 40 fill:#880E4F,color:#fff
 ```
 
 ---
@@ -142,7 +149,7 @@ flowchart TD
 | F — OpenShift | 25–28 | OVN-Kubernetes, Routes, EgressIP |
 | G — AWS | 29–32 | EKS-specific networking and hybrid connectivity |
 | H — GitOps | 33 | ArgoCD sync waves for network config delivery |
-| I — AI Platform | 34 | RDMA, SR-IOV, rail topology, GPU cluster networking |
+| I — AI Platform & Observability | 34, 40 | RDMA/SR-IOV/GPU rail topology; OTel/OBI zero-code instrumentation |
 
 ---
 
@@ -158,4 +165,4 @@ flowchart TD
 `01 → 03 → 08 → 09 → 13 → 16 → 20 → 29 → 30 → 31 → 32`
 
 ### AI/HPC Platform Engineer
-`01 → 05 → 07 → 09 → 10 → 12 → 34`
+`01 → 05 → 07 → 09 → 10 → 12 → 34 → 40`

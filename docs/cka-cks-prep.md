@@ -66,7 +66,7 @@ Map of all exam domains to specific lessons in this course.
 | **System Hardening** | 10% | [35](lessons/35-tetragon-ebpf-runtime-security.md) |
 | **Minimize Microservice Vulnerabilities** | 20% | [16](lessons/16-network-policies.md), [12](lessons/12-cilium-cni-ebpf.md), [21](lessons/21-service-mesh-istio.md) |
 | **Supply Chain Security** | 20% | — |
-| **Monitoring, Logging & Runtime Security** | 20% | [35](lessons/35-tetragon-ebpf-runtime-security.md), [24](lessons/24-network-observability-troubleshooting.md) |
+| **Monitoring, Logging & Runtime Security** | 20% | [35](lessons/35-tetragon-ebpf-runtime-security.md), [24](lessons/24-network-observability-troubleshooting.md), [40](lessons/40-opentelemetry-network-observability.md) |
 
 ### Networking-specific CKS tasks
 
