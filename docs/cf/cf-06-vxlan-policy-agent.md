@@ -4,7 +4,7 @@
 **Lesson:** 6 of 9
 **Time:** Quick Read 10 min | Deep Dive 45 min
 
-**Jump to:** [Theory](#1-architecture-overview--where-the-vpa-fits) · [Practice](#practice-setup) · [Troubleshooting](#4-troubleshooting-c2c-policy-enforcement) · [Quick Reference](#quick-reference)
+**Jump to:** [Theory](#1-architecture-overview-where-the-vpa-fits) · [Practice](#practice-setup) · [Troubleshooting](#4-troubleshooting-c2c-policy-enforcement) · [Quick Reference](#quick-reference)
 
 ---
 

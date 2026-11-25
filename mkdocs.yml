@@ -84,6 +84,7 @@ nav:
     - Course Map: course-map.md
     - Version Matrix: version-matrix.md
     - Resources: RESOURCES.md
+    - "00 · Visual Overview": lessons/00-k8s-concepts-visual-overview.md
     - "Track A — Linux Foundations":
       - "01 · Linux Networking Fundamentals": lessons/01-linux-networking-fundamentals.md
       - "02 · IP Routing and Forwarding": lessons/02-ip-routing-and-forwarding.md
@@ -141,32 +142,32 @@ nav:
   - "CF Networking":
     - Overview: cf/cf-00-overview.md
     - "Track CF-A — Platform Foundations":
-      - cf/cf-01-platform-architecture.md
-      - cf/cf-02-garden-container-networking.md
-      - cf/cf-03-bosh-dns-service-discovery.md
-      - cf/cf-04-ipam.md
+      - "CF-01 · CF Platform Architecture": cf/cf-01-platform-architecture.md
+      - "CF-02 · Garden Container Networking": cf/cf-02-garden-container-networking.md
+      - "CF-03 · BOSH DNS and Service Discovery": cf/cf-03-bosh-dns-service-discovery.md
+      - "CF-04 · IP Address Management": cf/cf-04-ipam.md
     - "Track CF-B — Container Runtime & Policy":
-      - cf/cf-05-silk-cni-vxlan.md
-      - cf/cf-06-vxlan-policy-agent.md
-      - cf/cf-07-application-security-groups.md
-      - cf/cf-08-garden-namespaces-deep-dive.md
+      - "CF-05 · Silk CNI — VXLAN Overlay": cf/cf-05-silk-cni-vxlan.md
+      - "CF-06 · VXLAN Policy Agent": cf/cf-06-vxlan-policy-agent.md
+      - "CF-07 · Application Security Groups": cf/cf-07-application-security-groups.md
+      - "CF-08 · Garden Namespaces Deep Dive": cf/cf-08-garden-namespaces-deep-dive.md
     - "Track CF-C — Routing":
-      - cf/cf-09-gorouter.md
-      - cf/cf-10-tcp-router.md
-      - cf/cf-11-routes-domains.md
-      - cf/cf-12-service-discovery.md
+      - "CF-09 · Gorouter HTTP Routing": cf/cf-09-gorouter.md
+      - "CF-10 · TCP Router": cf/cf-10-tcp-router.md
+      - "CF-11 · Routes, Domains, and Route Services": cf/cf-11-routes-domains.md
+      - "CF-12 · Service Discovery Deep Dive": cf/cf-12-service-discovery.md
     - "Track CF-D — Security & Isolation":
-      - cf/cf-13-c2c-network-policies.md
-      - cf/cf-14-tls-certificates.md
-      - cf/cf-15-org-space-isolation.md
+      - "CF-13 · C2C Network Policies": cf/cf-13-c2c-network-policies.md
+      - "CF-14 · TLS and Certificates": cf/cf-14-tls-certificates.md
+      - "CF-15 · Org/Space Isolation": cf/cf-15-org-space-isolation.md
     - "Track CF-E — Observability":
-      - cf/cf-16-observability-troubleshooting.md
-      - cf/cf-17-logging-metrics-performance.md
+      - "CF-16 · Observability and Troubleshooting": cf/cf-16-observability-troubleshooting.md
+      - "CF-17 · Logging, Metrics, and Performance": cf/cf-17-logging-metrics-performance.md
     - "Track CF-F — Migration & Korifi":
-      - cf/cf-18-korifi-cf-on-kubernetes.md
-      - cf/cf-19-cf-to-k8s-migration-patterns.md
+      - "CF-18 · Korifi — CF API on Kubernetes": cf/cf-18-korifi-cf-on-kubernetes.md
+      - "CF-19 · CF-to-K8s Migration Patterns": cf/cf-19-cf-to-k8s-migration-patterns.md
     - "Track CF-G — Comparison":
-      - cf/cf-20-cf-vs-k8s-comparison.md
+      - "CF-20 · K8s vs CF Complete Comparison": cf/cf-20-cf-vs-k8s-comparison.md
     - "Track CF-H — Security & Compliance":
       - "CF-21 · Compliance Networking (HIPAA/PCI-DSS/IEC 62443/GDPR)": cf/cf-21-compliance-networking.md
       - "CF-22 · SAP BTP Networking Deep Dive": cf/cf-22-sap-btp-networking.md
@@ -180,18 +181,18 @@ nav:
 
   - "Cheat Sheets":
     - Index: cheatsheets/cs-00-index.md
-    - cheatsheets/cs-01-linux-primitives.md
-    - cheatsheets/cs-02-overlay-networks.md
-    - cheatsheets/cs-03-cni-overview.md
-    - cheatsheets/cs-04-k8s-services-dns.md
-    - cheatsheets/cs-05-cf-routing.md
-    - cheatsheets/cs-06-network-policy-compare.md
-    - cheatsheets/cs-07-ingress-compare.md
-    - cheatsheets/cs-08-service-mesh.md
-    - cheatsheets/cs-09-observability.md
-    - cheatsheets/cs-10-security-hardening.md
-    - cheatsheets/cs-11-aws-eks.md
-    - cheatsheets/cs-12-openshift.md
-    - cheatsheets/cs-13-migration-cheatsheet.md
-    - cheatsheets/cs-14-ebpf-quick-ref.md
-    - cheatsheets/cs-15-ai-gpu-networking.md
+    - "CS-01 · Linux Networking Primitives": cheatsheets/cs-01-linux-primitives.md
+    - "CS-02 · VXLAN / Geneve / Silk Overlay": cheatsheets/cs-02-overlay-networks.md
+    - "CS-03 · CNI Plugins at a Glance": cheatsheets/cs-03-cni-overview.md
+    - "CS-04 · K8s Services, kube-proxy, CoreDNS": cheatsheets/cs-04-k8s-services-dns.md
+    - "CS-05 · CF Routing": cheatsheets/cs-05-cf-routing.md
+    - "CS-06 · Network Policy K8s vs CF": cheatsheets/cs-06-network-policy-compare.md
+    - "CS-07 · Ingress Compared": cheatsheets/cs-07-ingress-compare.md
+    - "CS-08 · Service Mesh Essentials": cheatsheets/cs-08-service-mesh.md
+    - "CS-09 · Observability, SLOs, RCA": cheatsheets/cs-09-observability.md
+    - "CS-10 · Security Hardening Checklist": cheatsheets/cs-10-security-hardening.md
+    - "CS-11 · AWS EKS Networking": cheatsheets/cs-11-aws-eks.md
+    - "CS-12 · OpenShift Networking": cheatsheets/cs-12-openshift.md
+    - "CS-13 · CF→K8s Migration": cheatsheets/cs-13-migration-cheatsheet.md
+    - "CS-14 · eBPF Quick Reference": cheatsheets/cs-14-ebpf-quick-ref.md
+    - "CS-15 · AI/GPU Networking": cheatsheets/cs-15-ai-gpu-networking.md

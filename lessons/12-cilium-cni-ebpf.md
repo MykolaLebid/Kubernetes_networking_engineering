@@ -456,7 +456,7 @@ hubble observe --protocol http --verdict DROPPED           # → non-GET request
 - [ ] Size the eBPF CT table for expected connection count (`bpf-ct-global-tcp-max`: default 512Ki)
 - [ ] Tune `bpf.masquerade=true` to move masquerade off iptables once kube-proxy is replaced
 - [ ] Deploy [Tetragon](35-tetragon-ebpf-runtime-security.md) alongside Cilium for runtime security audit of syscalls and file access
-- [ ] Use `CiliumClusterwideNetworkPolicy` default-deny with `fromEntities: cluster` before cluster goes to production — see [Lesson 23 — Network Policy and Security Hardening](23-network-policy-security.md) for hardening patterns
+- [ ] Use `CiliumClusterwideNetworkPolicy` default-deny with `fromEntities: cluster` before cluster goes to production — see [Lesson 23 — Network Policy and Security Hardening](23-network-security-hardening.md) for hardening patterns
 
 ---
 

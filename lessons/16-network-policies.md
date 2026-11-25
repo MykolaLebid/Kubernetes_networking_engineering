@@ -1,7 +1,7 @@
 # Lesson 16 — Network Policies: Microsegmentation
 
 > **Track:** Network Foundation — Bare Metal & Cloud  
-> **Prerequisites:** [Lesson 13 — Kubernetes Services](13-kubernetes-services-kube-proxy.md) · [Lesson 10 — eBPF](10-ebpf-networking.md) · [Lesson 12 — Cilium](12-cilium-cni.md)  
+> **Prerequisites:** [Lesson 13 — Kubernetes Services](13-kubernetes-services-kube-proxy.md) · [Lesson 10 — eBPF](10-ebpf-xdp.md) · [Lesson 12 — Cilium](12-cilium-cni-ebpf.md)  
 > **Duration:** ~2.5 hours
 
 > **Goal:** Configure NetworkPolicy resources to implement microsegmentation, enforce default-deny namespaces, test connectivity enforcement with Cilium and Calico tooling, and avoid common selector and DNS egress pitfalls.

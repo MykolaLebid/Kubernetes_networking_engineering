@@ -618,4 +618,4 @@ ip link set dev eth0 xdp off
 
 **← Previous:** [Lesson 09 — CNI Specification and Plugin Architecture](09-cni-specification.md)   |   **Next:** [Lesson 11 — Calico CNI Deep Dive](11-calico-cni-deep-dive.md)
 
-**Forward links:** [Lesson 11 — Calico CNI Deep Dive](11-calico-cni-deep-dive.md) · [Lesson 12 — Cilium CNI Deep Dive](12-cilium-cni-deep-dive.md)
+**Forward links:** [Lesson 11 — Calico CNI Deep Dive](11-calico-cni-deep-dive.md) · [Lesson 12 — Cilium CNI Deep Dive](12-cilium-cni-ebpf.md)

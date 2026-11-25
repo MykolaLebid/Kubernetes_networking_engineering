@@ -25,11 +25,11 @@ Both are hands-on, job-posting–recognized credentials in SRE, platform enginee
 
 | Domain | Weight | Primary lessons | Key skills |
 |---|---|---|---|
-| **Service Networking & DNS** | 25% | [13](../lessons/13-kubernetes-services-kube-proxy.md), [14](../lessons/14-coredns-service-discovery.md), [18](../lessons/18-gateway-api.md) | ClusterIP/NodePort/LoadBalancer, kube-proxy vs eBPF, CoreDNS customization, Gateway API v1.2, troubleshooting service traffic |
-| **Network Security & Policy** | 25% | [16](../lessons/16-network-policies.md), [23](../lessons/23-network-security-hardening.md), [35](../lessons/35-tetragon-ebpf-runtime-security.md) | default-deny NetworkPolicy, WireGuard node encryption, mTLS, pod-level auth, TLS certs for Gateways |
-| **Advanced Traffic Management** | 20% | [17](../lessons/17-ingress-controllers.md), [18](../lessons/18-gateway-api.md), [21](../lessons/21-service-mesh-istio.md), [22](../lessons/22-multi-cluster-networking.md) | Ingress/Gateway routing, egress gateways, cross-cluster service discovery, load distribution |
-| **Core Infrastructure & CNI** | 15% | [09](../lessons/09-cni-specification.md), [11](../lessons/11-calico-cni-deep-dive.md), [12](../lessons/12-cilium-cni-ebpf.md), [38](../lessons/38-multus-cni.md) | CNI plugin installation, IPAM, multi-interface pods (Multus), pod connectivity troubleshooting |
-| **Observability** | 15% | [24](../lessons/24-network-observability-troubleshooting.md), [12](../lessons/12-cilium-cni-ebpf.md) | Hubble flow inspection, L7 protocol visibility, metrics, end-to-end tracing, traffic audit logs |
+| **Service Networking & DNS** | 25% | [13](lessons/13-kubernetes-services-kube-proxy.md), [14](lessons/14-coredns-service-discovery.md), [18](lessons/18-gateway-api.md) | ClusterIP/NodePort/LoadBalancer, kube-proxy vs eBPF, CoreDNS customization, Gateway API v1.2, troubleshooting service traffic |
+| **Network Security & Policy** | 25% | [16](lessons/16-network-policies.md), [23](lessons/23-network-security-hardening.md), [35](lessons/35-tetragon-ebpf-runtime-security.md) | default-deny NetworkPolicy, WireGuard node encryption, mTLS, pod-level auth, TLS certs for Gateways |
+| **Advanced Traffic Management** | 20% | [17](lessons/17-ingress-controllers.md), [18](lessons/18-gateway-api.md), [21](lessons/21-service-mesh-istio.md), [22](lessons/22-multi-cluster-networking.md) | Ingress/Gateway routing, egress gateways, cross-cluster service discovery, load distribution |
+| **Core Infrastructure & CNI** | 15% | [09](lessons/09-cni-specification.md), [11](lessons/11-calico-cni-deep-dive.md), [12](lessons/12-cilium-cni-ebpf.md), [38](lessons/38-multus-cni.md) | CNI plugin installation, IPAM, multi-interface pods (Multus), pod connectivity troubleshooting |
+| **Observability** | 15% | [24](lessons/24-network-observability-troubleshooting.md), [12](lessons/12-cilium-cni-ebpf.md) | Hubble flow inspection, L7 protocol visibility, metrics, end-to-end tracing, traffic audit logs |
 
 ### Recommended study path
 
@@ -81,14 +81,14 @@ Week 4 — Observability + Practice
 
 | Domain | Weight | Primary lessons | Key concepts |
 |---|---|---|---|
-| **Architecture** | 20% | [12](../lessons/12-cilium-cni-ebpf.md) | cilium-agent, cilium-operator, Hubble relay, IPAM modes, CiliumNode CRDs |
-| **Network Policy** | 18% | [12](../lessons/12-cilium-cni-ebpf.md), [16](../lessons/16-network-policies.md) | Identity-based policy, L3/L4/L7 CiliumNetworkPolicy, FQDN egress filtering |
-| **Service Mesh** | 16% | [12](../lessons/12-cilium-cni-ebpf.md), [21](../lessons/21-service-mesh-istio.md) | Ingress routing, Gateway API, WireGuard/mTLS encryption, ambient mesh vs sidecar |
-| **Network Observability** | 10% | [24](../lessons/24-network-observability-troubleshooting.md), [12](../lessons/12-cilium-cni-ebpf.md) | Hubble CLI flows, L7 visibility, Hubble UI, flow filtering |
-| **Installation & Configuration** | 10% | [12](../lessons/12-cilium-cni-ebpf.md) | cilium CLI, helm values, connectivity test, `cilium status` |
-| **Cluster Mesh** | 10% | [22](../lessons/22-multi-cluster-networking.md) | clustermesh-apiserver, global services, cross-cluster NetworkPolicy |
-| **eBPF** | 10% | [10](../lessons/10-ebpf-xdp.md), [12](../lessons/12-cilium-cni-ebpf.md) | eBPF vs iptables, BPF maps, TC programs, kube-proxy replacement |
-| **BGP & External Networking** | 6% | [06](../lessons/06-bgp-fundamentals.md), [12](../lessons/12-cilium-cni-ebpf.md) | BGP Control Plane, CiliumBGPPeeringPolicy, LB IPAM |
+| **Architecture** | 20% | [12](lessons/12-cilium-cni-ebpf.md) | cilium-agent, cilium-operator, Hubble relay, IPAM modes, CiliumNode CRDs |
+| **Network Policy** | 18% | [12](lessons/12-cilium-cni-ebpf.md), [16](lessons/16-network-policies.md) | Identity-based policy, L3/L4/L7 CiliumNetworkPolicy, FQDN egress filtering |
+| **Service Mesh** | 16% | [12](lessons/12-cilium-cni-ebpf.md), [21](lessons/21-service-mesh-istio.md) | Ingress routing, Gateway API, WireGuard/mTLS encryption, ambient mesh vs sidecar |
+| **Network Observability** | 10% | [24](lessons/24-network-observability-troubleshooting.md), [12](lessons/12-cilium-cni-ebpf.md) | Hubble CLI flows, L7 visibility, Hubble UI, flow filtering |
+| **Installation & Configuration** | 10% | [12](lessons/12-cilium-cni-ebpf.md) | cilium CLI, helm values, connectivity test, `cilium status` |
+| **Cluster Mesh** | 10% | [22](lessons/22-multi-cluster-networking.md) | clustermesh-apiserver, global services, cross-cluster NetworkPolicy |
+| **eBPF** | 10% | [10](lessons/10-ebpf-xdp.md), [12](lessons/12-cilium-cni-ebpf.md) | eBPF vs iptables, BPF maps, TC programs, kube-proxy replacement |
+| **BGP & External Networking** | 6% | [06](lessons/06-bgp-fundamentals.md), [12](lessons/12-cilium-cni-ebpf.md) | BGP Control Plane, CiliumBGPPeeringPolicy, LB IPAM |
 
 ### Recommended study path
 
@@ -123,7 +123,7 @@ CKA → CKNE → CCA → CKS
 | CCA | Cilium/eBPF specialization | WireGuard, L7 policy, Hubble audit trails |
 | CKS | Security hardening | Runtime security (Tetragon), supply chain, RBAC |
 
-For manufacturing/IoT roles in Germany or Switzerland, additionally pursue **ISA/IEC 62443** credentials alongside this K8s path — see [Lesson 37](../lessons/37-compliance-networking.md) for the mapping between IEC 62443 controls and K8s network configurations.
+For manufacturing/IoT roles in Germany or Switzerland, additionally pursue **ISA/IEC 62443** credentials alongside this K8s path — see [Lesson 37](lessons/37-compliance-networking.md) for the mapping between IEC 62443 controls and K8s network configurations.
 
 ---
 

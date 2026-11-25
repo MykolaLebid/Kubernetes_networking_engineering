@@ -732,7 +732,7 @@ kubectl exec -n user-data deploy/user-service -- \
 
 ---
 
-## Quick Reference — Control Matrix
+## Quick Reference
 
 | Control | Framework | YAML file | Evidence command |
 |---|---|---|---|

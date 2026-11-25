@@ -20,10 +20,10 @@ Map of all exam domains to specific lessons in this course.
 | Domain | Weight | Primary lessons |
 |---|---|---|
 | **Storage** | 10% | — |
-| **Troubleshooting** | 30% | [24](../lessons/24-network-observability-troubleshooting.md), [14](../lessons/14-coredns-service-discovery.md) |
+| **Troubleshooting** | 30% | [24](lessons/24-network-observability-troubleshooting.md), [14](lessons/14-coredns-service-discovery.md) |
 | **Workloads & Scheduling** | 15% | — |
-| **Cluster Architecture, Installation & Config** | 25% | [01](../lessons/01-linux-networking-fundamentals.md)–[04](../lessons/04-network-namespaces-deep-dive.md), [09](../lessons/09-cni-specification.md) |
-| **Services & Networking** | 20% | [13](../lessons/13-kubernetes-services-kube-proxy.md), [14](../lessons/14-coredns-service-discovery.md), [16](../lessons/16-network-policies.md), [17](../lessons/17-ingress-controllers.md), [18](../lessons/18-gateway-api.md) |
+| **Cluster Architecture, Installation & Config** | 25% | [01](lessons/01-linux-networking-fundamentals.md)–[04](lessons/04-network-namespaces-deep-dive.md), [09](lessons/09-cni-specification.md) |
+| **Services & Networking** | 20% | [13](lessons/13-kubernetes-services-kube-proxy.md), [14](lessons/14-coredns-service-discovery.md), [16](lessons/16-network-policies.md), [17](lessons/17-ingress-controllers.md), [18](lessons/18-gateway-api.md) |
 
 ### Networking-specific CKA tasks (most common exam questions)
 
@@ -61,12 +61,12 @@ Map of all exam domains to specific lessons in this course.
 
 | Domain | Weight | Primary lessons |
 |---|---|---|
-| **Cluster Setup** | 15% | [23](../lessons/23-network-security-hardening.md), [16](../lessons/16-network-policies.md) |
-| **Cluster Hardening** | 15% | [23](../lessons/23-network-security-hardening.md) |
-| **System Hardening** | 10% | [35](../lessons/35-tetragon-ebpf-runtime-security.md) |
-| **Minimize Microservice Vulnerabilities** | 20% | [16](../lessons/16-network-policies.md), [12](../lessons/12-cilium-cni-ebpf.md), [21](../lessons/21-service-mesh-istio.md) |
+| **Cluster Setup** | 15% | [23](lessons/23-network-security-hardening.md), [16](lessons/16-network-policies.md) |
+| **Cluster Hardening** | 15% | [23](lessons/23-network-security-hardening.md) |
+| **System Hardening** | 10% | [35](lessons/35-tetragon-ebpf-runtime-security.md) |
+| **Minimize Microservice Vulnerabilities** | 20% | [16](lessons/16-network-policies.md), [12](lessons/12-cilium-cni-ebpf.md), [21](lessons/21-service-mesh-istio.md) |
 | **Supply Chain Security** | 20% | — |
-| **Monitoring, Logging & Runtime Security** | 20% | [35](../lessons/35-tetragon-ebpf-runtime-security.md), [24](../lessons/24-network-observability-troubleshooting.md) |
+| **Monitoring, Logging & Runtime Security** | 20% | [35](lessons/35-tetragon-ebpf-runtime-security.md), [24](lessons/24-network-observability-troubleshooting.md) |
 
 ### Networking-specific CKS tasks
 

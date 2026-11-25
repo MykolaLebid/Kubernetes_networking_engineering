@@ -580,9 +580,9 @@ cf ssh app-a -c "ping -c 3 <app-b-overlay-ip>"
 
 ## See Also
 
-**Previous lesson:** [CF-04 — Garden Container Runtime](cf-04-garden-container-runtime.md) — how Garden invokes the Silk CNI binary and manages container network namespaces.
+**Previous lesson:** [CF-04 — Garden Container Runtime](cf-04-ipam.md) — how Garden invokes the Silk CNI binary and manages container network namespaces.
 
-**Next lesson:** [CF-06 — GoRouter and HTTP Routing](cf-06-gorouter-http-routing.md) — how traffic enters the CF platform from outside and how Gorouter load-balances across container overlay IPs.
+**Next lesson:** [CF-06 — GoRouter and HTTP Routing](cf-09-gorouter.md) — how traffic enters the CF platform from outside and how Gorouter load-balances across container overlay IPs.
 
 **Related K8s lessons in this course:**
 

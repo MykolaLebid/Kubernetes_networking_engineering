@@ -651,7 +651,7 @@ ls -la "$AUDIT_DIR/"
 
 ---
 
-## Quick Reference — CF Control → Compliance Framework
+## Quick Reference
 
 | CF Control | HIPAA | PCI-DSS | IEC 62443 | GDPR |
 |---|---|---|---|---|
