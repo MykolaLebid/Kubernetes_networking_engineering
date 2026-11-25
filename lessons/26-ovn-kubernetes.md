@@ -6,6 +6,8 @@
 
 > **Goal:** Inspect the OVN/OVS control and data planes on a live OpenShift cluster, trace a packet from source pod to destination pod, and explain how NetworkPolicy is enforced without iptables.
 
+> **Version note:** Covers **OCP 4.x** (latest 4.22); OVN-Kubernetes is the default CNI from OCP 4.12+. **OCP 5.0 released November 3, 2026** — OVN-Kubernetes continues as default CNI; see OCP 5 release notes for changes.
+
 
 
 **Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)

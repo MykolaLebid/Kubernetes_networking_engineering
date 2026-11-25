@@ -4,6 +4,8 @@
 
 > **Goal:** Deploy Multus CNI, attach secondary network interfaces to pods using NetworkAttachmentDefinitions, and apply multi-homed networking to AI/GPU training workloads, industrial edge nodes, and telco CNFs — covering CKNE Domain 1 (Core Infrastructure & CNI, 15%).
 
+> **Version note:** Current stable as of November 2026 — **Multus CNI v4.3.2** (released November 5, 2026).
+
 **Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---

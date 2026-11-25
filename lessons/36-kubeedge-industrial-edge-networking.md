@@ -257,7 +257,7 @@ Mapping to Kubernetes:
 # OR use an existing K8s cluster as cloud
 
 # Install keadm (KubeEdge admin CLI)
-KEADM_VERSION=v1.17.0
+KEADM_VERSION=v1.23.1
 curl -LO https://github.com/kubeedge/kubeedge/releases/download/${KEADM_VERSION}/keadm-${KEADM_VERSION}-linux-amd64.tar.gz
 tar xzf keadm-${KEADM_VERSION}-linux-amd64.tar.gz
 sudo mv keadm-${KEADM_VERSION}-linux-amd64/keadm /usr/local/bin/
@@ -275,7 +275,7 @@ keadm --version
 # This installs the KubeEdge CRDs and CloudCore deployment
 keadm init --advertise-address=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[0].address}') \
   --set cloudCore.service.type=NodePort \
-  --kubeedge-version=1.17.0
+  --kubeedge-version=1.23.1
 
 # Verify CloudCore is running
 kubectl get pods -n kubeedge
@@ -305,7 +305,7 @@ TOKEN="<token-from-Lab1>"
 keadm join \
   --cloudcore-ipport=${CLOUD_IP}:10000 \
   --token=${TOKEN} \
-  --kubeedge-version=1.17.0 \
+  --kubeedge-version=1.23.1 \
   --cgroupdriver=systemd
 
 # Verify EdgeCore is running on the edge node
@@ -314,8 +314,8 @@ systemctl status edgecore
 # Terminal 2 (Mac): Verify edge node appears in kubectl
 kubectl get nodes
 # NAME         STATUS   ROLES        AGE   VERSION
-# cloud-node   Ready    control-plane  5m   v1.29.0
-# edge-node    Ready    agent,edge     1m   v1.29.0+kubeedge
+# cloud-node   Ready    control-plane  5m   v1.32.0
+# edge-node    Ready    agent,edge     1m   v1.32.0+kubeedge
 ```
 
 ---
@@ -514,7 +514,7 @@ kubectl get device factory-temp-sensor-01 -n iot -o jsonpath='{.status.twins}'
 
 ```bash
 # Install keadm
-curl -LO https://github.com/kubeedge/kubeedge/releases/download/v1.17.0/keadm-v1.17.0-linux-amd64.tar.gz
+curl -LO https://github.com/kubeedge/kubeedge/releases/download/v1.23.1/keadm-v1.23.1-linux-amd64.tar.gz
 
 # Initialize cloud side
 keadm init --advertise-address=<IP>

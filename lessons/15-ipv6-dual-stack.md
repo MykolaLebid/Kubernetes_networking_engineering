@@ -61,7 +61,7 @@ flowchart LR
 ```bash
 # kubeadm: enable dual-stack at init
 cat <<EOF > kubeadm-config.yaml
-apiVersion: kubeadm.k8s.io/v1beta3
+apiVersion: kubeadm.k8s.io/v1beta4
 kind: ClusterConfiguration
 networking:
   podSubnet: "10.244.0.0/16,fd00:10:244::/56"      # IPv4 + IPv6 pod CIDR

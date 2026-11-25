@@ -4,6 +4,8 @@
 
 > **Goal:** Understand how OpenShift's Cluster Network Operator manages OVN-Kubernetes, explain how OpenShift namespace isolation differs from vanilla Kubernetes, and use `oc` commands to inspect and troubleshoot network configuration.
 
+> **Version note:** These lessons cover **OpenShift 4.x** (latest: 4.22, June 2026). **OpenShift 5.0 was released November 3, 2026** — OVN-Kubernetes continues as the default CNI; consult the OCP 5.0 release notes for version-specific changes before applying these lessons to OCP 5 clusters.
+
 
 **Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 

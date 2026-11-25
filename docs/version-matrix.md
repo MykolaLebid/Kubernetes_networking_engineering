@@ -35,13 +35,15 @@ Minimum versions required for features covered in each lesson.
 | Calico | 3.21 | eBPF dataplane (GA) | 11 |
 | Calico | 3.14 | WireGuard node-to-node encryption | 11 |
 | Calico | 3.11 | IPAM block size tuning | 11 |
+| Calico | 3.33 | Current stable (Nov 2026) | 11 |
 | Cilium | 1.15 | Hubble OTLP export | 24, 40 |
-| Cilium | 1.20 | Current stable; remote node workload info in Hubble flows | 12, 24, 40 |
+| Cilium | 1.20 | Current stable (1.20.5, Nov 2026); remote node workload info in Hubble flows | 12, 24, 40 |
 | Cilium | 1.11 | Cluster Mesh (stable) | 22 |
 | Cilium | 1.10 | kube-proxy replacement (GA) | 12 |
 | Cilium | 1.9 | WireGuard node-to-node encryption | 23 |
 | Cilium | 1.8 | Hubble (GA) | 24 |
 | Cilium | 1.7 | FQDN-based egress policy | 16, 23 |
+| MetalLB | 0.16 | Current stable (0.16.2, Nov 2026) | 19 |
 | MetalLB | 0.13 | CRD-based config (IPAddressPool) | 19 |
 | MetalLB | 0.11 | BGP with BFD | 19 |
 
@@ -57,6 +59,7 @@ Minimum versions required for features covered in each lesson.
 | Telemetry API | 1.12 | 21 |
 | ProxyConfig API | 1.12 | 21 |
 | External Authorization | 1.9 | 21 |
+| Current stable | 1.32 (Nov 2026) | 21 |
 
 ---
 
@@ -125,5 +128,5 @@ Minimum versions required for features covered in each lesson.
 | calicoctl | matches Calico version | 11 |
 | cilium CLI | ≥ 0.15 | 12 |
 | istioctl | ≥ 1.24 (for ambient GA) | 21 |
-| argocd CLI | ≥ 2.8 | 33 |
+| argocd CLI | ≥ 3.0 | 33 |
 | Podman / Docker | for minikube driver | All |

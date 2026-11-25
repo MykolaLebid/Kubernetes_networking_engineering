@@ -4,6 +4,8 @@
 
 > **Goal:** Deploy Tetragon, write TracingPolicy to enforce syscall and network access controls at the kernel level, correlate runtime security events with Hubble network flows, and produce audit-trail output suitable for HIPAA/PCI-DSS/banking compliance review.
 
+> **Version note:** Current stable as of November 2026 — **Tetragon v1.8.0** (released October 30, 2026; via `cilium/tetragon` Helm chart). CRD `cilium.io/v1alpha1` TracingPolicy API is unchanged.
+
 **Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 
 ---

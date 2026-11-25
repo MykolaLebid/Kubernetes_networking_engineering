@@ -209,7 +209,7 @@ Latency:     microsecond-level (vs millisecond for TCP through kernel)
 
 ```bash
 # Install SR-IOV Network Operator
-kubectl apply -f https://github.com/k8snetworkplumbingwg/sriov-network-operator/releases/download/v1.3.0/deploy.yaml
+kubectl apply -f https://github.com/k8snetworkplumbingwg/sriov-network-operator/releases/download/v1.6.0/deploy.yaml
 
 # Check physical functions and VF capacity
 kubectl get sriovnetworknodestates -n sriov-network-operator -o yaml

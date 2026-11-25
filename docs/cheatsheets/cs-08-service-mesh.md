@@ -2,7 +2,7 @@
 
 ## Sidecar vs Ambient — Quick Compare
 
-| Dimension | Sidecar (classic Istio) | Ambient (Istio 1.18+) | Cilium Mesh |
+| Dimension | Sidecar (classic Istio) | Ambient (Istio 1.24+, GA) | Cilium Mesh |
 |---|---|---|---|
 | Data-plane | Envoy per pod | ztunnel (L4) + waypoint (L7) | eBPF + Envoy waypoint |
 | Injection | `istio-injection: enabled` label | None — node DaemonSet | None — Cilium agent |

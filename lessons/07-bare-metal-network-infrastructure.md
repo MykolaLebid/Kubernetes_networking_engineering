@@ -464,7 +464,7 @@ ip link del eth0.20
 # --- Terminal 2 (Mac) ---
 
 # Deploy MetalLB
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.8/config/manifests/metallb-native.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.16.2/config/manifests/metallb-native.yaml
 kubectl wait -n metallb-system deployment/controller --for=condition=Available --timeout=90s
 ```
 
@@ -521,7 +521,7 @@ minikube ssh -- curl -s -o /dev/null -w "%{http_code}" http://$(kubectl get svc 
 # Clean up
 kubectl delete deployment nginx
 kubectl delete service nginx
-kubectl delete -f https://raw.githubusercontent.com/metallb/metallb/v0.14.8/config/manifests/metallb-native.yaml
+kubectl delete -f https://raw.githubusercontent.com/metallb/metallb/v0.16.2/config/manifests/metallb-native.yaml
 ```
 
 ### Configuration Reference

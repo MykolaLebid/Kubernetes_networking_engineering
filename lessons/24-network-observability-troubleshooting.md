@@ -297,7 +297,7 @@ tshark -r pod-a.pcap -T fields -e frame.number -e ip.src -e ip.dst -e tcp.dstpor
 ```bash
 # Install Hubble CLI
 curl -L --fail --remote-name-all \
-  https://github.com/cilium/hubble/releases/download/v0.13.0/hubble-linux-amd64.tar.gz
+  https://github.com/cilium/hubble/releases/download/v1.20.4/hubble-linux-amd64.tar.gz
 tar xzvf hubble-linux-amd64.tar.gz
 mv hubble /usr/local/bin/
 
@@ -661,7 +661,7 @@ EOF
 
 ### 10.2 OBI v1.0 — eBPF Zero-Code Instrumentation
 
-**OBI** (OpenTelemetry eBPF Instrumentation) was originally Grafana's Beyla project. Grafana donated it to the CNCF/OTel project in 2025; it was renamed to OBI and reached v1.0 GA in 2026.
+**OBI** (OpenTelemetry eBPF Instrumentation) is the OTel project's native eBPF auto-instrumentation tool (`open-telemetry/opentelemetry-ebpf-instrumentation`). It reached v1.0 GA in October 2026.
 
 **What it does:** hooks into the Linux kernel via eBPF (kernel 5.8+) to intercept HTTP, gRPC, SQL, and other protocol calls at the system-call boundary. No sidecar. No code change. No pod restart. Runs as a cluster-wide DaemonSet.
 

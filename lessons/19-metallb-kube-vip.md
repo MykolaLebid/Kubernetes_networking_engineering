@@ -34,7 +34,7 @@ flowchart LR
     end
     subgraph bare["Bare Metal Cluster (on-prem / BTP)"]
         SVC2["Service type: LoadBalancer app: web"]
-        MLB["MetalLB v0.14 controller + speaker DaemonSet"]
+        MLB["MetalLB v0.16 controller + speaker DaemonSet"]
         VIP["VIP 192.168.100.100 ARP reply (L2) or BGP /32 route"]
     end
 
@@ -76,7 +76,7 @@ sequenceDiagram
     participant Router as Upstream Router / ToR Switch
     participant Node1 as Node 1 worker-1 (elected speaker)
     participant Node2 as Node 2 worker-2
-    participant Spk as MetalLB Speaker v0.14 (Node 1)
+    participant Spk as MetalLB Speaker v0.16 (Node 1)
     participant Pod as Backend Pod app:web
 
     Note over Spk: Leader election: worker-1 wins VIP 192.168.100.100

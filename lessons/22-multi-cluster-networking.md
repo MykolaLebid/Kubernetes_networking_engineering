@@ -113,12 +113,12 @@ Cilium's Cluster Mesh connects clusters so pods can communicate using their clus
 ```mermaid
 flowchart LR
     subgraph ClusterA["Cluster A (us-east-1)"]
-        cilA["Cilium Agent v1.15 eBPF dataplane"]
+        cilA["Cilium Agent v1.20 eBPF dataplane"]
         etcdA["clustermesh-apiserver :2379 TLS mutual auth"]
         cilA --> etcdA
     end
     subgraph ClusterB["Cluster B (eu-west-1)"]
-        cilB["Cilium Agent v1.15 eBPF dataplane"]
+        cilB["Cilium Agent v1.20 eBPF dataplane"]
         etcdB["clustermesh-apiserver :2379 TLS mutual auth"]
         cilB --> etcdB
     end

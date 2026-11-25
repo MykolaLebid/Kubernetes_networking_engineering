@@ -241,7 +241,7 @@ rules:
 
 ## 7. TCPRoute and GRPCRoute
 
-> **Status update (v1.6+):** TCPRoute and UDPRoute graduated to **v1 GA** in Gateway API v1.6 (June 2024) — use `gateway.networking.k8s.io/v1` API version. GRPCRoute is Standard channel. No longer requires experimental CRDs.
+> **Status update (v1.6+):** TCPRoute and UDPRoute graduated to **v1 GA** in Gateway API v1.6 (June 2026) — use `gateway.networking.k8s.io/v1` API version. GRPCRoute is Standard channel. No longer requires experimental CRDs.
 
 ```yaml
 # TCPRoute — v1 GA as of Gateway API v1.6
@@ -335,7 +335,7 @@ az aks update --name my-aks --resource-group rg \
 
 ```bash
 # Step 1: Install CRDs
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.7.0/standard-install.yaml
 
 # Step 2: Install a Gateway API-compatible controller
 # (most modern ingress controllers support both)
@@ -377,7 +377,7 @@ kubectl get ingress,httproute
 # Terminal 1 — Mac (kubectl)
 # Check if Gateway API CRDs are installed
 kubectl api-resources | grep -E "gateway|httproute|grpcroute|tcproute"
-kubectl get gatewayclass 2>/dev/null || echo "Gateway API not installed — run: kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/standard-install.yaml"
+kubectl get gatewayclass 2>/dev/null || echo "Gateway API not installed — run: kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.7.0/standard-install.yaml"
 
 # Terminal 2 — Mac
 kubectl get gateway,httproute -A 2>/dev/null
@@ -387,7 +387,7 @@ Observation commands — run after creating a Gateway and HTTPRoute:
 
 ```bash
 # Install Gateway API CRDs if not present
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.7.0/standard-install.yaml
 
 # Watch Gateway and HTTPRoute status conditions as they are applied
 kubectl get gateway -A -w &
@@ -481,8 +481,8 @@ Key parameter tables are embedded in the Theory sections above:
 | Describe Gateway (check status conditions) | `kubectl describe gateway <name> -n <ns>` |
 | Describe HTTPRoute (check Accepted/ResolvedRefs) | `kubectl describe httproute <name> -n <ns>` |
 | List ReferenceGrants | `kubectl get referencegrant -A` |
-| Install standard Gateway API CRDs | `kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/standard-install.yaml` |
-| Install experimental CRDs | `kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/experimental-install.yaml` |
+| Install standard Gateway API CRDs | `kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.7.0/standard-install.yaml` |
+| Install experimental CRDs | `kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.7.0/experimental-install.yaml` |
 | Test weighted traffic split (20 requests) | `for i in $(seq 1 20); do curl -s -H "Host: web.example.com" http://<gw-ip>/; done` |
 | Test header-based canary routing | `curl -H "X-Canary: true" -H "Host: web.example.com" http://<gw-ip>/` |
 | Get Gateway API conformance test results | `kubectl get gatewayclass <name> -o jsonpath='{.status.conditions}'` |
@@ -511,16 +511,16 @@ Gateway API has released rapidly since v1.2. Here is what graduated to Standard 
 | **v1.3** | April 2025 | Percentage-based request mirroring (`HTTPRoute`/`GRPCRoute`) | `XListenerSet` (listener merging); `XBackendTrafficPolicy` (retry budgets + session persistence); CORS filter |
 | **v1.4** | Oct 2025 | `BackendTLSPolicy`; `SupportedFeatures` status | Mesh resource; Default Gateways; HTTP External Auth |
 | **v1.5** | Feb 2026 | `TLSRoute` v1 GA; CORS filter; `ListenerSet`; `ReferenceGrant` v1; Gateway client-cert validation | Gateway + HTTPRoute-level authentication |
-| **v1.6** | Jun 2024 | **TCPRoute + UDPRoute v1 GA** (use `gateway.networking.k8s.io/v1`); CORS → standard | `XBackend` resource |
-| **v1.7** | Oct 2024 | HTTPRoute Retries (`codes`/`attempts`/`backoff`); BackendTLSPolicy SANs/TLS options | `XTelemetryPolicy` (OTel tracing config); Pre-routing Filters (ext-auth, payload inspection); Session Persistence on Backend |
+| **v1.6** | Jun 2026 | **TCPRoute + UDPRoute v1 GA** (use `gateway.networking.k8s.io/v1`); CORS → standard | `XBackend` resource |
+| **v1.7** | Oct 2026 | HTTPRoute Retries (`codes`/`attempts`/`backoff`); BackendTLSPolicy SANs/TLS options | `XTelemetryPolicy` (OTel tracing config); Pre-routing Filters (ext-auth, payload inspection); Session Persistence on Backend |
 
-**Current stable: v1.5.1** (March 14, 2026). Install:
+**Current stable: v1.7.0** (October 29, 2026). Install:
 ```bash
 # Standard channel (HTTPRoute, Gateway, GRPCRoute, TCPRoute, UDPRoute, TLSRoute all included)
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/standard-install.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.7.0/standard-install.yaml
 
 # Experimental channel (adds XListenerSet, XBackendTrafficPolicy, XTelemetryPolicy, etc.)
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/experimental-install.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.7.0/experimental-install.yaml
 ```
 
 ### HTTPRoute Retries (Standard since v1.7)

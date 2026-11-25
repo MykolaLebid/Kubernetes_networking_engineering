@@ -6,6 +6,8 @@
 
 > **Goal:** Use ArgoCD to manage NetworkPolicies, CoreDNS configs, and Ingress rules as code — with sync waves for ordered delivery, ApplicationSets for multi-cluster rollout, and drift auto-remediation.
 
+> **Version note:** Current stable is **ArgoCD v3.6.3** (November 2026). v3.0 introduced breaking changes: annotation-based resource tracking by default (was label-based), RBAC no longer extends to sub-resources automatically, deprecated metrics removed (`argocd_app_sync_status`, `argocd_app_health_status`), repository config must use Secrets not ConfigMap. The CRD apiVersion `argoproj.io/v1alpha1` is unchanged.
+
 
 **Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 

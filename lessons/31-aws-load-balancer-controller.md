@@ -6,6 +6,8 @@
 
 > **Goal:** Configure AWS Load Balancer Controller to provision ALBs via Ingress and NLBs via Service, using IRSA, IngressGroups, weighted canary routing, and WAFv2 integration.
 
+> **Version note:** Current stable as of November 2026 — **AWS Load Balancer Controller v3.7.0** (released November 24, 2026). The CRD apiVersion `elbv2.k8s.aws/v1beta1` for TargetGroupBinding is unchanged.
+
 
 **Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)
 

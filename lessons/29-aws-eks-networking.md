@@ -6,6 +6,8 @@
 
 > **Goal:** Explain how the AWS VPC CNI assigns real VPC IPs to pods via ENI secondary IPs, calculate the pod density limit for a given instance type, enable prefix delegation to increase that limit, and assign per-pod Security Groups using SecurityGroupPolicy.
 
+> **Version note:** Current stable as of November 2026 — **AWS VPC CNI v1.23.3**, **EKS supports K8s 1.32–1.37**. eBPF network policy controller was introduced in VPC CNI v1.14 (minimum version for that feature); the reference to `v1.14+` throughout this lesson means that feature boundary, not the current version.
+
 
 
 **Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference) · [Check Your Understanding](#check-your-understanding)

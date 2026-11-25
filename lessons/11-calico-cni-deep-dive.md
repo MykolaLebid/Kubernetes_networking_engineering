@@ -123,7 +123,7 @@ spec:
 
 ```bash
 # Install Calico via Tigera Operator (recommended)
-kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/tigera-operator.yaml
+kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.33.1/manifests/tigera-operator.yaml
 
 kubectl apply -f - <<EOF
 apiVersion: operator.tigera.io/v1
@@ -400,7 +400,7 @@ kubectl get ippool -o yaml
 
 ```bash
 # Step 1: Install Calico via Tigera Operator
-kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/tigera-operator.yaml
+kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.33.1/manifests/tigera-operator.yaml
 
 kubectl apply -f - <<EOF
 apiVersion: operator.tigera.io/v1

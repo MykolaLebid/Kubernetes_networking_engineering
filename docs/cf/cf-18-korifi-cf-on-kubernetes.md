@@ -758,7 +758,7 @@ cf auth admin --client-credentials  # for admin bootstrap
 - [ ] Alerting: alert on CFBuild failures, Korifi controller error rates, Contour backend 503s
 - [ ] Log aggregation: ship Korifi controller logs and app pod logs to central logging
 - [ ] Quota enforcement: CFOrgQuota and CFSpaceQuota objects configured
-- [ ] Upgrade path documented: Korifi is pre-1.0 as of 2026; pin Helm chart version
+- [ ] Upgrade path documented: Korifi is at **v0.18.0 (March 2026)**, still pre-1.0 — pin Helm chart version and monitor releases at github.com/cloudfoundry/korifi/releases
 - [ ] AI workload networking: if running AI/ML workloads, review Korifi AI Working Group guidance (announced June 2026) for GPU node scheduling support
 
 ---
