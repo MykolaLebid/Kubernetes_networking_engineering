@@ -374,6 +374,7 @@ Solution 3: Re-IP pods (if possible)
 | Google (Anthos) | 100+ GKE clusters across on-prem and cloud managed as a single fleet | Anthos Service Mesh (Istio multi-primary) + GKE Hub multi-cluster ingress + MCS controller | Single-pane control plane; mTLS between clusters with shared root CA; MultiClusterIngress routes to nearest healthy backend |
 | Netflix | Multi-region active-active deployments across AWS us-east-1, eu-west-1, ap-southeast-1 | Spinnaker for orchestration + Istio federation + VPC Lattice for service-level routing (replacing VPC Peering) | Zero-downtime regional failover; traffic shifts within seconds via VirtualService weight updates during incidents |
 | Red Hat OpenShift Submariner | On-prem + cloud hybrid clusters with overlapping pod CIDRs from independent team deployments | Submariner with `--globalnet` mode; IPsec tunnels between gateway nodes; Lighthouse DNS for clusterset.local | Clusters with identical 10.244.0.0/16 pod CIDRs coexist; cross-cluster traffic uses Globalnet SNATed global IPs |
+| Hospital group (medtech, HIPAA) | Federating patient-record microservices across on-prem and cloud clusters under HIPAA compliance | Submariner with `--globalnet`; on-prem pod CIDR collided with cloud VPC CIDR causing silent cross-cluster C2C traffic drops | IP collision between on-prem pod CIDR and cloud VPC CIDR identified; Globalnet SNAT global CIDR allocated per cluster to eliminate overlap and restore cross-cluster connectivity |
 
 ---
 

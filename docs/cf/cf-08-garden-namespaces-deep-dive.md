@@ -4,9 +4,13 @@
 **Duration:** ~45 min (Deep Dive) / ~10 min (Quick Read)
 **Prerequisites:** CF-01 through CF-07, Linux namespace fundamentals
 
+**Jump to:** [Quick Read](#quick-read-10-min) · [Deep Dive](#deep-dive) · [Troubleshooting](#4-troubleshooting-garden-and-network-namespaces) · [Quick Reference](#quick-reference)
+
 ---
 
 ## Quick Read (10 min)
+
+After this lesson you will be able to: explain how Garden creates and isolates CF app containers using Linux namespaces, trace the Silk CNI plugin's network wiring sequence, and diagnose common container networking failures on a Diego Cell.
 
 **What Garden is:**
 - Garden is the container runtime for Cloud Foundry, analogous to containerd in Kubernetes
@@ -53,6 +57,8 @@ graph TD
 ---
 
 ## Deep Dive
+
+The sections below examine each layer in depth: Garden's API and GrootFS filesystem management, the precise namespace creation and CNI wiring sequence, Silk CNI internals including the VXLAN Policy Agent, and a structured troubleshooting workflow with diagnostic commands you can run directly on a Diego Cell.
 
 ---
 
@@ -375,7 +381,7 @@ curl -sk https://<policy-server-ip>:4003/networking/v1/internal/policies
 
 **Failure 3: MTU mismatch — high packet loss or TCP stalls**
 
-Symptom: HTTP requests succeed for small payloads, fail or stall for large responses (file downloads, large JSON).
+Symptom: HTTP requests succeed for small payloads, fail or stall for large responses (file downloads, large JSON). In banking and healthcare deployments this failure is particularly deceptive: health checks pass because they use short probe payloads, yet bulk data transfers — such as HL7 FHIR bundles or large transaction batches — silently fragment and cause throughput collapse that appears as application-level timeouts.
 
 ```bash
 # Verify MTU inside container matches expected value
@@ -527,6 +533,16 @@ tcpdump -i eth0 -n udp port 4789 -w /tmp/vxlan-raw.pcap
 | Check Policy Agent logs | `tail -f /var/vcap/sys/log/vxlan-policy-agent/vxlan-policy-agent.stdout.log` |
 | List GrootFS images | `ls /var/vcap/data/grootfs/store/unprivileged/images/` |
 | Get GrootFS disk stats for image | `/var/vcap/packages/grootfs/bin/grootfs --config /var/vcap/jobs/garden/config/grootfs_config.yml stats <id>` |
+
+---
+
+## Check Your Understanding
+
+1. What is the role of Garden in Cloud Foundry, and which component is its direct analog in Kubernetes?
+2. Walk through the three-step sequence that occurs when a CF app instance starts: what does `runc` create first, what does `silk-cni ADD` configure, and when does the app process begin executing?
+3. Why does the default route inside a CF container point to `169.254.0.1` rather than a standard overlay IP, and what advantage does this give Silk?
+4. A developer reports that small HTTP responses from a backend app arrive correctly, but large file downloads always time out. No errors appear in `cf logs`. What is the most likely root cause, and which commands would you run on the Diego Cell to confirm it?
+5. You run `iptables -L cni-forward -n -v` on a Diego Cell and find no rule matching the destination overlay IP of a backend app, even though `cf network-policies` shows the policy exists. List the two most likely explanations and the command that distinguishes between them.
 
 ---
 

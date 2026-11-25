@@ -347,6 +347,7 @@ BGP is typically not available in public cloud VPCs — cloud providers abstract
 | Cloudflare | Anycast routing distributes traffic across 300+ PoPs using BGP route injection from edge servers | eBGP route advertisement + BGP community tags + ECMP | Any client IP reaches the closest healthy PoP; communities control route propagation scope |
 | LinkedIn | LinkedIn's data center fabric uses BGP to distribute pod routes across a spine-leaf topology with ECMP across all spine nodes | iBGP with Route Reflectors + BGP multipath ECMP | Scales to thousands of nodes; spine ECMP provides automatic load balancing and fast failover |
 | MetalLB (open source) | Kubernetes-native LoadBalancer implementation that advertises service VIPs via BGP to upstream routers | BGP service advertisement + BGP community + ECMP multipath | Bare-metal clusters get external IP reachability identical to cloud load balancers without cloud dependency |
+| Banking / PCI-DSS (bare-metal payment cluster) | PCI-DSS environment: BGP session dropped during scheduled maintenance because MD5 password was rotated on the ToR switch but not updated in Calico BGPPeer — payment API unreachable for 4 minutes | BGP MD5 TCP authentication + BGPPeer `password` field | Ops runbook updated to rotate MD5 credentials atomically (switch + BGPPeer manifest in the same change window); monitoring alert added for any BGP session leaving `Established` |
 
 ---
 

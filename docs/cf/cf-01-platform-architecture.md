@@ -4,9 +4,13 @@
 **Level:** Intermediate
 **Prerequisites:** Basic CF familiarity, Linux networking fundamentals
 
+**Jump to:** [Quick Read](#quick-read-10-min) · [Diego Cell & Silk CNI](#1-diego-cell-and-silk-cni-architecture) · [Gorouter](#2-gorouter-http-routing-without-etcd) · [C2C & ASGs](#3-c2c-networking-and-application-security-groups) · [Troubleshooting](#4-troubleshooting-cf-networking) · [Quick Reference](#quick-reference)
+
 ---
 
 ## Quick Read (10 min)
+
+After this lesson you will be able to: explain how CF assigns overlay IPs via Silk CNI, trace HTTP traffic through the Gorouter/NATS registration chain, and apply C2C Network Policies and ASGs to control container traffic — mapping each concept to its K8s equivalent.
 
 **What is CF networking, in one sentence:** Cloud Foundry is a multi-tenant PaaS where every container gets an overlay IP via Silk CNI, all inbound HTTP traffic flows through a shared Gorouter, and egress is controlled by Application Security Groups (ASGs).
 
@@ -60,6 +64,8 @@ bosh ssh diego-cell/0        # get to the kernel
 ---
 
 ## Deep Dive
+
+The Quick Read above establishes the mental model; the sections below build the operational knowledge you need to deploy, tune, and debug CF networking in production — with iptables inspection commands, sequence diagrams, and direct K8s translation notes at every step.
 
 ---
 
@@ -497,6 +503,8 @@ bosh -d cf ssh diego-cell/0 -- ip link show eth0
 cf ssh my-app -- curl -v --data "$(python3 -c 'print("x"*4000)')" https://echo.example.com
 ```
 
+In regulated environments such as banking or medtech, an MTU mismatch is a common root cause of intermittent failures during large TLS handshakes or file uploads — symptoms that can be misdiagnosed as application timeouts or backend instability before the VTEP MTU is inspected.
+
 **Failure 5: BOSH DNS not resolving apps.internal**
 
 ```bash
@@ -604,6 +612,16 @@ cf ssh my-app -- nslookup 1.other-app.apps.internal
 | Max cells | 250 (`/16` / `256` - 6 reserved) |
 | Containers per cell | ~254 |
 | VTEP IP on cell N | `10.255.N.1/32` |
+
+---
+
+## Check Your Understanding
+
+1. A new Diego Cell joins the foundation. What overlay subnet will Silk CNI assign it, and how many container IPs does it provide?
+2. An app was scaled to zero and back up again. Why should your service-discovery code use `app-name.apps.internal` rather than the overlay IP it observed before the scale-down?
+3. After adding a C2C policy with `cf add-network-policy`, how long at most will it take before the iptables rule is active on the destination Diego Cell, and which component is responsible for that propagation?
+4. A developer reports that large file uploads succeed from their laptop but consistently fail once the request reaches the CF app. No errors appear in the application logs. What single metric would you check first on the Diego Cell, and what is the formula to determine the correct value?
+5. You need to allow an app to reach an internal PostgreSQL instance at `10.100.50.20:5432` without restarting the app. Which CF construct do you use, and what cf-deployment version introduced the no-restart behaviour?
 
 ---
 

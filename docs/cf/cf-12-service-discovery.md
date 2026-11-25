@@ -3,9 +3,13 @@
 **Track:** CF-C — Application Networking
 **Prerequisites:** CF-09 (Gorouter Internals), CF-10 (C2C Policies), CF-11 (BOSH DNS)
 
+**Jump to:** [Quick Read](#quick-read-10-min) · [Deep Dive](#deep-dive) · [Troubleshooting](#4-troubleshooting-service-discovery) · [Quick Reference](#quick-reference)
+
 ---
 
 ## Quick Read (10 min)
+
+After this lesson you will be able to: explain how CF routes HTTP requests through Gorouter using NATS-based registration and how container-to-container discovery works via BOSH DNS and the `apps.internal` domain, and diagnose failures in both discovery planes using CLI and BOSH SSH commands.
 
 **The essential mental model for CF service discovery:**
 
@@ -51,6 +55,8 @@ graph LR
 ---
 
 ## Deep Dive
+
+The sections below examine each discovery plane in detail: how Gorouter assembles its in-memory routing table from NATS messages, how BOSH DNS performs health-aware resolution for `apps.internal` names, and how the VXLAN Policy Agent enforces C2C access control at the iptables layer. Work through sections 1–3 in order before moving to the troubleshooting and production checklist sections.
 
 ---
 
@@ -325,7 +331,7 @@ cf ssh myapp -t -c 'for i in 1 2 3 4 5; do \
   echo "Query $i:"; dig +short mybackend.apps.internal; sleep 2; done'
 ```
 
-The result: a client using BOSH DNS for C2C discovery will naturally avoid connecting to crashed instances without any client-side retry logic, circuit breaker, or Endpoints watch.
+The result: a client using BOSH DNS for C2C discovery will naturally avoid connecting to crashed instances without any client-side retry logic, circuit breaker, or Endpoints watch. In a banking or medtech environment where a backend microservice handles sensitive transactions, this DNS-layer health filtering means a crashing instance is removed from the discovery pool within seconds — before client applications have a chance to accumulate connection errors that require manual intervention.
 
 ### Per-instance addressing
 
@@ -583,6 +589,20 @@ iptables-save | grep -E "ACCEPT|DROP" | grep "10\.255\." | head -30
 | `grep HTTP /var/vcap/sys/log/gorouter/access.log` | Gorouter access log |
 | `iptables -t nat -L -n` | DNAT rules on Diego Cell |
 | `cat /var/vcap/data/silk/state.json` | Silk overlay state for this cell |
+
+---
+
+## Check Your Understanding
+
+1. CF has two discovery planes. What determines which plane handles a given request, and what is the key difference in how each plane locates a destination app?
+
+2. A Route Emitter publishes `router.register` messages every 20 seconds and the Gorouter TTL is 2 minutes. What happens to routing if a Diego Cell loses NATS connectivity for 90 seconds? For 150 seconds?
+
+3. You run `cf ssh myapp -t -c 'dig +short mybackend.apps.internal'` and get no output (no IPs returned). Walk through the two distinct root causes that could produce this result and the first command you would run to distinguish between them.
+
+4. Explain why CF containers use `ndots:0` while K8s pods use `ndots:5`, and describe one operational scenario where the K8s `ndots:5` default causes measurable latency overhead that CF avoids.
+
+5. A source app can resolve `mybackend.apps.internal` to a valid overlay IP but `nc -zv mybackend.apps.internal 8080` times out. What is the most likely cause, and which two commands — one using `cf` CLI and one on the Diego Cell — would you run to confirm and fix it?
 
 ---
 

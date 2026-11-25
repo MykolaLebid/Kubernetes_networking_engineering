@@ -6,7 +6,7 @@
 
 > **Goal:** Understand how SAP Business Technology Platform (BTP) handles network isolation, private connectivity to on-premise systems, and the boundary between the BTP CF environment and BTP Kyma (Kubernetes). This lesson is specifically for engineers working in SAP BTP — the most widely deployed CF platform in enterprise CH/DE/USA markets.
 
-**Jump to:** [Theory](#theory) · [Practice](#practice) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference)
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference)
 
 ---
 
@@ -419,6 +419,18 @@ cf curl /v2/service_instances?q=service_plan_guid:CONNECTIVITY_PLAN_GUID
 
 ---
 
+## Troubleshooting
+
+| Symptom | Likely cause | Resolution |
+|---------|-------------|------------|
+| `cf service my-private-link` shows `create in progress` for more than 10 minutes | PrivateLink approval pending on the customer VPC side (AWS requires explicit endpoint service approval; Azure requires resource owner acceptance) | On AWS: approve the endpoint connection in the VPC Endpoint Service console. On Azure: approve the private endpoint connection in the target resource's networking blade. Then re-check `cf service my-private-link`. |
+| CF app gets `Connection refused` to on-premise virtual host despite Cloud Connector being up | ASG missing for the Connectivity Service proxy port, or virtual host mapping not configured in Cloud Connector admin UI | Verify `cf running-security-groups` includes an ASG with `destination` matching the connectivity proxy CIDR and `ports: 20003`. Then check Cloud Connector admin UI (port 8443 by default) under `Cloud To On-Premise → Access Control` to confirm the virtual host mapping exists and shows green status. In regulated environments such as manufacturing OT networks, Cloud Connector is often behind an additional plant firewall — confirm outbound port 443 is open from the Cloud Connector host to `*.connectivity.cloud.sap`. |
+| CF app receives HTTP 401 when calling a Kyma service with a token obtained via `cf oauth-token` | Token audience mismatch — the CF CLI issues tokens scoped to the CF API, not to the Kyma service's OAuth client | Generate a service-to-service token using the app's own XSUAA client credentials (`client_id` and `client_secret` from VCAP_SERVICES), requesting the scope registered on the Kyma service. User-delegation tokens from `cf oauth-token` are not suitable for machine-to-machine Kyma calls. |
+| BTP Private Link credentials show an IPv6 address but the CF app cannot connect | ASG blocks IPv6; the default BTP CF security group posture may only permit IPv4 destinations | Create an ASG with the IPv6 CIDR block from `cf env` credentials (e.g., `fd12:3456::/32`) and bind it to the running lifecycle of the target space. Confirm with `cf ssh my-app -c "curl -6 -v fd12:3456::1:1433"`. In PCI-DSS environments (banking, fintech) ensure the IPv6 range is also documented in the network diagram submitted to the QSA. |
+| Cloud Connector shows `Connected` in the BTP Cockpit but `cf ssh my-app -c "curl ..."` to virtual host times out | The CF app is in a different BTP subaccount than the Cloud Connector location mapping | Cloud Connector location mappings are subaccount-scoped. Verify in the BTP Cockpit that the Cloud Connector is registered under the same subaccount as the CF space. If the org spans multiple subaccounts, each requires its own Cloud Connector instance or sub-location. |
+
+---
+
 ## Production Checklist
 
 - [ ] One BTP subaccount per data residency region (EU personal data never in US subaccount)
@@ -472,10 +484,26 @@ btp list accounts/entitlement --subaccount <SA_GUID>
 
 ---
 
+## Check Your Understanding
+
+1. A CF app in BTP needs to read data from an Azure SQL database without traffic leaving the hyperscaler backbone. Which BTP service do you use, and what ASG change is required after binding it?
+
+2. Your on-premise SAP S/4HANA system sits behind a corporate firewall that blocks all inbound connections. Explain how the BTP Cloud Connector establishes connectivity to BTP CF, and which outbound port and destination the firewall team must allow.
+
+3. A CF app calls a Kyma-hosted REST API within the same BTP subaccount. Does traffic between them stay within a private network? Justify your answer, and describe what ASG and NetworkPolicy rules are needed on each side.
+
+4. A security audit flags that a BTP subaccount's CF space has the `public_networks` ASG bound to the running lifecycle. Why is this a concern for a PCI-DSS-scoped space, and what is the recommended remediation?
+
+5. An engineer obtains a token with `cf oauth-token` and uses it to call a Kyma service. The call returns HTTP 401. Without changing the Kyma service's authorization policy, what is the correct way to generate a token that the Kyma service will accept?
+
+---
+
 ## See Also
 
 - [CF-19 — CF-to-K8s Migration Patterns](cf-19-cf-to-k8s-migration-patterns.md) — BTP CF → Kyma migration networking patterns in depth
 - [CF-21 — Compliance Networking](cf-21-compliance-networking.md) — HIPAA/PCI-DSS/GDPR controls for BTP CF
+- [Compliance Paths by Sector and Region](../compliance-paths.md) — sector-specific compliance paths for medtech, banking, manufacturing, and big tech across CH/DE/USA
 - [K8s Lesson 22 — Multi-Cluster Networking](../lessons/22-multi-cluster-networking.md) — Kyma/Gardener multi-cluster patterns
+- [K8s Lesson 37 — Compliance Networking](../lessons/37-compliance-networking.md) — HIPAA/PCI-DSS/IEC 62443/GDPR controls for Kubernetes
 - [SAP BTP Connectivity Service Documentation](https://help.sap.com/docs/connectivity/sap-btp-connectivity-cf/connectivity-service) — official SAP documentation
 - [SAP BTP Private Link Service Documentation](https://help.sap.com/docs/private-link/private-link1/what-is-sap-private-link-service) — official SAP documentation

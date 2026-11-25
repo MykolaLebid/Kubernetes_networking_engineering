@@ -305,6 +305,8 @@ kubectl exec -n kube-system ds/tetragon -- \
   tetra getevents --event-types PROCESS_ACCEPT,PROCESS_CONNECT -o json
 # expect: process-level network events including binary path and args
 
+> See [Lesson 35 — Tetragon: eBPF Runtime Security](35-tetragon-ebpf-runtime-security.md) for full TracingPolicy authoring.
+
 # kube-apiserver audit log — network policy changes
 kubectl get events --all-namespaces | grep NetworkPolicy
 ```
@@ -363,6 +365,8 @@ kubectl run -it --rm egress-test --image=nicolaka/netshoot -- \
 | SOC 2 | Audit logs: Hubble + Tetragon for network events |
 | CIS Benchmark | Default deny policies, no hostNetwork for user pods |
 
+For sector-specific paths (medtech/banking/manufacturing), see [docs/compliance-paths.md](../compliance-paths.md)
+
 ```bash
 # CIS Kubernetes Benchmark network checks
 # 5.3.1 Ensure network policies are set (default deny)
@@ -382,6 +386,7 @@ kubectl logs -f job.kube-bench | grep -A3 "5.3"
 | Goldman Sachs | PCI DSS zone enforcement | Admission webhooks + default-deny NetworkPolicy | Automated cardholder environment segmentation applied at every deploy pipeline stage |
 | Fortune 500 financial firms | Org-wide baseline security standard | CISA K8s Hardening Guide as org policy | Default-deny + metadata block standardized across 100+ production clusters |
 | CNCF enterprise adopters | Runtime audit and forensics | Tetragon + Hubble flow logs exported to SIEM | Process-level network event capture meeting SOC 2 audit log retention requirements |
+| Goldman Sachs-style trading platform | PCI-DSS Requirement 10 audit trail gap during peak trading | Tetragon TracingPolicy with rateLimit misconfigured too low | rateLimit dropped kernel audit events for 20 minutes at peak load, leaving a gap in the PCI-DSS Req 10 audit trail; fix: raise rateLimit and add alerting on event-drop counters |
 
 ---
 
@@ -408,41 +413,53 @@ kubectl get netpol -n default
 ### Hands-On Lab
 
 ```bash
-# 1. Default deny policies in all namespaces
-for ns in $(kubectl get ns -o jsonpath='{.items[*].metadata.name}'); do
-  count=$(kubectl get networkpolicy -n $ns 2>/dev/null | grep deny | wc -l)
-  echo "$ns: $count deny policies"
-done
-# expect: each namespace shows ≥1 deny policy
+# 1. Deploy a test pod without restrictions
+kubectl run -n default test-pod --image=nicolaka/netshoot --restart=Never -- sleep 3600
+kubectl exec -n default test-pod -- curl -m 3 http://httpbin.default.svc.cluster.local/get
+# expect: HTTP 200 — no policy blocking traffic yet
 
-# 2. Pod → metadata API is blocked
-kubectl run -it --rm meta-test --image=curlimages/curl -- \
-  curl -m 3 http://169.254.169.254/
-# expect: timeout
+# 2. Apply default-deny NetworkPolicy — verify traffic drops
+kubectl apply -f - <<'EOF'
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: default
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+EOF
+kubectl exec -n default test-pod -- curl -m 3 http://httpbin.default.svc.cluster.local/get
+# expect: connection timed out — default-deny is in effect
 
-# 3. Encryption is active
-cilium encrypt status   # for Cilium/WireGuard
-# expect: "Encryption: Wireguard" and "Keys in use: 1"
+# 3. Add a Tetragon TracingPolicy — verify audit events
+kubectl apply -f - <<'EOF'
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: tcp-connect-audit
+spec:
+  kprobes:
+    - call: "tcp_connect"
+      syscall: false
+      return: false
+      args:
+        - index: 0
+          type: "sock"
+EOF
+kubectl exec -n kube-system ds/tetragon -- \
+  tetra getevents --event-types PROCESS_CONNECT -o json | head -20
+# expect: JSON audit events showing binary path, pod name, and destination IP
 
-# 4. mTLS is enforced (Istio)
-istioctl authn tls-check --all-namespaces 2>/dev/null | grep CONFLICT
-# expect: empty — no CONFLICT rows
-
-# 5. No hostNetwork pods (except system components)
-kubectl get pods --all-namespaces \
-  -o json | jq '.items[] | select(.spec.hostNetwork == true) |
-    .metadata.namespace + "/" + .metadata.name'
-# expect: only kube-system / openshift-* components
-
-# 6. No pods with excessive capabilities
-kubectl get pods --all-namespaces \
-  -o json | jq '.items[].spec.containers[].securityContext.capabilities.add // empty'
-# expect: empty or only NET_BIND_SERVICE
-
-# 7. Egress to internet is controlled
-kubectl run -it --rm egress-test --image=nicolaka/netshoot -- \
-  curl -m 5 https://ifconfig.me
-# expect: timeout (if egress blocked) or only expected exit IPs
+# 4. Enable WireGuard encryption — verify cilium encrypt status
+helm upgrade cilium cilium/cilium --reuse-values \
+  --set encryption.enabled=true \
+  --set encryption.type=wireguard \
+  --set encryption.nodeEncryption=true
+cilium encrypt status
+# expect: "Encryption: Wireguard" and "Keys in use: 1" for all nodes
 ```
 
 ### Configuration Reference

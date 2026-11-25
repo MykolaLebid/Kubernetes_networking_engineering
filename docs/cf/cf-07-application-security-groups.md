@@ -2,9 +2,13 @@
 
 **Track:** CF-B | **Lesson:** CF-07 | **Duration:** 45–60 min
 
+**Jump to:** [Quick Read](#quick-read-10-min) · [Deep Dive](#deep-dive) · [Practice](#practice-setup) · [Troubleshooting](#4-troubleshooting) · [Quick Reference](#quick-reference)
+
 ---
 
 ## Quick Read (10 min)
+
+After this lesson you will be able to: design and apply Application Security Groups to control CF app egress, distinguish global from space-scoped bindings, and audit ASG rules against PCI-DSS, HIPAA, and GDPR requirements.
 
 **What ASGs are:** Stateful allow-rules that control outbound (egress) traffic from CF app containers to external destinations. They are the CF equivalent of Kubernetes egress NetworkPolicy rules — but coarser-grained and lifecycle-scoped.
 
@@ -426,6 +430,8 @@ cf bind-staging-security-group staging-internet
 
 **Symptom:** Security audit reveals app containers can reach internal infrastructure IPs.
 
+In banking environments, an overly broad RFC 1918 ASG can expose core banking systems or SWIFT integration endpoints to any app on the platform; in medical device manufacturing, the same misconfiguration can allow app containers to reach OT network segments that are only logically separated by IP range, making ASG scope audits a mandatory step in both pre-launch security reviews and ongoing change management.
+
 **Diagnosis:**
 ```bash
 # Check if someone added a broad RFC 1918 ASG
@@ -583,6 +589,16 @@ for sg in json.load(sys.stdin)['resources']:
 ```
 
 > **Full compliance mapping:** See [CF-21 — Compliance Networking](cf-21-compliance-networking.md) for the complete HIPAA/PCI-DSS/IEC 62443/GDPR control matrix with exact ASG JSON for each framework.
+
+---
+
+## Check Your Understanding
+
+1. What is the difference between a **staging ASG** and a **running ASG**, and why must they be managed independently?
+2. An app in `myorg/production` cannot reach a PostgreSQL instance at `10.100.50.5:5432`. The global `public_networks` and `dns` ASGs are bound. What is the most likely cause, and what command creates the fix?
+3. You run `cf update-security-group` to tighten an ASG rule, but containers in the affected space still see the old iptables behavior 10 minutes later. Name two things you would check first.
+4. A security audit flags that an app container can reach `10.0.0.0/8` — the BOSH director subnet. Which ASG command sequence would you run to identify and remediate the source of that permission?
+5. Why is binding `public_networks` globally to a space that processes EU personal data considered a GDPR Art. 25 finding, even if no data is actually exfiltrated?
 
 ---
 

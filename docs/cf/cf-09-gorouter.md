@@ -4,9 +4,13 @@
 **Prerequisite:** CF-02 (Garden Container Networking), CF-04 (Silk CNI) or equivalent  
 **Companion K8s lessons:** Lesson 15 — Ingress Controllers, Lesson 16 — Gateway API, Lesson 19 — Service Mesh TLS
 
+**Jump to:** [Theory](#1-gorouter-architecture-and-the-routing-table) · [Practice](#practice-setup) · [Troubleshooting](#4-troubleshooting) · [Quick Reference](#quick-reference)
+
 ---
 
 ## Quick Read (10 min)
+
+After this lesson you will be able to: explain how Gorouter builds and maintains its routing table via NATS, diagnose the five most common Gorouter failure modes, and translate CF routing concepts to their K8s Ingress equivalents.
 
 **What Gorouter is:** CF's built-in HTTP/WebSocket L7 reverse proxy. Every inbound request to any `cf push`-deployed app flows through one or more Gorouter instances sitting behind a load balancer. No Nginx, no Envoy, no Ingress YAML required — Gorouter is the platform's answer to all of those.
 
@@ -60,6 +64,8 @@ flowchart LR
 ---
 
 ## Deep Dive
+
+The Quick Read above gives you the operational mental model; the sections below work through each subsystem in detail — routing table internals, the full NATS registration sequence, every TLS mode, and the five failure modes you are most likely to encounter in production. Work through them in order if you are new to CF routing, or jump directly to a numbered section if you are diagnosing a specific issue.
 
 ---
 
@@ -399,6 +405,8 @@ sudo /var/vcap/packages/nats/bin/nats-sub -s nats://nats:$NATS_PASSWORD@10.0.0.6
 # Wait 20s — should see registration messages
 ```
 
+> **Banking/fintech context:** In regulated environments running payment-processing apps on SAP BTP CF, a 502 window during rolling deploys can violate SLA commitments for transaction endpoints. Teams in this sector typically pre-warm routes by keeping the old version mapped until the new instance emits at least one successful `router.register`, verified via NATS subscription, before unmapping the old route.
+
 ### Failure Mode 2: Routes Not Appearing (502 Persistent)
 
 **Symptom:** 502 persists even after the app is confirmed running. No `router.register` messages seen on NATS.
@@ -558,6 +566,16 @@ monit status | grep route_emitter
 | Check Route Emitter | `monit status \| grep route_emitter` (from Diego Cell) |
 | NATS sub to route events | `/var/vcap/packages/nats/bin/nats-sub -s nats://HOST "router.register"` |
 | Check BOSH job config | `cat /var/vcap/jobs/gorouter/config/gorouter.yml` |
+
+---
+
+## Check Your Understanding
+
+1. What is the default TTL Gorouter sets on a routing table entry, and what event causes that entry to expire before its TTL is reached?
+2. A `cf push` completes successfully and `cf app myapp` shows `instances: 1/1`, but HTTP requests return 502. Walk through the NATS registration flow to identify where the breakdown could be.
+3. How does Gorouter implement sticky sessions, and what happens to a pinned session when the target instance is rescheduled to a different Diego Cell?
+4. Explain the difference between TLS edge termination and full re-encrypt mode in Gorouter. Under which compliance requirements would you enable full re-encrypt, and what does route integrity verification protect against?
+5. How does CF's blue-green deployment via route mapping differ from weighted traffic splitting using K8s Gateway API HTTPRoute `backendRefs`?
 
 ---
 

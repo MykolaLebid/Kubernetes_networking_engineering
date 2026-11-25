@@ -237,6 +237,7 @@ These are set in `/etc/sysctl.d/99-kubernetes.conf` by kubeadm.
 | Cloudflare | Edge nodes run thousands of containers on bare-metal Linux, using Linux bridges for intra-host routing | Linux bridge + veth pairs + ip_forward sysctl | Achieves sub-microsecond container routing without custom hardware switches |
 | Docker Desktop | Every Docker container on Mac and Linux gets a veth pair connected to the docker0 bridge | veth pair + bridge (docker0) | Same Linux primitives used in this lesson power 50M+ Docker Desktop installs worldwide |
 | AWS EKS Fargate | Each Fargate task receives its own network namespace and veth pair managed by the VPC CNI plugin | veth pairs + network namespaces + ip_forward | Provides workload isolation at scale without touching the physical NIC or hypervisor |
+| Hospital EMR (medtech) | Bare-metal K8s cluster running electronic medical records: `nf_conntrack_max` left at kernel default (65536) caused conntrack table exhaustion under peak load, silently dropping TCP sessions mid-transaction during patient data writes | `net.netfilter.nf_conntrack_max` sysctl | Raising `nf_conntrack_max` to 1000000 eliminated silent write failures and restored transaction integrity |
 
 ---
 
@@ -463,3 +464,5 @@ ip link del br0
 ---
 
 **Next:** [Lesson 02 — IP Routing and Forwarding in Linux](02-ip-routing-and-forwarding.md)
+
+**These primitives recur in:** [Lesson 08 — CNI Specification](08-cloud-provider-networking.md) · [Lesson 13 — Kubernetes Services](13-kubernetes-services-kube-proxy.md) · [Lesson 23 — Network Security Hardening](23-network-security-hardening.md)

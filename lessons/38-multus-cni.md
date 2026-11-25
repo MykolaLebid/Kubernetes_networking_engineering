@@ -18,7 +18,7 @@ Every standard Kubernetes pod gets exactly one network interface (`eth0`) manage
 |---|---|---|
 | **AI/GPU training (NCCL/RDMA)** | RDMA requires a dedicated NIC on a separate network; mixing RDMA and control-plane traffic on `eth0` causes head-of-line blocking | Separate `eth0` (K8s control) + `net1` (RDMA/RoCE on 400 GbE) |
 | **Industrial edge (OT/IT separation)** | OT network (MQTT/OPC-UA to PLCs) must be isolated from IT network (K8s API server) | `eth0` (K8s control, IT network) + `net1` (OT network, isolated VLAN) |
-| **Telco CNFs (5G UPF, vRouter)** | User-plane and control-plane traffic must be separated; DPDK requires dedicated NIC | `eth0` (management) + `net1` (N3/N6 user-plane) + `net2` (N4 control) |
+| **Telco CNFs (5G UPF, vRouter)** | User-plane and control-plane traffic must be separated; DPDK (Data Plane Development Kit — bypass kernel networking for line-rate packet processing) requires dedicated NIC | `eth0` (management) + `net1` (N3/N6 user-plane) + `net2` (N4 control) |
 | **Network appliances (firewall, IDS)** | Need multiple interfaces to sit inline between network segments | Arbitrary number of interfaces with different subnets |
 
 ---
@@ -111,6 +111,8 @@ NCCL_SOCKET_IFNAME=net1
 NCCL_IB_HCA=mlx5_0        # Mellanox HCA on net1
 ```
 
+See [Lesson 34 — AI Platform Networking](34-ai-platform-networking.md) for SR-IOV device plugin setup and rail topology.
+
 ---
 
 ## 5. Use Case: Industrial Edge (OT/IT Separation)
@@ -133,7 +135,7 @@ flowchart LR
     ITNet -.->|"firewall: blocked"| OTNet
 ```
 
-This isolates OT traffic completely from the K8s overlay — no CNI policy or iptables rule can accidentally bridge them, because they are on physically separate network paths.
+This isolates OT traffic completely from the K8s overlay — no CNI policy or iptables rule can accidentally bridge them, because they are on physically separate network paths. See [Lesson 36 — KubeEdge](36-kubeedge-industrial-edge-networking.md) for the full IEC 62443 zone model.
 
 ---
 
@@ -361,6 +363,7 @@ kubectl get pod multus-test \
 | NCCL not using `net1` | `NCCL_SOCKET_IFNAME` not set or wrong | Set `NCCL_SOCKET_IFNAME=net1` (or the custom interface name) in pod env |
 | `network-status` annotation missing | Pod came up before Multus was ready | Delete and recreate pod; Multus writes the annotation after successful attachment |
 | SR-IOV VFs not available | SR-IOV not enabled in BIOS or VF count not set | `echo 8 > /sys/class/net/ens2f0/device/sriov_numvfs` on node; check BIOS SR-IOV setting |
+| Medtech: OT device-bus traffic leaking onto hospital IT network, audit trail for device commands invalidated (FDA 21 CFR Part 11) | NAD `master` interface set to the shared K8s NIC (`eth0`) instead of the isolated OT VLAN interface — medical device gateway pod mixes device-bus (`net1`) and hospital IT on the same physical link | Set NAD `master` to the dedicated OT VLAN interface (e.g. `eth1`) that is physically isolated; verify with `ip link show` on the node and test OT/IT path separation before deployment |
 
 ---
 
@@ -370,7 +373,7 @@ kubectl get pod multus-test \
 - [ ] NetworkAttachmentDefinitions are namespace-scoped — create them in every namespace that needs them
 - [ ] Parent interface name (`master`) in NAD config matches actual node interface name
 - [ ] SR-IOV VF count configured via node feature discovery or operator — not manually
-- [ ] IPAM ranges per NAD do not overlap between nodes (use `whereabouts` for cluster-wide IPAM instead of `host-local`)
+- [ ] IPAM (IP Address Management) ranges per NAD do not overlap between nodes (use `whereabouts` for cluster-wide IPAM instead of `host-local`)
 - [ ] GPU training pods set `NCCL_SOCKET_IFNAME` to the RDMA interface name
 - [ ] OT/IT isolation: OT interface NAD uses a master that is physically on the OT VLAN — not the K8s overlay NIC
 - [ ] NetworkPolicy on `eth0` still applies — Multus secondary interfaces are NOT controlled by K8s NetworkPolicy

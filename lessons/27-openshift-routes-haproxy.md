@@ -416,6 +416,7 @@ spec:
 | Deutsche Bahn | Microservice traffic routing across 100+ services | OpenShift Routes + reencrypt TLS | End-to-end TLS from browser to pod without manual HAProxy config |
 | SAP BTP | Multi-tenant PaaS service routing | OpenShift Router + TLS edge termination + router sharding | Per-tenant IngressController with namespace selector for traffic isolation |
 | Financial services firms | PCI DSS zone separation | Custom IngressControllers with `namespaceOwnership: Strict` | Separate routers for cardholder and non-cardholder traffic with audit logging |
+| Banking (PCI-DSS payment portal) | Blue-green route cutover during payment processing window | HAProxy access logs + weighted `alternateBackends` route | Old route remained bound for 2 minutes due to HAProxy TTL lag, sending 2% of transactions to the old version — detectable only via HAProxy access logs |
 
 ---
 
@@ -476,17 +477,7 @@ oc get routes -A -o json \
 
 ### Configuration Reference
 
-| Parameter | Default | Effect | When to change |
-|-----------|---------|--------|---------------|
-| `spec.replicas` | `2` | Number of HAProxy router pods | Increase for high throughput |
-| `spec.domain` | cluster install value | Wildcard DNS base for auto-generated hostnames | Set at install; changing disrupts all routes |
-| `endpointPublishingStrategy.type` | `LoadBalancerService` | How the router is exposed (LB, NodePort, HostNetwork) | Use `HostNetwork` on bare metal |
-| `tuningOptions.maxConnections` | `50000` | HAProxy global maxconn | Increase for high-connection workloads |
-| `tuningOptions.threadCount` | auto | HAProxy worker threads | Set to vCPU count of infra nodes |
-| `httpHeaders.forwardedHeaderPolicy` | `Append` | Handling of `X-Forwarded-For` | Set `Replace` if upstream proxy already sets it |
-| `logging.access.destination.type` | `Container` | Access log destination | Use `Syslog` for centralized logging |
-| `routeAdmission.wildcardPolicy` | `WildcardsDisallowed` | Whether `*.example.com` routes are accepted | Set `WildcardsAllowed` for multi-tenant platforms |
-| `routeAdmission.namespaceOwnership` | `InterNamespaceAllowed` | Whether routes can claim hostnames across namespaces | Set `Strict` for tenant isolation |
+See IngressController Configuration Reference in Theory Section 4 above.
 
 ---
 

@@ -302,6 +302,7 @@ eksctl create iamserviceaccount \
 | Lyft | Ride-sharing backend services | NLB target-type ip for direct-to-pod routing | Eliminated kube-proxy hop, reducing P99 latency by 15% for driver location API |
 | Twilio | Cloud communications platform | IngressGroup consolidating 200+ Ingress objects | Reduced ALB count from 200+ to 8 shared ALBs, saving $12k/month |
 | Shopify | E-commerce checkout flow | WAFv2 ACL attached to ALB via annotation | Blocked 95% of bot traffic on checkout endpoints without code changes |
+| Regional bank (PCI-DSS) | Cardholder data boundary enforcement | WAFv2 on ALB for PCI-DSS scope; missing `wafv2.amazonaws.com` VPC endpoint caused WAF rule updates to fail silently | Outdated ruleset remained active for 48 hours; fix: add Interface VPC endpoint for `wafv2.amazonaws.com` in private subnets |
 
 ---
 

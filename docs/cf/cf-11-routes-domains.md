@@ -3,9 +3,13 @@
 **Track:** CF-C — Cloud Foundry Application Networking
 **Prerequisites:** CF-09 (Gorouter Internals), CF-10 (TCP Routing)
 
+**Jump to:** [Quick Read](#quick-read-10-min) · [Deep Dive](#deep-dive) · [Troubleshooting](#4-troubleshooting-routes-and-domains) · [Quick Reference](#quick-reference)
+
 ---
 
 ## Quick Read (10 min)
+
+After this lesson you will be able to: map and unmap routes across shared and private domains, bind route services to intercept traffic for auth or rate-limiting, and diagnose the five most common Gorouter routing failures including stale TTL and route conflicts.
 
 **Core mental model:** In CF, a route is a DNS name + optional path that maps to one or more app instances. Domains are the namespace from which routes are carved. Route services intercept traffic before it reaches the app.
 
@@ -21,7 +25,7 @@
 **What breaks most often:**
 
 1. `404` — route unmapped or Gorouter table stale (wait up to 2 min or push again).
-2. `502` — backend app crashed; route still registered for 2 min after crash.
+2. `502` — backend app crashed; route still registered for 2 min after crash. In regulated banking environments running payment APIs on CF, a 2-minute window of `502` responses after an unplanned crash can breach SLA thresholds and trigger incident escalation; always pair `cf unmap-route` with pre-stop hooks in production.
 3. Route conflict — another org/space owns the same hostname on a shared domain.
 
 **Mermaid — Route Resolution Path:**
@@ -469,6 +473,16 @@ curl -s http://localhost:8082/routes | \
 | Find route owner (admin) | `cf curl /v3/routes?hosts=myapp` |
 | Check route service bindings | `cf curl /v3/service_route_bindings` |
 | View Gorouter logs | `tail -f /var/vcap/sys/log/gorouter/gorouter.stdout.log` |
+
+---
+
+## Check Your Understanding
+
+1. What is the maximum time a route entry can remain in the Gorouter table after a backend app crashes, and what HTTP status code will clients see during that window?
+2. A developer reports that `myapp.apps.example.com` returns `404` immediately after a `cf push`. List the two most likely causes and the commands you would run to confirm each.
+3. You need to send 10% of traffic to a canary version of an app while keeping 90% on the stable version. Which CF API resource and which CLI or `cf curl` commands support this, and what is the valid weight range?
+4. Explain the purpose of the `X-CF-Proxy-Signature` header. What attack does it prevent, and what log message would you search for on the Gorouter VM to detect a failure?
+5. What is the difference between a shared domain and a private domain in CF, and which role (platform admin vs. org manager) is responsible for creating each?
 
 ---
 

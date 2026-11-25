@@ -363,6 +363,7 @@ kubectl get ingress,httproute
 | Linkerd service mesh | GAMMA mesh routing specification — routing inside a service mesh, not just at ingress | HTTPRoute applied to east-west mesh traffic between services using the same Gateway API objects | Standard Gateway API objects work for both ingress and service-mesh east-west routing without separate CRDs |
 | Cilium | Native ingress layer replacing Ingress objects, backed by eBPF-accelerated Envoy gateway | GatewayClass backed by Cilium's Envoy data plane; HTTPRoute replaces all Ingress annotations | Unified routing model across ingress and mesh without a separate Ingress controller deployment |
 | Kong Konnect | Enterprise API gateway managing thousands of API routes with security policies | GatewayClass + HTTPRoute + KongPlugin extension points for rate-limiting, authentication, and logging | Security and routing policies expressed as standard Kubernetes objects with vendor-specific extensions |
+| European bank (payment platform) | Migrated annotation-based rate-limiting from Ingress to Gateway API HTTPRoute; the annotation was silently ignored after migration (no error), causing the payment API to accept unlimited requests during a load test | HTTPRoute does not honor Ingress annotations — rate-limiting must be re-implemented as a controller-specific extension or policy CRD attached to the HTTPRoute | Team added a RateLimitPolicy (or equivalent vendor CRD) to the HTTPRoute and verified enforcement under synthetic load before promoting to production |
 
 ---
 

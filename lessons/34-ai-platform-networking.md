@@ -420,7 +420,7 @@ env:
 
 ## 11. AWS EFA — Elastic Fabric Adapter
 
-AWS's custom RDMA-capable interconnect for P4d/P5 instances running LLM training.
+AWS's custom RDMA-capable interconnect for P4d/P5 instances running LLM training. See [Lesson 29 — AWS EKS Networking](29-aws-eks-networking.md) for the full VPC and EKS networking context in which EFA operates.
 
 ```
 AWS EFA Architecture:
@@ -684,6 +684,7 @@ cat /sys/class/net/ens4f0/ecn_enable   # 1 = ECN enabled
 | Meta AI Research SuperCluster (RSC) | 16000-GPU cluster for LLaMA training | RoCE v2 on 400G Ethernet with PFC+ECN, NVSwitch within server | Sub-2 μs latency AllReduce across racks; 36 Tbps bisection bandwidth |
 | Google TPU Pod | JAX/XLA distributed training (Gemini) | ICI (Inter-Chip Interconnect) fabric at 4800 Gbps per chip | Custom silicon interconnect eliminates Ethernet bottleneck entirely for ultra-scale jobs |
 | Stability AI | Stable Diffusion and SDXL training | H100 DGX clusters with rail-optimized topology and Volcano gang scheduling | Eliminated training stalls from partial pod starts; 40% utilization improvement |
+| Big Tech (LLM training) | Multi-node GPU training job for a large language model | NCCL all-reduce routing misconfigured to use eth0 instead of the dedicated RDMA interface | Effective bandwidth dropped from 400 Gbps to 25 Gbps, increasing a 2-hour training run to 32 hours; fix was setting `NCCL_IB_HCA` and `NCCL_SOCKET_IFNAME` explicitly to target the RDMA interface |
 
 ---
 
@@ -909,4 +910,6 @@ kubectl debug node/<gpu-node> -it --image=nicolaka/netshoot -- \
 
 ---
 
-**← Previous:** [Lesson 33 — ArgoCD and GitOps for Network Configuration](33-argocd-gitops.md)
+**Previous:** [Lesson 33 — ArgoCD and GitOps](33-argocd-gitops.md)  
+**Next:** [Lesson 35 — Tetragon: eBPF Runtime Security](35-tetragon-ebpf-runtime-security.md)  
+**See also:** [Lesson 29 — AWS EKS Networking](29-aws-eks-networking.md) · [Lesson 38 — Multus CNI](38-multus-cni.md)

@@ -419,6 +419,7 @@ kubectl get svc istio-ingressgateway -n istio-system
 | SAP BTP | Service-to-service mTLS within BTP Kyma runtime across shared Kubernetes clusters | Istio mesh with SPIFFE X.509 certs; PeerAuthentication STRICT per namespace; VirtualService for A/B testing | Tenant workloads cryptographically isolated; routing policies expressed in YAML without application changes |
 | eBay | A/B testing and canary releases across payment services processing millions of transactions/day | VirtualService with weighted routes (95/5 split) + DestinationRule subsets (v1/v2 label selectors) | Traffic gradually shifted to new payment logic; instant rollback by updating weights without redeployment |
 | Microsoft (Azure Service Fabric + Istio) | Migrating legacy on-prem microservices to AKS with gradual mTLS adoption | PeerAuthentication PERMISSIVE during migration; switched to STRICT per namespace after sidecar coverage reached 100% | Zero downtime migration; services coexisted with and without mTLS during the transition period |
+| Hospital EMR Platform (medtech) | HIPAA ePHI encryption-in-transit requirement for internal service communication; PERMISSIVE mode failed a compliance audit when the auditor captured plaintext traffic between EMR microservices | PeerAuthentication STRICT enforced per namespace; auditors verified mTLS using `istioctl authn tls-check` output showing STATUS OK + STRICT on all in-scope services | Passed re-audit; all ePHI flows cryptographically protected in transit without application-layer code changes |
 
 ---
 

@@ -6,7 +6,7 @@
 
 > **Goal:** Map Cloud Foundry's native network controls — ASGs, C2C policies, TLS, org/space isolation — to specific audit requirements in HIPAA, PCI-DSS, IEC 62443, and GDPR. Produce the exact CF CLI commands and evidence artifacts that satisfy each control.
 
-**Jump to:** [Theory](#theory) · [HIPAA](#hipaa) · [PCI-DSS](#pci-dss) · [IEC-62443](#iec-62443) · [GDPR](#gdpr) · [Audit Evidence Runbook](#audit-evidence-runbook) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference)
+**Jump to:** [Theory](#theory) · [Practice](#practice) · [HIPAA](#hipaa) · [PCI-DSS](#pci-dss) · [IEC-62443](#iec-62443) · [GDPR](#gdpr) · [Audit Evidence Runbook](#audit-evidence-runbook) · [Troubleshooting](#troubleshooting) · [Production Checklist](#production-checklist) · [Quick Reference](#quick-reference)
 
 ---
 
@@ -15,6 +15,8 @@
 ---
 
 ## Theory
+
+After this lesson you will be able to: map each CF network primitive (ASG, C2C policy, TLS, org/space isolation) to its specific clause in HIPAA, PCI-DSS, IEC 62443, and GDPR; and produce the CLI commands and evidence artifacts required by an auditor for each control.
 
 ## 1. CF Network Controls vs Compliance Requirements
 
@@ -69,6 +71,117 @@ cf security-group public_networks
 
 # For regulated environments: unbind or replace with explicit allow-list ASGs
 cf unbind-running-security-group public_networks
+```
+
+---
+
+## Practice
+
+### Lab Setup
+
+These labs require CF admin access and a CF foundation with at least two orgs and spaces. Use `cf target` to switch between orgs and spaces as directed. All commands assume CF CLI v7+.
+
+```bash
+# Confirm CF CLI version and login
+cf version
+cf target
+
+# Create lab orgs and spaces if they do not exist
+cf create-org phi-org
+cf create-space phi-production -o phi-org
+cf create-org payment-org
+cf create-space cde-production -o payment-org
+cf create-org personal-data-org
+cf create-space production -o personal-data-org
+cf create-org operations-zone
+cf create-org enterprise-it
+```
+
+### Lab 1 — Harden the Default ASG Posture
+
+**Goal:** Remove the default open ASG and verify regulated spaces cannot reach arbitrary internet IPs.
+
+```bash
+# Step 1: Check current global ASGs
+cf running-security-groups
+
+# Step 2: Unbind the open default (do NOT delete — just unbind globally)
+cf unbind-running-security-group public_networks
+
+# Step 3: Verify a container in phi-production is now blocked from arbitrary egress
+cf target -o phi-org -s phi-production
+# (Requires a running app; substitute your app name)
+cf ssh my-test-app -c "nc -zv 8.8.8.8 443 || echo BLOCKED"
+# Expected: BLOCKED
+
+# Step 4: Create and bind a minimal allow-list ASG for DNS and CF internals
+cat > asg-minimal-dns.json <<'EOF'
+[{"protocol":"udp","destination":"10.0.0.2","ports":"53","description":"Internal DNS only","log":false}]
+EOF
+cf create-security-group minimal-dns asg-minimal-dns.json
+cf bind-running-security-group minimal-dns
+```
+
+### Lab 2 — HIPAA ePHI Access Control
+
+**Goal:** Restrict a space to reach only the ePHI database, verify isolation, and confirm audit log rules exist.
+
+```bash
+# Step 1: Create the ePHI-scoped ASG
+cat > asg-phi-db-access.json <<'EOF'
+[{"protocol":"tcp","destination":"10.0.5.20","ports":"5432","description":"HIPAA 164.312(a)(1): EHR app to ePHI PostgreSQL","log":true}]
+EOF
+cf create-security-group hipaa-phi-db-access asg-phi-db-access.json
+
+# Step 2: Bind to phi-production space only
+cf bind-security-group hipaa-phi-db-access phi-org phi-production --lifecycle running
+
+# Step 3: Confirm the ASG is NOT globally bound
+cf running-security-groups
+# hipaa-phi-db-access must NOT appear here
+
+# Step 4: Confirm a container in another space cannot reach 10.0.5.20:5432
+cf target -o payment-org -s cde-production
+cf ssh payment-processor -c "nc -zv 10.0.5.20 5432 || echo BLOCKED"
+# Expected: BLOCKED
+```
+
+### Lab 3 — PCI-DSS CDE Segmentation Verification
+
+**Goal:** Demonstrate that the CDE space has no wildcard ASG and cannot reach arbitrary internet destinations.
+
+```bash
+# Step 1: Create CDE-specific ASG
+cat > asg-cde-egress.json <<'EOF'
+[
+  {"protocol":"tcp","destination":"192.168.10.5","ports":"8443","description":"PCI Req 1.3.2: CDE to payment gateway","log":true},
+  {"protocol":"tcp","destination":"10.0.1.53","ports":"53","description":"PCI Req 1.3.2: CDE to internal DNS","log":false}
+]
+EOF
+cf create-security-group pci-cde-egress asg-cde-egress.json
+cf bind-security-group pci-cde-egress payment-org cde-production --lifecycle running
+
+# Step 2: Confirm no wildcard rule in CDE space
+cf space-security-groups cde-production
+# Must NOT show public_networks or any 0.0.0.0/0 rule
+
+# Step 3: Test segmentation from CDE container
+cf target -o payment-org -s cde-production
+cf ssh payment-processor -c "nc -zv 8.8.8.8 443 || echo BLOCKED"
+# Expected: BLOCKED — arbitrary internet is not reachable from CDE
+```
+
+### Lab 4 — Run the Compliance Audit Runbook
+
+**Goal:** Collect the full set of audit evidence files.
+
+```bash
+# Run the audit script from the Audit Evidence Runbook section below
+# and verify each output file is non-empty
+bash cf-compliance-audit.sh
+ls -lh cf-audit-*/
+# Review 01-global-running-asgs.txt: should not contain public_networks
+# Review 03-all-security-groups.json: check all rules have log:true for regulated destinations
 ```
 
 ---
@@ -506,6 +619,20 @@ ls -la "$AUDIT_DIR/"
 
 ---
 
+## Troubleshooting
+
+| Symptom | Likely Cause | Diagnosis | Fix |
+|---|---|---|---|
+| `cf ssh myapp -c "nc -zv 10.0.5.20 5432"` times out even though the ASG allows it | ASG was created but not bound to the running lifecycle, or bound to staging only | `cf space-security-groups <space>` — check the `running` column; `cf security-group <name>` to confirm rule destination | `cf bind-security-group <name> <org> <space> --lifecycle running` |
+| Auditor finds `public_networks` still appears in `cf running-security-groups` after unbind | A subsequent CF upgrade or Diego deploy re-bound the default ASG | `cf curl /v3/security_groups?per_page=100` — look for `globally_enabled.running: true` on the `public_networks` entry | `cf unbind-running-security-group public_networks`; pin the removal in your BOSH ops-file or Concourse pipeline so it survives re-deploys |
+| `iptables -L OUTPUT -n \| grep LOG` on Diego Cell shows no LOG rules despite `"log": true` in ASG JSON | Diego Cell was not restarted after the ASG update, or the CF Networking plugin version pre-dates ASG logging support | Check Diego Cell `rep` logs: `bosh -d cf logs diego-cell/0`; confirm cf-deployment >= v20 (Networking release >= 3.0) | Rolling-restart Diego Cells: `bosh -d cf recreate diego-cell`; upgrade cf-deployment if below minimum version |
+| `cf curl /networking/v1/external/policies` returns an empty list but apps claim C2C is working | C2C policy API query is paginated and default page size is 100; more than 100 policies exist | Add `?per_page=5000` to the curl and compare total count | `cf curl "/networking/v1/external/policies?per_page=5000"` — iterate pages if needed; audit each policy against conduit register |
+| Plain HTTP routes appear in `cf routes` for a regulated space even after operator instruction | Developer pushed app with `cf push --no-route` then mapped a plain route manually, or CF marketplace service created it | `cf curl "/v3/routes?organization_guids=<org-guid>"` and filter `protocol == "http"` | Delete the HTTP route: `cf delete-route <domain> --hostname <host>` and remap to HTTPS domain; enforce with CF quota or rego policy |
+| `cf curl /v3/audit_events` returns no events for ASG changes | CC audit event log was purged or `max_events` is too low, or the query time window was not set | Add `&created_ats[after]=<ISO-timestamp>` and check CC log retention settings | Increase `cc.audit_events.max_records_per_request` in Cloud Controller config; forward CC audit events to SIEM before local purge |
+| GDPR Art. 44 ASG blocks all egress including internal services after binding | The EU-only ASG was bound globally (running) instead of space-scoped, overriding DNS and internal service routes | `cf running-security-groups` — if `gdpr-eu-only` appears here it is global | `cf unbind-running-security-group gdpr-eu-only`; rebind space-scoped only: `cf bind-security-group gdpr-eu-only <org> <space> --lifecycle running` |
+
+---
+
 ## Production Checklist
 
 - [ ] Default `public_networks` and `all_open` ASGs unbound from all regulated spaces
@@ -540,10 +667,26 @@ ls -la "$AUDIT_DIR/"
 
 ---
 
+## Check Your Understanding
+
+1. CF's default running ASG `public_networks` allows all outbound traffic from every container. Which specific clause in PCI-DSS v4.0 does this violate, and what is the exact CF CLI command to remove it globally?
+
+2. You have created an ASG with `"log": true` on all ePHI-destination rules, but `iptables -L OUTPUT -n | grep LOG` on the Diego Cell shows no LOG rules. Name two likely causes and the command to verify which applies.
+
+3. Explain how a CF Org and CF Space map to the IEC 62443 Zone/Conduit model. What CF object represents a Conduit, and what CF CLI command lists all active conduits between containers?
+
+4. A developer reports that their app in `cde-production` cannot reach the internal payment gateway at `192.168.10.5:8443`, even though the `pci-cde-egress` ASG allows it. Walk through three `cf` commands you would run to diagnose whether the ASG is correctly bound to the running lifecycle.
+
+5. Your GDPR Art. 44 ASG restricts egress to EU IP ranges. After binding it to `personal-data-org/production`, the app loses connectivity to the internal DNS resolver at `10.0.0.2`. What went wrong and how do you fix it without weakening the GDPR control?
+
+---
+
 ## See Also
 
 - [CF-07 — Application Security Groups](cf-07-application-security-groups.md) — ASG mechanics and iptables enforcement
 - [CF-13 — C2C Network Policies](cf-13-c2c-network-policies.md) — container-to-container policy model
 - [CF-14 — TLS and Certificates](cf-14-tls-certificates.md) — CredHub, route integrity, certificate rotation
 - [CF-15 — Org/Space Isolation](cf-15-org-space-isolation.md) — multi-tenancy boundaries and quota isolation
+- [CF-22 — SAP BTP Networking](cf-22-sap-btp-networking.md) — Private Link, Cloud Connector, and Kyma network boundary on SAP BTP
 - [K8s Lesson 37 — Compliance Networking](../lessons/37-compliance-networking.md) — the K8s equivalent of this lesson (NetworkPolicy, Cilium, Tetragon)
+- [Compliance Paths by Sector](../compliance-paths.md) — sector-specific guidance for medtech, banking, manufacturing, and big tech across CH/DE/USA jurisdictions

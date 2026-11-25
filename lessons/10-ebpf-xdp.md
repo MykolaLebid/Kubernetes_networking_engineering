@@ -345,6 +345,8 @@ spec:
             - action: Sigkill   # kill the process
 ```
 
+For production TracingPolicy authoring, see [Lesson 35 — Tetragon: eBPF Runtime Security](35-tetragon-ebpf-runtime-security.md).
+
 ---
 
 ## 8. bpftool — Essential Debug Tool
@@ -415,6 +417,7 @@ grep -E "CONFIG_BPF|CONFIG_XDP|CONFIG_NET_CLS_BPF" /boot/config-$(uname -r)
 | Meta (Facebook) | Open-source katran L4 load balancer used to handle billions of connections per day | XDP_TX and XDP_REDIRECT for L4 load balancing; eBPF maps for consistent hash backend tables | Near-linear scaling of L4 LB without stateful kernel NAT; katran is open-sourced on GitHub |
 | Datadog | Replaced iptables-based kube-proxy with Cilium eBPF across 1M+ containers in production | TC hook programs on pod lxc interfaces, eBPF service maps replacing kube-proxy iptables rules | 50% reduction in CPU overhead for networking; policy enforcement at kernel speed with zero iptables |
 | Netflix | Uses eBPF-based profiling tools in production to identify hot paths in microservices | kprobe/tracepoint hooks, BPF_MAP_TYPE_PERF_EVENT_ARRAY for event streaming, bpftrace | Continuous flamegraph profiling with <1% CPU overhead; replaced heavyweight Java profiling agents |
+| Banking (PCI-DSS) | Enforces PCI-DSS network segmentation across a high-volume transaction platform | Cilium identity-based eBPF policy at TC hook layer, replacing kernel iptables rules | Replaced 50,000 iptables rules with identity-based eBPF policy; kube-proxy CPU dropped from 12% to 0.3% under peak transaction load |
 
 ---
 
@@ -614,3 +617,5 @@ ip link set dev eth0 xdp off
 ---
 
 **← Previous:** [Lesson 09 — CNI Specification and Plugin Architecture](09-cni-specification.md)   |   **Next:** [Lesson 11 — Calico CNI Deep Dive](11-calico-cni-deep-dive.md)
+
+**Forward links:** [Lesson 11 — Calico CNI Deep Dive](11-calico-cni-deep-dive.md) · [Lesson 12 — Cilium CNI Deep Dive](12-cilium-cni-deep-dive.md)

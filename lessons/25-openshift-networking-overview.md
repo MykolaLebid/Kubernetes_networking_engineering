@@ -319,6 +319,7 @@ oc adm must-gather --image=registry.redhat.io/openshift4/ose-must-gather -- \
 | SAP BTP | Multi-tenant PaaS platform on OpenShift | Namespace isolation + CNO + OVN-Kubernetes | Automated per-tenant network segmentation across 50+ regions |
 | US Army (DoD) | IL-5 classified workloads on OpenShift Container Platform | OpenShift default namespace isolation + SCCs | Meets DoD IL-5 network isolation requirements without custom CNI |
 | Red Hat / Telcos | NFVI deployments (5G RAN, core) | OpenShift + OVN-Kubernetes + SR-IOV | Kubernetes-native VNF hosting replacing proprietary NFVI stacks |
+| SAP BTP (Banking) | Multi-tenant OpenShift deployment: a misconfigured auto-policy deletion script wiped NetworkPolicies from 12 tenant namespaces during a maintenance window, causing monitoring blackout and triggering a MaRisk incident | Namespace isolation via auto-created NetworkPolicies; `allow-from-openshift-monitoring` policy | Incident drove enforcement of GitOps-only policy management and pre-flight dry-run checks before any maintenance automation |
 
 ---
 
@@ -373,19 +374,6 @@ oc adm must-gather --image=registry.redhat.io/openshift4/ose-must-gather -- \
   /usr/bin/gather_network_logs
 # produces /must-gather/network/ with OVN NB/SB DB dumps and flow tables
 ```
-
-### Configuration Reference
-
-| Parameter | Default | Effect | When to change |
-|-----------|---------|--------|----------------|
-| `spec.defaultNetwork.type` | `OVNKubernetes` | Active CNI plugin | Set at install time only — migration requires maintenance window |
-| `spec.clusterNetwork[].cidr` | `10.128.0.0/14` | Pod IP CIDR | Set at install time — cannot change post-install |
-| `spec.clusterNetwork[].hostPrefix` | `23` | Subnet size per node | Smaller = more nodes; larger = more pods per node |
-| `spec.serviceNetwork` | `172.30.0.0/16` | ClusterIP range | Set at install time only |
-| `spec.defaultNetwork.ovnKubernetesConfig.mtu` | `1400` (Geneve) | Pod network MTU | Lower if physical MTU < 1450 (e.g. VPN overhead) |
-| `spec.defaultNetwork.ovnKubernetesConfig.genevePort` | `6081` | UDP tunnel port | Change if 6081 is blocked |
-
----
 
 ## Troubleshooting
 

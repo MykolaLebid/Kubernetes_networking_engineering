@@ -2,9 +2,13 @@
 
 **Track:** CF-E | **Lesson:** 16 | **Time:** Quick Read 10 min · Deep Dive 60 min
 
+**Jump to:** [Quick Read](#quick-read-10-min) · [Deep Dive](#deep-dive) · [Troubleshooting](#4-troubleshooting) · [Quick Reference](#quick-reference)
+
 ---
 
 ## Quick Read (10 min)
+
+After this lesson you will be able to: trace a CF network failure end-to-end using Gorouter access logs, iptables chain inspection, and Silk VXLAN packet captures; and map each diagnostic tool to its Kubernetes counterpart.
 
 ### The Mental Model
 
@@ -51,6 +55,8 @@ graph TD
 ---
 
 ## Deep Dive
+
+The Quick Read establishes the two visibility planes and their tool mapping. The sections below work through each plane in hands-on detail: Gorouter access log parsing, iptables chain inspection for C2C and ASG policies, Silk VXLAN packet captures at overlay and underlay levels, and a failure-scenario matrix with step-by-step remediation commands.
 
 ---
 
@@ -723,6 +729,18 @@ Before deploying to production or handing off to on-call:
 | Policy Server internal | `policy-server.service.cf.internal:4003` |
 | CF apps internal domain | `apps.internal` |
 | MTU formula | underlay MTU - 50 |
+
+---
+
+## Check Your Understanding
+
+1. A developer reports that `frontend` returns 502 errors intermittently. You check Gorouter access logs and see `x_cf_routererror:"backend_not_found"`. What two components should you investigate next, and what log file on the Diego Cell is most relevant?
+
+2. You run `cf network-policies` and confirm a policy exists allowing `frontend` to reach `backend` on TCP port 8080. The connection still times out from inside the `frontend` container. What is the maximum delay before a newly added policy takes effect, and which log file on the Diego Cell confirms whether the Policy Agent has synced recently?
+
+3. What is the formula for the correct Silk VTEP MTU given an underlay NIC MTU of 9000, and what symptom would you observe in an application if the Silk MTU were left at the default 1450 on that underlay?
+
+4. You need to capture all container-to-container traffic between two Diego Cells. Name the two tcpdump interfaces you can capture on, and explain what each one shows (overlay-decoded vs. VXLAN-encapsulated).
 
 ---
 

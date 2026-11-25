@@ -2,9 +2,13 @@
 
 **Track CF-E | Lesson 17 of 20**
 
+**Jump to:** [Quick Read](#quick-read-10-min) · [Deep Dive](#deep-dive) · [Practice](#practice-setup) · [Troubleshooting](#4-troubleshooting) · [Quick Reference](#quick-reference)
+
 ---
 
 ## Quick Read (10 min)
+
+After this lesson you will be able to: query container network metrics and Gorouter latency from Log Cache using the cf log-cache plugin, diagnose tx_drops caused by VXLAN MTU mismatches, and identify the correct Loggregator component to inspect when logs or metrics stop flowing.
 
 **Core mental model:** CF uses a dedicated log and metrics pipeline called Loggregator. Every container emits logs and metrics via a local Metron agent. Metron forwards to Doppler (aggregation), which feeds Traffic Controller (streaming) and Log Cache (queryable ring buffer). Network performance data — Gorouter latency, container TX/RX bytes — flows through this same pipeline.
 
@@ -175,6 +179,8 @@ cf log-cache "$APP_GUID" \
 ### MTU and tx_drops
 
 Silk VXLAN wraps each packet with a 50-byte VXLAN/UDP/IP header. With underlay MTU 1500, the container MTU must be at most 1450. If a misconfigured app or sidecar tries to send 1500-byte frames, they are fragmented or dropped.
+
+> **Sector note:** In medical device manufacturing environments running FDA-regulated workloads on SAP BTP, sustained `tx_drops` on containers handling HL7 or DICOM image transfer can silently corrupt message streams and trigger audit failures. MTU alignment should be verified as part of any infrastructure change control procedure, not only during incident response.
 
 ```bash
 # Terminal 2 — check MTU on the silk-vtep and silk bridge interfaces
@@ -541,6 +547,16 @@ monit summary | grep log-cache
 | `bbs` | Diego BBS (task/LRP scheduling) |
 | `rep` | Diego rep (cell-local executor) |
 | `doppler` | Loggregator aggregator self-metrics |
+
+---
+
+## Check Your Understanding
+
+1. What is the role of the Metron agent, and what happens to envelopes if Doppler becomes temporarily unavailable?
+2. A container shows a steady rise in `tx_drops` but `rx_drops` remains zero. What is the most likely cause, and what BOSH property controls the fix?
+3. `gorouter.ms_since_last_registry_update` reaches 150000 ms. What does this mean for in-flight HTTP requests, and which component should you inspect first?
+4. A space developer reports that `cf log-cache my-app --start-time ... --end-time ...` returns no envelopes for a window one hour ago. The app was running. What is the most probable explanation?
+5. You need to expose CF container metrics in an existing Prometheus + Grafana stack. The Firehose is not an option. What is the recommended approach, and what UAA scope does it require?
 
 ---
 

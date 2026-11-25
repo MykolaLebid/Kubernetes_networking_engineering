@@ -568,6 +568,7 @@ spec:
 | Codefresh | SaaS CI/CD platform (ArgoCD originators) | ArgoCD with self-managed fleet using the same tool | Dogfood approach: ArgoCD manages its own platform deployments |
 | SAP | BTP multi-tenant cluster fleet management | ArgoCD App-of-Apps for per-tenant network baseline | Each BTP tenant gets isolated NetworkPolicy set deployed via GitOps with zero manual steps |
 | Shopify | E-commerce platform network hardening | ArgoCD selfHeal=true on all NetworkPolicy resources | Automated revert of any manual NetworkPolicy changes within 3 minutes |
+| Banking (tax-season rollout) | Missing sync-wave annotation on payment API stack | Sync waves for Ingress/NetworkPolicy ordering | Ingress was created before the NetworkPolicy, exposing the payment API for ~90 seconds until ArgoCD reverted on the next reconcile cycle; root cause traced to absent `argocd.argoproj.io/sync-wave` annotation on the NetworkPolicy |
 
 ---
 

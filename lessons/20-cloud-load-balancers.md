@@ -16,6 +16,8 @@
 
 ## 1. How Cloud LBs Are Provisioned
 
+The Cloud Controller Manager (CCM) is a Kubernetes control-plane component that integrates with a specific cloud provider's API to manage cloud resources such as load balancers, nodes, and routes on behalf of the cluster.
+
 ```mermaid
 flowchart TD
     SA["kubectl apply Service type: LoadBalancer"]
@@ -354,16 +356,6 @@ Work through each provider section to understand annotation-driven provisioning:
 4. Enable cross-zone load balancing and check that traffic distributes across AZs with uneven pod counts
 5. Set `externalTrafficPolicy: Local` (Section 6) and confirm pod-less nodes are removed from LB targets
 6. Test `externalTrafficPolicy: Cluster` to see SNAT behavior in pod access logs
-
-### Configuration Reference
-
-Key parameter tables are embedded in the Theory sections above:
-
-| Section | Table |
-|---------|-------|
-| Section 2 — AWS | Key AWS Annotations: `aws-load-balancer-type`, `nlb-target-type`, `scheme`, `cross-zone`, `preserve_client_ip` |
-| Section 5 — Comparison | Cross-Provider Comparison: AWS NLB vs GCP NLB vs Azure SLB features |
-| Section 6 — ExternalTrafficPolicy | Policy behavior: client IP preservation vs traffic balance |
 
 ---
 

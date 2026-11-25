@@ -287,6 +287,7 @@ Benefits: no conntrack for pod-to-pod, no SNAT for intra-cluster traffic, lower 
 | Datadog | Replaced kube-proxy iptables rules with Cilium eBPF at their Kubernetes platform for 10x rule-load performance | iptables KUBE-SERVICES chains → eBPF XDP | Reduced CPU usage from iptables rule traversal by 90% at 100k+ services scale |
 | Kubernetes kube-proxy | At scale, every Service creates O(n) KUBE-SEP rules; clusters with 10k services have 100k+ iptables rules | KUBE-SERVICES + KUBE-SVC-* + KUBE-SEP-* chain hierarchy | Deterministic ClusterIP DNAT for every pod-to-service packet across all nodes |
 | Calico CNI | Felix daemon manages per-pod iptables FORWARD rules so only valid pod-to-pod traffic is allowed | filter/FORWARD chain with pod CIDR src/dst ACCEPT rules | Network policy enforcement without an overlay or SDN controller |
+| Hospital PACS (medtech) | Bulk DICOM image transfers exhausted the conntrack table on radiology cluster nodes, silently dropping TCP connections with no application-level error | conntrack `nf_conntrack_max` tuning + kube-proxy IPVS mode | Raising `nf_conntrack_max` and switching kube-proxy to IPVS eliminated silent drops and stabilised image retrieval under peak radiology load |
 
 ---
 
@@ -306,29 +307,7 @@ sudo iptables -t nat -L KUBE-SERVICES -n --line-numbers | head -20
 
 Trace a packet through Netfilter hooks and inspect kube-proxy rules.
 
-```bash
-# Inspect kube-proxy chains
-iptables -t nat -L KUBE-SERVICES -n --line-numbers
-iptables -t nat -L KUBE-SVC-XXXX -n       # per-Service chain
-iptables -t nat -L KUBE-SEP-XXXX -n       # per-Endpoint chain
-
-# View conntrack table
-conntrack -L
-conntrack -L --proto tcp --state ESTABLISHED
-
-# Monitor new connections
-conntrack -E --event-mask NEW
-
-# Table size (critical to tune for high-throughput clusters)
-cat /proc/sys/net/netfilter/nf_conntrack_max
-sysctl -w net.netfilter.nf_conntrack_max=1000000
-
-# Current usage
-cat /proc/sys/net/netfilter/nf_conntrack_count
-
-# Bucket count (hash table size)
-cat /proc/sys/net/netfilter/nf_conntrack_buckets
-```
+Run the commands from Section 4 above inside `minikube ssh` to observe each chain.
 
 #### Packet Tracing
 

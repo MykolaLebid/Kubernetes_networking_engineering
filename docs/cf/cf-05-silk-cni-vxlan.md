@@ -2,9 +2,13 @@
 
 **Track:** CF-B | **Lesson:** CF-05 | **Time:** 10 min quick read / 45 min deep dive
 
+**Jump to:** [Quick Read](#quick-read-10-min) · [Deep Dive](#deep-dive) · [Troubleshooting](#4-troubleshooting) · [Quick Reference](#quick-reference)
+
 ---
 
 ## Quick Read (10 min)
+
+After this lesson you will be able to: explain how Silk CNI builds a flat VXLAN overlay across Diego Cells, trace a container-to-container packet end-to-end, and diagnose the four most common overlay failures using BOSH SSH and CF CLI commands.
 
 **What Silk CNI does in one sentence:** Silk is CF's built-in CNI plugin that creates a flat VXLAN overlay network so every container on every Diego Cell can talk to every other container using a stable, routable IP address — without needing the underlay network to know anything about containers.
 
@@ -427,6 +431,8 @@ bosh ssh diego-cell/0 -c "sudo iptables -L netout-<container-id> -n -v"
 - Stale VTEP routes → `sudo monit restart silk-daemon` on affected Cell
 - Underlay firewall blocking UDP 4789 → open it in IaaS security groups
 
+> **Banking sector note:** In regulated financial environments, IaaS security groups are often managed by a separate network operations team with change-control lead times of 24–72 hours. When UDP 4789 is blocked between Diego Cells, all inter-Cell C2C traffic silently fails; include this port in the initial infrastructure runbook and validate it during every Diego Cell rollout to avoid a production incident during a high-traffic trading window.
+
 ---
 
 #### Failure: MTU mismatch causing silent packet loss
@@ -558,7 +564,25 @@ cf ssh app-a -c "ping -c 3 <app-b-overlay-ip>"
 
 ---
 
+## Check Your Understanding
+
+1. A Diego Cell is assigned the subnet `10.255.7.0/24`. What is the VTEP MAC address for that Cell, and how does the Silk Daemon derive it without querying the Silk Controller for MAC information?
+
+2. You run `cf push myapp` and the app stays stuck in "Starting" with a "Diego error: insufficient resources" message, yet the Diego Cells have plenty of CPU and memory headroom. What is the most likely networking cause, and what is the first command you would run to confirm it?
+
+3. An app works fine for small HTTP responses but silently hangs when downloading files larger than ~1 MB. The overlay CIDR is `10.255.0.0/16` and the IaaS underlay MTU is 1500. Walk through the MTU chain from the IaaS NIC to the container `eth0` and explain where the misconfiguration is most likely to exist.
+
+4. Explain the difference in packet path when Container A communicates with Container B on the same Diego Cell versus with Container C on a different Diego Cell. At which layer does policy enforcement happen in each case?
+
+5. The Silk Daemon on Cell 2 has stale FDB entries pointing to the old underlay IP of a Diego Cell that was recently rebuilt. What observable symptom would you see, and which single command is the fastest remediation?
+
+---
+
 ## See Also
+
+**Previous lesson:** [CF-04 — Garden Container Runtime](cf-04-garden-container-runtime.md) — how Garden invokes the Silk CNI binary and manages container network namespaces.
+
+**Next lesson:** [CF-06 — GoRouter and HTTP Routing](cf-06-gorouter-http-routing.md) — how traffic enters the CF platform from outside and how Gorouter load-balances across container overlay IPs.
 
 **Related K8s lessons in this course:**
 

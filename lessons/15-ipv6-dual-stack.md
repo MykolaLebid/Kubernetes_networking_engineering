@@ -319,34 +319,7 @@ rdisc6 eth0    # or: ip -6 route show | grep ra
 
 ## 11. Verification Steps
 
-After configuring dual-stack, run these checks in order:
-
-```bash
-# Step 1: Verify nodes have both address families
-kubectl get nodes -o custom-columns=\
-"NAME:.metadata.name,ADDRESSES:.status.addresses[*].address"
-
-# Step 2: Verify pods have dual IPs
-kubectl get pods -A -o custom-columns=\
-"NS:.metadata.namespace,NAME:.metadata.name,IPs:.status.podIPs[*].ip" | head -20
-
-# Step 3: Verify services have dual ClusterIPs
-kubectl get svc -A -o custom-columns=\
-"NS:.metadata.namespace,NAME:.metadata.name,CLUSTER-IPS:.spec.clusterIPs"
-
-# Step 4: Test pod-to-pod IPv6 connectivity
-kubectl exec -it pod-a -- ping6 -c3 <pod-b-ipv6-addr>
-# Expected: 3 packets transmitted, 3 received, 0% packet loss
-
-# Step 5: Test service resolution over IPv6
-kubectl exec -it pod-a -- nslookup -type=AAAA web.default.svc.cluster.local
-# Expected: an fd00:... address in the Answer section
-
-# Step 6: Verify ip6tables service rules exist
-# (run on the node via minikube ssh or kubectl debug)
-ip6tables -t nat -L KUBE-SERVICES -n | head -10
-# Expected: KUBE-SVC-* entries for IPv6 ClusterIPs
-```
+Verification steps are in the Practice lab below.
 
 ### Industry Applications
 
@@ -356,6 +329,7 @@ ip6tables -t nat -L KUBE-SERVICES -n | head -10
 | AWS EKS | Cloud-native Kubernetes for telco and enterprise customers | IPv6-only cluster mode added in 2022 for EKS; each pod gets a unique VPC IPv6 address | Exhausted IPv4 space in large VPCs; IPv6-only pods scale to millions of endpoints per region |
 | Comcast | Cable modem provisioning services on Kubernetes | IPv6-only pods used in DOCSIS provisioning infrastructure | Cable modems receive IPv6 from K8s pods without NAT; end-to-end IPv6 from CPE to provisioning server |
 | GKE / Anthos | Google's managed Kubernetes platform | Dual-stack enabled by default since GKE 1.21; Cloud DNS handles AAAA records automatically | Zero-config dual-stack for all new clusters; transparent migration path for IPv4 workloads |
+| Hospital network (medtech) | Migrating bedside device management to IPv6-only K8s pods to meet FDA cybersecurity guidance on network segmentation | IPv6-only pods per FDA network segmentation requirement; NDP neighbor discovery on a /64 subnet | NDP neighbor solicitations flooded the /64 subnet causing broadcast storms on legacy switches; resolved by switching to /80 per-pod subnets and enabling proxy NDP on the node interface |
 
 ---
 

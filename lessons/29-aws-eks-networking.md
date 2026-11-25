@@ -133,7 +133,7 @@ Formula (prefix delegation): `(ENIs × prefixes_per_ENI × 16) − ENIs`
 
 ---
 
-## 6. Prefix Delegation
+## 5. Prefix Delegation
 
 Assign /28 CIDR blocks (16 IPs) per ENI slot instead of individual secondary IPs. Dramatically increases pod density.
 
@@ -159,9 +159,11 @@ kubectl logs -n kube-system -l k8s-app=aws-node -c aws-node | \
   grep -i prefix | tail -20
 ```
 
+**Industry example:** Capital One adopted prefix delegation on EKS clusters running cloud-native banking workloads. By assigning /28 CIDR blocks per ENI slot on `m5.xlarge` nodes, they achieved a 3x pod density increase without changing instance type.
+
 ---
 
-## 7. Security Groups for Pods
+## 6. Security Groups for Pods
 
 By default all pods on a node share the **node's Security Group**. With Security Groups for Pods, individual pods get their own SG via ENI trunking.
 
@@ -216,9 +218,11 @@ aws ec2 describe-network-interfaces \
 # [{"GroupId": "sg-0123456789abcdef0", "GroupName": "db-access"}]
 ```
 
+**Industry example:** Shopify uses `SecurityGroupPolicy` on their EKS-based e-commerce platform to satisfy PCI-DSS isolation requirements. Per-pod Security Groups restrict database access to only payment-processing pods, preventing lateral movement from other workloads on the same node.
+
 ---
 
-## 8. EKS Node Networking
+## 7. EKS Node Networking
 
 ```bash
 # View all ENIs attached to a node
@@ -244,7 +248,7 @@ aws ec2 describe-instance-attribute \
 
 ---
 
-## 9. VPC CNI Network Policies (eBPF)
+## 8. VPC CNI Network Policies (eBPF)
 
 Since VPC CNI v1.14, AWS includes a built-in eBPF network policy controller:
 
@@ -280,7 +284,7 @@ kubectl exec -n kube-system -l k8s-app=aws-node -- \
 
 ---
 
-## 10. IRSA — IAM Roles for Service Accounts
+## 9. IRSA — IAM Roles for Service Accounts
 
 Pods need AWS API access without storing static credentials. IRSA uses OIDC federation to map Kubernetes service accounts to IAM roles.
 
@@ -309,7 +313,7 @@ kubectl run test-irsa --rm -it --image=amazon/aws-cli \
 
 ---
 
-## 11. EKS with Alternative CNI Plugins
+## 10. EKS with Alternative CNI Plugins
 
 ```bash
 # Option 1: Keep VPC CNI for pod IPs; add Calico for NetworkPolicy only
@@ -330,9 +334,7 @@ helm install cilium cilium/cilium \
 | Company / Project | Context | Technology from this lesson | Outcome |
 |---|---|---|---|
 | Robinhood | Financial trading platform on EKS | VPC CNI real VPC IPs for low-latency order routing | Direct pod IPs eliminate NAT for sub-millisecond trade execution |
-| Capital One | Cloud-native banking on EKS at scale | Prefix delegation (/28 CIDR blocks per ENI slot) | 3x pod density increase on m5.xlarge without changing instance type |
 | Amazon.com | Thousands of EKS clusters for Prime Day traffic | IRSA (IAM Roles for Service Accounts) per microservice | Zero static credentials; each pod scope-limited to its own IAM role |
-| Shopify | E-commerce platform on EKS | SecurityGroupPolicy (Security Groups for Pods) for PCI-DSS isolation | Per-pod SGs restrict DB access to only payment-processing pods |
 
 ---
 
@@ -384,7 +386,7 @@ kubectl describe node $NODE | grep "pods:"
 
 # 3. Enable Security Groups for Pods
 kubectl set env ds aws-node -n kube-system ENABLE_POD_ENI=true
-# Then apply a SecurityGroupPolicy (see Section 7)
+# Then apply a SecurityGroupPolicy (see Section 6)
 
 # 4. Enable eBPF network policy enforcement (VPC CNI v1.14+)
 kubectl set env ds aws-node -n kube-system ENABLE_NETWORK_POLICY_CONTROLLER=true

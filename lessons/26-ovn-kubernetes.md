@@ -302,6 +302,7 @@ oc exec -n openshift-ovn-kubernetes ovnkube-node-xxxxx -- \
 | IBM Cloud ROKS | Red Hat OpenShift on IBM Cloud (managed) | OVN-Kubernetes as the platform CNI | Consistent OVN control plane across IBM Cloud multi-zone clusters |
 | OpenShift Virtualization (KubeVirt) | Running VMs alongside containers in OpenShift | OVN-Kubernetes as reference CNI + SR-IOV | VM-to-pod networking using the same OVN logical switches as containers |
 | Telco NFV operators | Virtualized 5G core on OpenShift | OVN-Kubernetes + DPDK/SR-IOV offload | NFVI-grade throughput with OVN logical network control plane |
+| Banking cluster (PCI-scoped namespace) | Firewall blocking UDP 6081 (Geneve) silently dropped all cross-node pod traffic — pods appeared healthy, no firewall log entries | Geneve tunnel (UDP :6081) cross-node encapsulation | Root-caused via `tcpdump udp port 6081` showing no tunnel packets arriving on destination node; firewall rule added to permit UDP 6081 between all node IPs |
 
 ---
 
@@ -357,17 +358,6 @@ oc debug node/<node> -- chroot /host \
   ovs-appctl ofproto/trace br-int \
   "in_port=1,ip,ip_src=10.128.0.5,ip_dst=10.128.1.5,tcp,tcp_dst=8080"
 ```
-
-### Configuration Reference
-
-| Parameter | Default | Effect | When to change |
-|-----------|---------|--------|---------------|
-| `gatewayConfig.routingViaHost` | `false` (shared) | Routes egress via node NIC vs master | Set `true` for local gateway in production |
-| `ipsecConfig.mode` | `Disabled` | Encrypts Geneve tunnels with IPsec ESP | Enable for compliance (PCI, HIPAA) |
-| `mtu` | auto-detected | Overlay MTU (subtract Geneve overhead ~50B) | Lower if jumbo frames unavailable |
-| `hybridOverlayConfig.enabled` | `false` | Allows Windows nodes using VXLAN hybrid | Enable for mixed Linux/Windows clusters |
-| `v4InternalSubnet` | `100.64.0.0/16` | Transit subnet for OVN join switch | Change only if 100.64.x conflicts |
-| `egressIPConfig.reachabilityTotalTimeoutSeconds` | `1` | Time to detect EgressIP node failure | Lower for faster HA failover |
 
 ---
 

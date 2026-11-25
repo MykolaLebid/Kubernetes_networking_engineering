@@ -1,7 +1,7 @@
 # Lesson 16 — Network Policies: Microsegmentation
 
 > **Track:** Network Foundation — Bare Metal & Cloud  
-> **Prerequisites:** [Lesson 13 — Kubernetes Services](13-kubernetes-services-kube-proxy.md)  
+> **Prerequisites:** [Lesson 13 — Kubernetes Services](13-kubernetes-services-kube-proxy.md) · [Lesson 10 — eBPF](10-ebpf-networking.md) · [Lesson 12 — Cilium](12-cilium-cni.md)  
 > **Duration:** ~2.5 hours
 
 > **Goal:** Configure NetworkPolicy resources to implement microsegmentation, enforce default-deny namespaces, test connectivity enforcement with Cilium and Calico tooling, and avoid common selector and DNS egress pitfalls.
@@ -389,6 +389,7 @@ az aks create --network-policy azure
 | US Department of Defense (DoD) | Classified Kubernetes environments under DoD DevSecOps reference design | NetworkPolicy as a mandatory baseline zero-trust control in every namespace | Enforced least-privilege pod communication without relying solely on network perimeter; audit trail via Calico policy events |
 | Stripe | Payments API infrastructure handling billions of transactions | Namespace-scoped default-deny policies for PCI card data isolation | Prevented lateral movement between payment-processing and non-PCI namespaces; simplified PCI audit scope |
 | Shopify | Multi-tenant e-commerce platform with hundreds of merchant environments | Cilium L7 NetworkPolicy enforcing HTTP path-level access rules | Blocked unauthorized cross-tenant API calls at layer 7; reduced blast radius of compromised merchant pods |
+| Medtech ISV (HIPAA) | HIPAA-scoped PHI namespace on a managed Kubernetes cluster; no default-deny policy was applied at deployment | Missing default-deny left all pods reachable from kube-system; gap was not flagged by internal monitoring and was discovered during an external PCI audit 3 months after deployment | Retrospective remediation required re-auditing all namespace-to-namespace traffic logs; default-deny-all policy and automated policy-compliance scanning added to the deployment pipeline to prevent recurrence |
 
 ---
 
@@ -535,18 +536,6 @@ calicoctl policy trace \
 kubectl apply --dry-run=server -f policy.yaml
 ```
 
-### Configuration Reference
-
-| Parameter | Default | Effect | When to Change |
-|-----------|---------|--------|----------------|
-| `podSelector: {}` | Selects no pods | With `policyTypes`, selects ALL pods in namespace | Use for namespace-wide default-deny baseline policy |
-| `policyTypes: [Ingress, Egress]` | Ingress only if ingress rules present | Governs both traffic directions | Always declare explicitly to avoid implicit inferences |
-| `from: []` / `to: []` empty list | — | Denies ALL ingress or ALL egress | Use alongside `podSelector: {}` for default-deny pattern |
-| `namespaceSelector` + `podSelector` same `from` entry | — | AND logic: pod must match AND be in matching namespace | Cross-namespace access with pod-level specificity |
-| `namespaceSelector` + `podSelector` separate `from` entries | — | OR logic: either selector alone allows access | Permits broader access than intended — use same-entry AND form |
-| `ipBlock: cidr` with `except` | — | Allow/block external CIDR with exclusions | On-prem resources, cloud health check IPs, monitoring agents |
-| `port: 53 protocol: UDP` and `protocol: TCP` | — | DNS exception for egress policy | Required whenever any egress policy is applied to avoid DNS breakage |
-
 ---
 
 ## Troubleshooting
@@ -663,3 +652,5 @@ kubectl apply --dry-run=server -f policy.yaml
 ---
 
 **← Previous:** [Lesson 15 — IPv6 and Dual-Stack Kubernetes](15-ipv6-dual-stack.md)   |   **Next:** [Lesson 17 — Ingress Controllers and L7 Load Balancing](17-ingress-controllers.md)
+
+See also: [Lesson 35 — Tetragon](35-tetragon-ebpf-runtime-security.md) · [docs/compliance-paths.md](../compliance-paths.md)

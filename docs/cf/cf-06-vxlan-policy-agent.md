@@ -4,11 +4,13 @@
 **Lesson:** 6 of 9
 **Time:** Quick Read 10 min | Deep Dive 45 min
 
+**Jump to:** [Theory](#1-architecture-overview--where-the-vpa-fits) · [Practice](#practice-setup) · [Troubleshooting](#4-troubleshooting-c2c-policy-enforcement) · [Quick Reference](#quick-reference)
+
 ---
 
 ## Quick Read (10 min)
 
-**Mental model in one sentence:** The VXLAN Policy Agent (VPA) is the per-cell enforcement daemon that translates abstract C2C policy (source GUID → dest GUID, protocol, port) into concrete iptables rules on each Diego Cell.
+After this lesson you will be able to: trace the full path from `cf add-network-policy` through the Policy Server to iptables rules on a Diego Cell, and diagnose why a C2C policy that appears correct in the control plane is not being enforced in the dataplane.
 
 ### Key Facts
 
@@ -427,6 +429,8 @@ cf app backend --guid
 
 **Symptom:** Small payloads succeed; large payloads (file uploads, database queries) hang or fail.
 
+In banking or medtech environments running CF on bare-metal hosts with jumbo frames enabled on the underlay, an MTU mismatch is a common root cause of intermittent DICOM image transfer failures or large transaction payload drops that are difficult to reproduce with synthetic health checks.
+
 **Diagnostic:**
 
 ```bash
@@ -514,6 +518,16 @@ openssl verify \
 | Check Policy Server API | `cf curl /networking/v1/external/policies` |
 | Check MTU inside container | `ip link show eth0 \| grep mtu` |
 | Verify cert expiry | `openssl x509 -enddate -noout -in /path/to/client.crt` |
+
+---
+
+## Check Your Understanding
+
+1. What is the default C2C traffic posture in a CF deployment using Silk/VPA, and what must an operator do to allow two apps to communicate on the overlay?
+2. The VPA uses app GUIDs rather than container IPs to identify policy subjects. What operational problem does this solve, and when does the GUID-to-IP resolution actually occur?
+3. A developer adds a C2C policy via `cf add-network-policy` but traffic from the source app still times out 60 seconds later. List three distinct root causes you would investigate in order, and state which tool or log surfaces each one.
+4. A CF deployment is running on bare-metal hosts with a 9000-byte underlay MTU. What container MTU should Silk be configured to use, and what symptom appears first when this value is set incorrectly?
+5. In Korifi (CF on Kubernetes), the VXLAN Policy Agent is removed entirely. What replaces it, and what is the key architectural difference in how workload identity is expressed in policy rules?
 
 ---
 

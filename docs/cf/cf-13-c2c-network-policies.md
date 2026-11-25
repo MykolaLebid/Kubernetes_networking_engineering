@@ -2,9 +2,13 @@
 
 **Track:** CF-D | **Lesson:** 13 | **Duration:** 45 min (Deep Dive) / 10 min (Quick Read)
 
+**Jump to:** [Quick Read](#quick-read-10-min) · [Deep Dive](#deep-dive) · [Troubleshooting](#4-troubleshooting) · [Quick Reference](#quick-reference)
+
 ---
 
 ## Quick Read (10 min)
+
+After this lesson you will be able to: explain how CF enforces container-to-container isolation with default-deny iptables rules, and create, inspect, and remove network policies using the cf CLI and BOSH SSH tools.
 
 **What this lesson covers:** How Cloud Foundry implements container-to-container (C2C) networking with a default-deny security model enforced by iptables and the VXLAN Policy Agent.
 
@@ -313,13 +317,13 @@ DROP       all  --  0.0.0.0/0            10.255.0.0/16
 
 ### Microservice Mesh Without a Service Mesh
 
-For a 3-tier app (frontend → API → database), you need explicit policies at each hop:
+In a PCI-DSS-compliant banking deployment, strict tier isolation is a hard requirement: the card-data environment (CDE) must be segmented from the web tier, and the web tier must have no direct path to the database. CF network policies enforce this topology explicitly — a misconfigured or missing policy generates a DROP at the iptables level, providing an auditable control boundary that satisfies PCI-DSS Requirement 1 (network segmentation).
 
 ```bash
-# Frontend can reach API
+# Frontend (web tier) can reach the payment API (CDE boundary)
 cf add-network-policy frontend --destination-app api-service --port 8080 --protocol tcp
 
-# API can reach database
+# Payment API can reach the database proxy (CDE internal)
 cf add-network-policy api-service --destination-app postgres-proxy --port 5432 --protocol tcp
 
 # Database cannot reach anything (no policies from db)
@@ -580,6 +584,20 @@ bosh -d cf scp diego-cell/0:/tmp/vxlan.pcap ./vxlan.pcap
 | Import policies from file | `cf curl -X POST /networking/v1/external/policies -d @policies.json` |
 | DNS resolution test | `cf ssh app-a -c "dig app-b.apps.internal"` |
 | Check resolv.conf | `cf ssh app-a -c "cat /etc/resolv.conf"` |
+
+---
+
+## Check Your Understanding
+
+1. By default, can two apps in the same CF space communicate over C2C without any network policy? Explain which iptables chain enforces this restriction and on which component it runs.
+
+2. A network policy is created with `cf add-network-policy`. After what maximum delay will the policy be active on all Diego Cells, and which component is responsible for translating the policy into iptables rules?
+
+3. You push a new version of `app-b` with `cf push`. Does the existing network policy from `app-a` to `app-b` break? Explain why or why not, referencing how CF identifies the destination app in a policy.
+
+4. A developer reports that `curl http://app-b.apps.internal:8080` from inside `app-a` returns "Could not resolve host", but `curl http://10.255.2.7:8080` works. What component is likely failing, and what is the first diagnostic command you would run?
+
+5. In a Korifi deployment, what Kubernetes resource type replaces a CF network policy, and in which namespace does that resource appear?
 
 ---
 

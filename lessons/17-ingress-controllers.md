@@ -358,6 +358,7 @@ metadata:
 | Zalando (fashion e-commerce) | AWS-hosted Kubernetes serving millions of requests/day | AWS ALB Ingress Controller (AWS Load Balancer Controller) for path-based routing | Native AWS ALB integration; path-level traffic shaping between microservices without maintaining NGINX pods |
 | GitHub | github.com global load balancing infrastructure | HAProxy-based ingress for github.com with custom health checks and routing | Sub-10ms routing decisions at scale; fine-grained backend health probing integrated with Kubernetes endpoints |
 | Traefik Labs (open source maintainer) | Reference deployment for edge routing in Kubernetes | Traefik IngressRoute CRDs with Let's Encrypt auto-TLS via cert-manager | Zero-touch TLS certificate lifecycle; dynamic routing config from Kubernetes API without NGINX reload delays |
+| Medtech ISV (FHIR platform) | NGINX Ingress routing FHIR API traffic including DICOM image uploads from radiology systems | NGINX Ingress Controller; `nginx.ingress.kubernetes.io/proxy-body-size` annotation | Missing `proxy-body-size` annotation left the default 1 MB limit in place; DICOM uploads over 1 MB returned intermittent 413 errors visible only with large radiology images; fix was adding `proxy-body-size: "100m"` to the FHIR Ingress resource |
 
 ---
 
@@ -522,23 +523,6 @@ kubectl describe certificate web-tls
 openssl s_client -connect web.example.com:443 -servername web.example.com < /dev/null 2>/dev/null | \
   openssl x509 -noout -subject -dates
 ```
-
-### Configuration Reference
-
-| Parameter | Default | Effect | When to Change |
-|-----------|---------|--------|----------------|
-| `ingressClassName` | Cluster default IngressClass | Selects which controller processes this Ingress | Always set explicitly when multiple controllers are installed |
-| `pathType: Prefix` | — | Matches path and all sub-paths | Use `Exact` for precise path matching with no sub-path bleed |
-| `pathType: Exact` | — | Matches only the exact path string | Strict API endpoints where sub-paths should 404 |
-| `tls.secretName` | — | Secret containing `tls.crt` and `tls.key` | Required for HTTPS; pair with cert-manager for auto-renewal |
-| `nginx.ingress.kubernetes.io/rewrite-target` | (no rewrite) | Rewrites URL before forwarding to backend | Strip path prefix before sending to backend service |
-| `nginx.ingress.kubernetes.io/proxy-read-timeout` | 60 s | Max time to wait for backend response | Increase for slow backends; decrease to fail fast |
-| `nginx.ingress.kubernetes.io/limit-rps` | (none) | Per-source-IP requests per second rate limit | Apply to all public-facing endpoints |
-| `nginx.ingress.kubernetes.io/affinity` | (none) | Sticky sessions via cookie | Use when backend has in-memory session state |
-| `nginx.ingress.kubernetes.io/proxy-body-size` | 1m | Maximum request body size | Increase to `100m` or `0` (unlimited) for file upload endpoints |
-| controller `kind: DaemonSet` | Deployment | Runs NGINX pod on every node | Use on bare metal with HostPort so every node accepts traffic |
-
----
 
 ## Troubleshooting
 

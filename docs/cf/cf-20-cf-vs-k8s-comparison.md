@@ -4,9 +4,13 @@
 **Prerequisites:** CF-01 through CF-19, K8s lessons 01–34  
 **Time:** Quick Read 10 min | Deep Dive 60 min
 
+**Jump to:** [Architecture Overview](#1-architecture-overview) · [Network Layer Comparisons](#2-network-layer-comparisons) · [Troubleshooting](#5-troubleshooting) · [Quick Reference](#quick-reference)
+
 ---
 
 ## Quick Read (10 min)
+
+After this lesson you will be able to: map every CF networking primitive (Gorouter, Silk CNI, ASGs, C2C policies, BOSH DNS) to its Kubernetes counterpart, and choose the right platform for a given networking use case based on routing model, egress policy defaults, and scaling constraints.
 
 For engineers who already know K8s and need the essential mental model for CF networking.
 
@@ -993,6 +997,16 @@ Before promoting an application or CF networking configuration to production, ve
 | apps.internal DNS domain | BOSH DNS, all spaces |
 | Default ASGs | dns, public_networks |
 | C2C default | deny-all |
+
+---
+
+## Check Your Understanding
+
+1. A CF container IP changes on every restage. Which component must you use for app-to-app addressing instead of a hardcoded IP, and what domain does it use?
+2. An engineer adds a C2C network policy from appA to appB on port 8080, but `curl http://appB.apps.internal:8080` from appA still times out. Name two steps to diagnose the problem before checking iptables rules on the Diego Cell.
+3. CF ASGs and K8s NetworkPolicy both control egress, but their default postures differ. Explain the difference: what is the default for a new CF space versus a new K8s namespace (without any NetworkPolicy applied)?
+4. The Silk CNI limits a CF deployment to 250 Diego Cells and roughly 63,500 containers. Which component or migration path removes this ceiling, and what CNI does it inherit instead?
+5. A Gorouter 502 error persists for up to two minutes after a container crash, whereas a K8s Ingress backend failure is removed within seconds. Identify the two timer values in CF that cause this lag and the BOSH job responsible for publishing route health.
 
 ---
 

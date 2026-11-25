@@ -244,6 +244,7 @@ netstat -s | grep -i "forwarded\|route"
 | Cloudflare | Uses ECMP routing for anycast IP distribution across 300+ PoPs worldwide | ECMP nexthop routing + L4 hash policy | Traffic from any client IP reaches the nearest healthy PoP with per-flow load balancing |
 | Netflix Open Connect | BGP route reflectors with iBGP propagate CDN routes across data center fabrics | BGP route injection + Linux routing table | Low-latency content delivery by selecting optimal CDN appliance via ip route selection |
 | Calico CNI | Each Kubernetes node runs BIRD which injects per-pod /32 host routes into the Linux routing table | Host routes /32 + LPM precedence over /24 | Per-pod routing without ARP flooding; ECMP across nodes for load balanced services |
+| Bank trading platform | ECMP L4 hashing for FIX protocol flows; strict rp_filter=1 dropped half the packets on return paths because asymmetric routing sent replies via a different interface | ECMP nexthop routing + rp_filter + L4 hash policy | Setting rp_filter=2 (loose) restored bidirectional flow for all FIX sessions without disabling reverse path validation entirely |
 
 ---
 
@@ -403,19 +404,6 @@ ip netns del node2
 | Enable IP forwarding | `sysctl -w net.ipv4.ip_forward=1` |
 | Monitor routing table changes live | `ip monitor route` |
 | Set L4 ECMP hash | `sysctl -w net.ipv4.fib_multipath_hash_policy=1` |
-
----
-
-## Summary
-
-| Concept | Command |
-|---------|---------|
-| Show routing table | `ip route show` |
-| Test routing decision | `ip route get <dst>` |
-| Add static route | `ip route add <prefix> via <gw>` |
-| Enable forwarding | `sysctl net.ipv4.ip_forward=1` |
-| Monitor route changes | `ip monitor route` |
-| Multi-path hash policy | `net.ipv4.fib_multipath_hash_policy=1` |
 
 ---
 

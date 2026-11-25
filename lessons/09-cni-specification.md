@@ -302,6 +302,7 @@ kubectl exec -it <pod> -- ip addr
 | Calico (open source) | Default CNI on many on-prem and cloud Kubernetes distributions including EKS-A, OpenShift, Rancher | calico-ipam with /26 IPAM blocks, calico binary in /opt/cni/bin/, 10-calico.conflist | Full NetworkPolicy enforcement via standard CNI lifecycle; used by Goldman Sachs, SAP BTP, and thousands of enterprises |
 | Azure CNI (Microsoft AKS) | Azure's cloud-native CNI is spec-compliant and assigns VNet IPs through the standard ADD/DEL flow | CNI spec stdin/stdout protocol, chained with bandwidth + portmap plugins, IPAM backed by Azure VNET API | Azure-native IP assignment while maintaining full compatibility with standard CNI tooling and kubectl debugging |
 | Multus (Red Hat / CNCF) | Meta-CNI used in telco 5G networks (Nokia, Ericsson) for pods with multiple network interfaces | CNI chaining, NetworkAttachmentDefinition CRD, delegates ADD to multiple plugins per pod | Telco workloads get separate management, data, and control-plane interfaces from a single CNI framework |
+| Big-tech e-commerce (EKS) | IPAM exhaustion during a Black Friday EKS scale-out caused 400 pods stuck in ContainerCreating for 8 minutes until WARM_IP_TARGET was raised from 2 to 10 | aws-vpc-cni IPAM warm pool, EC2 ENI secondary IP pre-provisioning, WARM_IP_TARGET tuning | Raising WARM_IP_TARGET eliminated the ENI allocation bottleneck; pods reached Running state within seconds of scheduling during subsequent traffic spikes |
 
 ---
 

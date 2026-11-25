@@ -294,6 +294,7 @@ ethtool -L eth0 combined 8
 | AWS VPC networking | AWS VPC uses VXLAN-like tunneling internally to provide per-VPC isolation across shared physical infrastructure | VXLAN-style L2-over-UDP encapsulation between hypervisors | Millions of VPC tenants share hardware with full L2 isolation; ENIs get dedicated VNIs |
 | WeaveNet CNI | WeaveNet uses VXLAN for multi-host pod networking with its own control plane for FDB population | VXLAN with dynamic FDB population via gossip protocol | No external control plane required; works across cloud providers and on-prem without BGP |
 | Cilium Geneve mode | Cilium uses Geneve (54-byte overhead vs VXLAN 50-byte) for its overlay mode, allowing extensible option headers for future telemetry | Geneve UDP :6081 with extensible VNI header | Supports future metadata embedding in tunnel headers for observability without separate sidecar |
+| Medical device manufacturer (IEC 62443) | Bare-metal K8s cluster with VXLAN-isolated subnets per IEC 62443 security zone; OT sensor data crossed zone boundaries over the overlay | VXLAN per-zone VNI segmentation + MTU configuration on bare metal | MTU misconfiguration left pod interfaces at 1500 instead of 1450, causing silent 1-byte payload corruption on OT sensor packets crossing zones; detected only after checksum failures surfaced in sensor telemetry |
 
 ---
 

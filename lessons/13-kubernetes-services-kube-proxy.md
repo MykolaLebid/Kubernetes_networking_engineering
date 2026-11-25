@@ -342,6 +342,7 @@ annotations:
 | LinkedIn | High-churn microservices platform with thousands of services | IPVS kube-proxy with least-connection scheduler | Reduced CPU overhead of iptables rule processing; maintained sub-millisecond service latency |
 | AWS EKS | Cloud-native Kubernetes workloads for enterprise customers | NLB-backed LoadBalancer services with `externalTrafficPolicy: Local` | Direct pod routing preserves client source IPs; elastic scaling without kube-proxy as bottleneck |
 | Airbnb | Multi-AZ Kubernetes platform serving global traffic | `trafficDistribution: PreferClose` with zone-aware topology constraints | Reduced cross-AZ data transfer costs; improved p99 service latency for regional users |
+| Hospital EHR platform (medtech) | HIPAA-regulated EHR system requiring real client IPs in audit logs | `externalTrafficPolicy: Local` on LoadBalancer service to suppress SNAT and preserve source IPs | Node failure caused the cloud LB to route traffic to nodes with no local pods; 30% of requests dropped for 90 seconds until LB health checks removed the unhealthy nodes — highlighting the need to configure kube-proxy health port 10256 as the LB health check endpoint |
 
 ---
 

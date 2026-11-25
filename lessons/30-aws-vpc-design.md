@@ -414,6 +414,7 @@ aws logs filter-log-events \
 | Yelp | Business review platform across 3 AWS regions | Transit Gateway connecting 50+ VPCs | Replaced 1225 VPC peering connections with a single TGW hub-and-spoke |
 | Expedia | Travel booking platform | AWS PrivateLink for cross-account microservice communication | Zero-data-transfer NAT costs for internal service-to-service calls |
 | Datadog | SaaS observability platform on EKS | Secondary CIDR 100.64.0.0/16 for pod subnet isolation | Separated pod IPs from node IPs avoiding RFC1918 exhaustion with on-prem overlap |
+| Hospital imaging platform (medtech) | HIPAA-regulated EKS cluster running diagnostic image workloads | Missing ECR VPC endpoints (ecr.api + ecr.dkr) | Docker image pulls traversed the public NAT gateway during a scale event — HIPAA-covered container images and credentials briefly crossed the public internet; adding VPC endpoints eliminated the exposure and reduced NAT data-transfer costs |
 
 ---
 
@@ -487,16 +488,7 @@ aws ec2 describe-vpc-endpoints \
 | XL | 50 | 58 (m5.xlarge) | /21 | 2043 |
 | Cluster with prefix delegation | 50 | 110+ | /20 | 4091 |
 
-**Required VPC Endpoints:**
-
-| Endpoint | Type | Why needed |
-|----------|------|-----------|
-| `com.amazonaws.<region>.ecr.api` | Interface | Authenticate ECR image pulls |
-| `com.amazonaws.<region>.ecr.dkr` | Interface | Pull image layers from ECR |
-| `com.amazonaws.<region>.s3` | Gateway (free) | Pull image layers (ECR uses S3 backend) |
-| `com.amazonaws.<region>.sts` | Interface | IRSA token exchange |
-| `com.amazonaws.<region>.ec2` | Interface | VPC CNI calls EC2 API |
-| `com.amazonaws.<region>.elasticloadbalancing` | Interface | AWS Load Balancer Controller |
+See VPC endpoint reference in Theory Section 8 above.
 
 ---
 

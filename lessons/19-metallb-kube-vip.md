@@ -297,6 +297,7 @@ spec:
 | Equinix Metal customers | Bare-metal cloud workloads require anycast VIPs for high-availability services | MetalLB BGP mode peering with Equinix Metal's BGP infrastructure; ECMP across all nodes | Traffic distributed across all announcing nodes; sub-second failover via BFD on BGP sessions |
 | Talos Linux clusters | Immutable bare-metal OS requiring HA control-plane API server without external LB | kube-vip VRRP mode providing a floating VIP for the kube-apiserver before the cluster is bootstrapped | Multi-master control plane works without any external load balancer hardware or cloud CCM |
 | Home Assistant OS | Home automation clusters on Raspberry Pi / NUC hardware needing local service exposure | MetalLB L2 mode on a home LAN; services get local IPs from a 192.168.x.x pool | Kubernetes services accessible on the home network at stable IPs without router configuration |
+| Hospital PACS cluster (medtech) | Bare-metal PACS imaging cluster requiring stable VIPs; rolling deploys caused two nodes to briefly co-announce the same VIP in L2 mode, triggering ARP storms that disrupted in-flight DICOM transfers | MetalLB BGP mode with per-node next-hops advertised to ToR switch; each node announces the VIP as its own /32 route so the router arbitrates via ECMP rather than ARP | ARP storms eliminated; rolling deploys complete without network disruption; ECMP provides even traffic distribution across PACS nodes |
 
 ---
 

@@ -339,6 +339,7 @@ az aks create \
 | Adobe Creative Cloud | Kubernetes platform serving 20M+ creative subscribers across on-prem and AWS | Cilium CNI with Hubble observability, CiliumNetworkPolicy for microservice isolation | Real-time flow visibility replaced expensive network TAPs; L7 HTTP policy without sidecar proxies |
 | AWS EKS (Amazon.com) | Cilium available as an EKS add-on since 2023, used by customers replacing aws-vpc-cni | Cilium eBPF service LB (kube-proxy replacement), CiliumNetworkPolicy, Tetragon runtime security | 40% lower latency for intra-cluster service calls compared to iptables kube-proxy at high connection rates |
 | Datadog | Runs 1M+ containers in production; migrated from Flannel + kube-proxy to Cilium | kube-proxy replacement with eBPF, Hubble for observability, identity-based policy replacing IP rules | 50% reduction in networking CPU overhead; policy rules survive pod restarts without IP-based rule updates |
+| Hospital system (medtech) | HIPAA-regulated EHR platform running PHI workloads on Kubernetes; strict pod isolation required | CiliumNetworkPolicy for PHI namespace isolation; Hubble flow logs for compliance audit | A misconfigured allow rule opened the PHI namespace to all pods in the cluster; Hubble flow logs surfaced the exposure after 6 hours, enabling targeted remediation before external data left the cluster |
 
 ---
 
@@ -454,8 +455,8 @@ hubble observe --protocol http --verdict DROPPED           # → non-GET request
 - [ ] Enable Hubble relay (`hubble.relay.enabled=true`) so flows are visible across all nodes
 - [ ] Size the eBPF CT table for expected connection count (`bpf-ct-global-tcp-max`: default 512Ki)
 - [ ] Tune `bpf.masquerade=true` to move masquerade off iptables once kube-proxy is replaced
-- [ ] Deploy Tetragon alongside Cilium for runtime security audit of syscalls and file access
-- [ ] Use `CiliumClusterwideNetworkPolicy` default-deny with `fromEntities: cluster` before cluster goes to production
+- [ ] Deploy [Tetragon](35-tetragon-ebpf-runtime-security.md) alongside Cilium for runtime security audit of syscalls and file access
+- [ ] Use `CiliumClusterwideNetworkPolicy` default-deny with `fromEntities: cluster` before cluster goes to production — see [Lesson 23 — Network Policy and Security Hardening](23-network-policy-security.md) for hardening patterns
 
 ---
 
@@ -545,5 +546,7 @@ hubble observe --protocol http --verdict DROPPED           # → non-GET request
 | [Killercoda Playground](https://killercoda.com/) | Free | Run `cilium status`, `hubble observe`, inspect BPF maps with `bpftool` on a real cluster |
 
 ---
+
+See also: [Lesson 35 — Tetragon](35-tetragon-ebpf-runtime-security.md) · [Lesson 37 — Compliance Networking](37-compliance-networking.md)
 
 **← Previous:** [Lesson 11 — Calico CNI Deep Dive](11-calico-cni-deep-dive.md)   |   **Next:** [Lesson 13 — Kubernetes Services and kube-proxy](13-kubernetes-services-kube-proxy.md)

@@ -2,9 +2,13 @@
 
 **Track:** CF-A | **Lesson:** CF-03 | **Prerequisites:** CF-01 (Overlay Networking), CF-02 (Gorouter and Traffic Flow)
 
+**Jump to:** [Theory](#1-bosh-dns-architecture) · [Practice](#practice-setup) · [Troubleshooting](#4-troubleshooting-bosh-dns-and-service-discovery) · [Quick Reference](#quick-reference)
+
 ---
 
 ## Quick Read (10 min)
+
+After this lesson you will be able to: explain how BOSH DNS resolves both platform component addresses and app-to-app addresses, and diagnose the most common `apps.internal` failures using `dig` and CF CLI commands.
 
 **Core mental model:** BOSH DNS is CF's internal DNS system. It is health-aware, runs on every VM, and resolves both platform component addresses and app-to-app addresses. The `apps.internal` domain is the namespace for container-to-container service discovery.
 
@@ -406,101 +410,15 @@ For production workloads requiring true load balancing and retry logic, apps can
 
 ### Common failure modes
 
-**Failure Mode 1: `apps.internal` DNS returns NXDOMAIN**
+| Symptom | Root cause | Fix |
+|---|---|---|
+| `dig my-service.apps.internal` returns `NXDOMAIN` | Internal route not mapped, or app is not running/healthy | Run `cf map-route my-service-app apps.internal --hostname my-service`; confirm `cf app my-service-app` shows state `running` |
+| DNS resolves an IP but `curl` hangs or connection is refused | C2C network policy missing between caller and target | Run `cf add-network-policy my-caller-app my-service-app --protocol tcp --port 8080` |
+| All `apps.internal` DNS queries fail from containers on a Diego Cell | `bosh-dns` process is not running on that Cell | SSH to the Cell with `bosh ssh`, run `sudo monit restart bosh-dns`, verify with `dig @169.254.0.2 nats.service.cf.internal` |
+| DNS returns IPs that are no longer reachable after `cf push` | Client is caching stale IPs beyond the DNS TTL; Route Emitter has not propagated new IPs yet | Wait up to 20 seconds for Route Emitter refresh; ensure app runtimes re-resolve DNS every 60 seconds or less |
+| `curl http://my-service.apps.internal:80` returns connection refused | Wrong port — CF apps listen on `$PORT` (default 8080), not port 80 | Use port 8080: `curl http://my-service.apps.internal:8080` |
 
-Symptom: `dig my-service.apps.internal` returns `NXDOMAIN` or empty answer.
-
-Causes and fixes:
-
-```bash
-# Check 1: Is the internal route actually mapped?
-cf routes | grep apps.internal
-# If not present:
-cf map-route my-service-app apps.internal --hostname my-service
-
-# Check 2: Is the app actually running?
-cf app my-service-app
-# State must be "running" for DNS to resolve
-
-# Check 3: Is the app healthy? Check health check
-cf events my-service-app
-cf logs my-service-app --recent | grep -i health
-
-# Check 4: From inside a container, test DNS directly
-cf ssh my-caller-app
-dig @169.254.0.2 my-service.apps.internal
-# If this works but app curl fails, it is a C2C policy issue, not DNS
-```
-
-**Failure Mode 2: DNS resolves but connection is refused (C2C policy missing)**
-
-```bash
-# Symptom: DNS gives an IP but curl hangs or connection refused
-dig my-service.apps.internal  # Returns 10.255.1.5
-curl http://my-service.apps.internal:8080  # Connection refused / timeout
-
-# Check C2C policies
-cf network-policies
-# If no policy exists for caller -> service:
-cf add-network-policy my-caller-app my-service-app --protocol tcp --port 8080
-
-# Verify from inside the caller container
-cf ssh my-caller-app
-# Try direct IP connection (bypasses DNS to isolate the issue)
-curl http://10.255.1.5:8080
-```
-
-**Failure Mode 3: BOSH DNS agent not responding**
-
-```bash
-# From bosh ssh on a Diego Cell
-# Check if bosh-dns is running
-sudo monit summary | grep bosh-dns
-
-# If not running, check logs
-sudo tail -100 /var/vcap/sys/log/bosh-dns/bosh-dns.stdout.log
-sudo tail -100 /var/vcap/sys/log/bosh-dns/bosh-dns.stderr.log
-
-# Restart bosh-dns (requires root)
-sudo monit restart bosh-dns
-
-# Test after restart
-dig @169.254.0.2 nats.service.cf.internal
-# Should return the NATS IP(s)
-```
-
-**Failure Mode 4: Stale DNS entries after app redeploy**
-
-After `cf push`, app instances get new IPs on the VXLAN overlay. If a client caches the old IPs, connections fail.
-
-```bash
-# Check if DNS is returning old IPs
-dig @169.254.0.2 my-service.apps.internal
-
-# Compare against actual container IPs from CAPI
-cf curl /v3/apps/$(cf app my-service-app --guid)/processes/web/stats \
-  | jq '.[].host'
-
-# If IPs do not match, the DNS record has not refreshed yet
-# Wait up to 20 seconds (Route Emitter interval) and retry
-sleep 25
-dig @169.254.0.2 my-service.apps.internal
-```
-
-**Failure Mode 5: Wrong port in curl / connection refused on `apps.internal`**
-
-Apps expose their PORT as the `$PORT` env var (usually 8080). The port used in `apps.internal` calls must match what the app listens on.
-
-```bash
-# From inside caller container
-cf ssh my-caller-app
-
-# Check what port the target app exposes
-# (You need to check cf app details or the app manifest)
-# Common mistake: using port 80 instead of 8080
-curl http://my-service.apps.internal:80   # WRONG - nothing listens on 80 in CF
-curl http://my-service.apps.internal:8080 # CORRECT - $PORT default is 8080
-```
+> **Banking scenario:** In a retail banking platform running payment microservices on CF, a `cf push` of the account-balance service caused the transaction-history service to return errors for up to 90 seconds after deployment. The root cause was that the transaction-history service's HTTP client cached DNS responses for 5 minutes, far exceeding the 60-second `apps.internal` TTL. After the push, the client continued connecting to the old container IP, which had already been released. The fix was to configure the HTTP connection pool to re-resolve DNS every 30 seconds, bringing stale-IP errors to zero on subsequent deployments.
 
 ### Diagnostic command cheatsheet
 
@@ -596,6 +514,16 @@ sudo tail -f /var/vcap/sys/log/bosh-dns/bosh-dns.stdout.log
 | Check Route Emitter (Diego) | `bosh -d cf logs diego-cell/0 --job route_emitter` |
 | Check bosh-dns health | `sudo monit summary \| grep bosh-dns` (from bosh ssh) |
 | Resolve platform alias | `dig @169.254.0.2 nats.service.cf.internal` |
+
+---
+
+## Check Your Understanding
+
+1. What IP address does BOSH DNS listen on, and why is a link-local address used instead of `127.0.0.1`?
+2. You run `dig my-service.apps.internal` from inside a CF app container and receive `NXDOMAIN`. List two distinct causes you would check first and the command to verify each.
+3. An app resolves `my-service.apps.internal` and receives a valid IP, but `curl` to that IP on port 8080 times out. What is the most likely cause, and how do you fix it?
+4. How does CF's per-instance DNS record format (`0.my-service.apps.internal`) compare to StatefulSet pod DNS in Kubernetes, and in what scenario would you use it?
+5. A client app caches DNS responses for 5 minutes. After a `cf push` of the target service, the client experiences errors for up to 5 minutes. Explain the mechanism and the recommended remediation.
 
 ---
 

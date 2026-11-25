@@ -3,9 +3,13 @@
 **Track:** CF-D — Multi-Tenancy and Isolation
 **Prerequisites:** CF-01 (Architecture Overview), CF-07 (ASGs), CF-13 (C2C Network Policies)
 
+**Jump to:** [Quick Read](#quick-read-10-min) · [Deep Dive](#deep-dive) · [Troubleshooting](#6-troubleshooting) · [Quick Reference](#quick-reference)
+
 ---
 
 ## Quick Read (10 min)
+
+After this lesson you will be able to: explain how CF enforces multi-tenant isolation across the routing, network, and policy layers simultaneously, and diagnose isolation failures using cf CLI and Diego Cell iptables commands.
 
 **Core mental model:** CF multi-tenancy is enforced at three layers simultaneously — routing (Gorouter), network (Silk/iptables), and policy (ASGs + C2C). Orgs own quota. Spaces own network policy scope. Apps live in spaces and get isolated container networks by default.
 
@@ -350,11 +354,13 @@ C2C (container-to-container) networking uses app GUIDs as policy identifiers. A 
 
 ### How C2C traverses the VXLAN overlay
 
-1. App 1 (Space A, `10.255.1.10`) sends a packet destined for App 2 (Space B, `10.255.2.10`)
+Consider a fintech platform where the `payment-api` app (Space: `pci-cde`, `10.255.1.10`) must call the `fraud-scoring` service (Space: `fraud-detection`, `10.255.2.10`) without exposing either service to the public internet. By default Silk drops all C2C traffic, so the connection is blocked even though both apps are in the same CF org. A single cross-space C2C policy is the only control that opens the conduit — no load balancer, no Gorouter hop, and no SNAT in the path.
+
+1. `payment-api` (Space: `pci-cde`, `10.255.1.10`) sends a packet destined for `fraud-scoring` (Space: `fraud-detection`, `10.255.2.10`)
 2. The packet hits the iptables FORWARD chain on Diego Cell 1
 3. The VXLAN Policy Agent has pre-populated iptables rules derived from stored policies; if `10.255.1.10 → 10.255.2.10 tcp:8080` is allowed, the packet proceeds
 4. The packet is VXLAN-encapsulated and sent to Diego Cell 2's underlay IP on UDP 4789
-5. Diego Cell 2 decapsulates and delivers to App 2's container network namespace
+5. Diego Cell 2 decapsulates and delivers to `fraud-scoring`'s container network namespace
 6. If no policy exists, iptables silently DROPs the packet — no ICMP unreachable is generated
 
 ```bash
@@ -717,6 +723,16 @@ Global Account
 ```
 
 > **Full compliance mapping:** See [CF-21 — Compliance Networking](cf-21-compliance-networking.md) for the complete control matrix with CF CLI commands as auditor evidence for each framework.
+
+---
+
+## Check Your Understanding
+
+1. A CF Org is described as a "quota boundary, not a network boundary." What does this mean in practice — specifically, what network-level communication is NOT blocked between containers in two different orgs on the same Diego Cell?
+2. You bind a space-scoped ASG to `space-a` that opens TCP port 5432 to `10.0.0.0/8`. An app in `space-b` on the same platform tries to reach the same database and times out. What is the reason, and what is the correct fix?
+3. A C2C policy between `payment-api` and `fraud-scoring` exists, `dig fraud-scoring.apps.internal` returns the correct overlay IP, but `curl` from inside `payment-api` still hangs with no RST. Walk through the two most likely causes and the diagnostic command for each.
+4. Two teams in different spaces both map `my-service.apps.example.com` in the shared domain. What traffic behavior results, and what is the CF-native mechanism to prevent this conflict?
+5. The VXLAN Policy Agent polls the Policy Server every 5 seconds. After you run `cf add-network-policy`, how can you confirm on the Diego Cell that the iptables FORWARD chain has actually been updated for the new policy?
 
 ---
 

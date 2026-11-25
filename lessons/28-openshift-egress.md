@@ -292,6 +292,8 @@ oc get egressrouter -A 2>/dev/null
 # Prefer EgressIP for stable source IP + EgressFirewall for destination control
 ```
 
+---
+
 ### Industry Applications
 
 | Company / Project | Context | Technology from this lesson | Outcome |
@@ -369,13 +371,7 @@ oc adm uncordon worker-1
 
 ### Configuration Reference
 
-| Parameter | Values | Effect | When to change |
-|-----------|--------|--------|---------------|
-| `spec.egress[].type` | `Allow` / `Deny` | Permit or block matching traffic | First match wins — order rules carefully |
-| `spec.egress[].to.cidrSelector` | CIDR string | Match by destination IP range | Use for RFC1918 or known IP blocks |
-| `spec.egress[].to.dnsName` | FQDN or `*.example.com` | Match by DNS name (OVN resolves it) | Use for SaaS APIs with dynamic IPs |
-| `spec.egress[].ports[].protocol` | `TCP` / `UDP` / `SCTP` | Protocol filter per rule | Omit to match all protocols |
-| `spec.egress[].ports[].port` | 1–65535 | Port filter per rule | Combine with CIDR for precise control |
+> See [Theory Section 6 — EgressFirewall Configuration Reference](#6-egressfirewall-configuration-reference) for the full parameter table.
 
 ---
 

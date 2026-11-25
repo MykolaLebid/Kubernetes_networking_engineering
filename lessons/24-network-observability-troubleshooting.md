@@ -384,6 +384,7 @@ rate(kubeproxy_sync_proxy_rules_duration_seconds_bucket[5m])
 | AWS (EKS) | Network forensics and incident response | VPC Flow Logs + CloudWatch + netshoot | Post-incident packet-level analysis for security investigations |
 | Google (GKE) | Real-time service topology for GKE customers | Hubble (Cilium) flow exporter + service map UI | Automated dependency mapping across thousands of services |
 | LinkedIn | Distributed tracing across 1,000+ microservices | eBPF probes + custom conntrack metrics | Sub-millisecond latency anomaly detection without application instrumentation |
+| Banking (PCI-DSS cluster) | conntrack table saturation during Black Friday caused intermittent payment gateway TCP resets | Hubble flows (drop verdict) + `conntrack -S` on node | Identified table at 98% capacity at peak; increased `nf_conntrack_max` and added conntrack usage alert to prevent recurrence |
 
 ---
 
@@ -443,13 +444,7 @@ kubectl cp pod-a:/tmp/capture.pcap ./pod-a.pcap
 
 ### Configuration Reference
 
-| Metric | PromQL | What it shows |
-|--------|--------|---------------|
-| Total drop rate | `rate(cilium_drop_count_total[5m])` | Policy drops per second |
-| Drop by reason | `sum by (reason) (rate(cilium_drop_count_total[5m]))` | Why traffic is dropped |
-| iptables rule count | `felix_iptables_rules_total` | Calico iptables rule count |
-| conntrack entries | `node_nf_conntrack_entries` | Current conntrack table usage |
-| DNS error rate | `rate(coredns_dns_responses_total{rcode!="NOERROR"}[5m])` | CoreDNS failures |
+See Hubble metrics reference in Theory Section 8 above.
 
 ---
 

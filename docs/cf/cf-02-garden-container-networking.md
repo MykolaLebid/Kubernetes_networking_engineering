@@ -4,9 +4,13 @@
 **Prerequisite:** CF-01 (Diego Architecture) or equivalent  
 **Companion K8s lessons:** Lesson 07 — CNI Deep Dive, Lesson 08 — Pod Networking Internals
 
+**Jump to:** [Quick Read](#quick-read-10-min) · [Deep Dive](#deep-dive) · [Practice Setup](#practice-setup) · [Troubleshooting](#4-troubleshooting-garden-and-silk-networking) · [Quick Reference](#quick-reference)
+
 ---
 
 ## Quick Read (10 min)
+
+After this lesson you will be able to: explain how Garden constructs container network namespaces using Silk CNI, and diagnose the four most common container networking failures on a Diego Cell.
 
 **What Garden is:** CF's container runtime — a wrapper around runc + containerd that adds CF-specific lifecycle management, resource limits, and network namespace wiring. Every `cf push` creates one or more Garden containers per instance.
 
@@ -544,7 +548,7 @@ tcpdump -i eth0 -n -X 'udp port 4789' -c 10
 **Common causes:**
 
 - IaaS security group blocking UDP 4789 between Diego Cells
-- MTU mismatch causing fragmentation (Silk MTU not accounting for encapsulation overhead)
+- MTU mismatch causing fragmentation (Silk MTU not accounting for encapsulation overhead). In a PCI-DSS cardholder data environment, MTU fragmentation is a recurring audit finding: a misconfigured Silk MTU can cause TCP sessions carrying card-present transaction data to silently drop, breaking the payment flow in ways that are difficult to attribute without packet-level evidence from `tcpdump` on the VTEP interface.
 - Silk daemon on one cell has stale FDB entries — restart silk-daemon
 - Underlay network asymmetric routing causing VXLAN packets to drop
 
@@ -594,6 +598,16 @@ tcpdump -i eth0 -n -X 'udp port 4789' -c 10
 | Capture VXLAN traffic | `tcpdump -i eth0 -n 'udp port 4789' -c 50` |
 | SSH into app container | `cf ssh <app-name>` |
 | SSH to specific instance | `cf ssh <app-name> -i 2` |
+
+---
+
+## Check Your Understanding
+
+1. A Garden container on a Diego Cell with a /24 subnet has been assigned IP `10.255.7.45`. What is the IP of the bridge gateway for that container, and how many containers can share the same cell before the subnet is exhausted?
+2. After running `cf add-network-policy app-a --destination-app app-b --port 9000 --protocol tcp`, app-a still cannot reach app-b. You confirm the policy appears in `cf network-policies`. What two components would you check on the Diego Cell, and what log file would you inspect first?
+3. Silk VXLAN encapsulation adds 50 bytes of overhead. If the IaaS underlay MTU is 1500 bytes and the Silk container MTU is left at 1500, what failure symptom would you observe and which command inside a container confirms the misconfiguration?
+4. A new app instance crashes immediately with "container failed to start". The Silk daemon is running and the CNI log shows no errors, but `ip addr show | grep 10.255 | wc -l` returns 255 on the Diego Cell. What is the most likely cause and what is the remediation?
+5. An ASG named `allow-db` permits TCP port 5432 to `203.0.113.0/24`. An app bound to that ASG still cannot reach a PostgreSQL instance at `203.0.113.10`. Name two distinct causes unrelated to the ASG rules themselves that you would rule out first using `cf ssh`.
 
 ---
 

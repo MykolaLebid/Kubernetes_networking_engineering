@@ -4,9 +4,13 @@
 **Prerequisites:** CF-05 (Silk CNI), CF-06 (VXLAN Policy Agent), CF-07 (ASGs), CF-09 (Gorouter), CF-10 (TCP Router), CF-13 (C2C Policies), CF-18 (Korifi)
 **Time:** Quick Read 10 min | Deep Dive 60-90 min
 
+**Jump to:** [Quick Read](#quick-read-10-min) · [Deep Dive](#deep-dive) · [Troubleshooting](#4-troubleshooting-migration-issues) · [Quick Reference](#quick-reference)
+
 ---
 
 ## Quick Read (10 min)
+
+After this lesson you will be able to: map every CF networking primitive (Gorouter, ASGs, C2C policies, BOSH DNS, Silk VXLAN) to its explicit Kubernetes equivalent, and execute an incremental CF-to-K8s migration using the Strangler Fig traffic-split pattern without breaking connectivity.
 
 **Core idea:** Migrating from CF to Kubernetes means making every networking decision CF made *invisibly* on your behalf into *explicit* YAML. The Strangler Fig pattern lets you do this incrementally — CF and K8s run side by side, with traffic gradually shifting.
 
@@ -1109,6 +1113,8 @@ kubectl -n migration-space exec -it deployment/frontend -- \
 
 **Cause:** Pod MTU in K8s does not match the value Silk used. Packets above MSS are fragmented or silently dropped.
 
+In medtech migrations running HL7 FHIR bulk-export payloads (routinely 2-10 MB per batch), an MTU miscalculation caused intermittent TCP resets that only appeared under load — patient data exports appeared to succeed but truncated silently, a silent data-integrity risk that only surfaced during end-to-end validation testing.
+
 ```bash
 # Diagnose: test MTU with ping (DF = don't fragment bit)
 kubectl -n migration-space exec -it deployment/frontend -- \
@@ -1262,6 +1268,20 @@ kubectl -n <ns> exec -it <pod> -- nc -zv <ip> <port> # connectivity test
 kubectl -n kube-system logs -l k8s-app=kube-dns      # CoreDNS logs
 kubectl -n kube-system exec ds/cilium -- cilium policy get  # Cilium policy state
 ```
+
+---
+
+## Check Your Understanding
+
+1. CF ships with `public_networks` and `dns` ASGs that allow internet access by default. When you migrate to Kubernetes and apply any egress NetworkPolicy to a namespace, what happens to traffic that is not explicitly covered by a rule, and what must you create first to replicate CF's security model?
+
+2. A CF C2C policy is defined between `frontend` (source) and `backend-api` (destination) on TCP port 8080. After translation, the K8s NetworkPolicy exists but service-to-service traffic is still blocked. What is the most likely cause, and which `kubectl` command lets you verify it?
+
+3. Your migrated app calls `backend-api.apps.internal` and receives NXDOMAIN in K8s. Describe two remediation options and explain the operational trade-off between them.
+
+4. During the Strangler Fig traffic split, you have 20% of traffic going to K8s and 80% to CF Gorouter. A stateful Java app using JSESSIONID starts returning session errors for the K8s-routed 20%. What is missing and how do you fix it?
+
+5. Silk VTEP on a Diego Cell reports `mtu 1410`. After migrating to Cilium on GCP nodes (underlay MTU 1460), large SQL result sets fail silently. What CNI ConfigMap value must you set, and how do you confirm the new MTU is applied inside a running pod?
 
 ---
 

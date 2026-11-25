@@ -728,6 +728,7 @@ kubectl exec -n user-data deploy/user-service -- \
 - [ ] IEC 62443 zone/conduit model documented and namespace labels match
 - [ ] Quarterly audit: run `kubectl get networkpolicy -A` and validate against control matrix
 - [ ] Change management: NetworkPolicy changes require compliance review annotation
+- For sector-specific learning paths, see [docs/compliance-paths.md](../compliance-paths.md)
 
 ---
 
@@ -761,4 +762,5 @@ kubectl exec -n user-data deploy/user-service -- \
 ---
 
 **Previous:** [Lesson 36 — KubeEdge and Industrial Edge Networking](36-kubeedge-industrial-edge-networking.md)  
-**See also:** [Lesson 35 — Tetragon Runtime Security](35-tetragon-ebpf-runtime-security.md) for the runtime audit trail controls referenced in HIPAA §164.312(b) and PCI-DSS Req 10.2
+**See also:** [Lesson 35 — Tetragon Runtime Security](35-tetragon-ebpf-runtime-security.md) for the runtime audit trail controls referenced in HIPAA §164.312(b) and PCI-DSS Req 10.2  
+**Next:** [Lesson 38 — Multus CNI](38-multus-cni.md)

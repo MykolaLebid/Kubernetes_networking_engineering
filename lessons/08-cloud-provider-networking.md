@@ -411,6 +411,7 @@ az aks create --network-plugin azure --network-plugin-mode overlay ...
 | GKE Autopilot (Google) | Google's fully-managed Kubernetes mode; default for new GKE clusters since 2022 | Alias IP ranges per node with Dataplane v2 (Cilium eBPF under the hood) | Zero-maintenance pod networking with sub-millisecond latency for GCP-native workloads |
 | Azure AKS + CNI Overlay (Microsoft) | Azure's managed Kubernetes for enterprise workloads with 1000+ node clusters | Azure CNI Overlay separates pod CIDR from VNet IPs to prevent address exhaustion | Clusters avoid VNet IP exhaustion; standard enterprise AKS deployments now default to Overlay mode |
 | Shopify | Multi-cloud Kubernetes platform serving high-traffic flash sales with burst traffic patterns | Cloud-native CNI with direct VPC routing and cloud load balancer integration | Deterministic pod-to-pod latency with no tunnel overhead during peak traffic spikes |
+| Regulated EU bank (AKS) | Core-banking migration on AKS: 2000 pods across 20 nodes exhausted a /24 subnet using Azure CNI classic, triggering an emergency overlay mode migration mid-rollout | Azure CNI classic assigns each pod a VNet IP from the node subnet; a /24 provides only 251 usable addresses, far below the 2000 pods required | Cluster was migrated to Azure CNI Overlay mode; pod IPs moved to a separate overlay CIDR, freeing VNet IPs for nodes and preventing further address exhaustion |
 
 ---
 

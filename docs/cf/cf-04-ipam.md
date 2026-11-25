@@ -2,9 +2,13 @@
 
 > **Track CF-A** | Prerequisites: CF-01 (Garden), CF-02 (Silk CNI), CF-03 (Diego Cell networking)
 
+**Jump to:** [Quick Read](#quick-read-10-min) · [Deep Dive](#deep-dive) · [Troubleshooting](#4-troubleshooting-ipam-issues) · [Quick Reference](#quick-reference)
+
 ---
 
 ## Quick Read (10 min)
+
+After this lesson you will be able to: explain how Silk CNI allocates and releases container overlay IPs without a central IPAM service, and diagnose the four most common IPAM failure modes using BoltDB inspection, MTU probes, and VXLAN FDB checks.
 
 **The essential mental model in under 60 lines.**
 
@@ -47,7 +51,7 @@ flowchart LR
 
 - **IP exhaustion on a cell** → `cf scale` fails with placement errors; fix: `bosh ssh` → check BoltDB, drain containers to other cells.
 - **Duplicate IP** → usually a stale BoltDB entry after a hard cell crash; fix: restart `silk-daemon` after draining.
-- **MTU mismatch** → fragmented packets, app sees TCP resets; fix: audit underlay MTU and recalculate Silk MTU property.
+- **MTU mismatch** → fragmented packets, app sees TCP resets; fix: audit underlay MTU and recalculate Silk MTU property. In banking environments running SAP HANA workloads on BTP, an MTU misconfiguration after a hyperscaler network upgrade has caused silent TCP resets on high-throughput batch settlement jobs — symptoms appeared only under load, making root cause difficult to isolate without underlay MTU probes.
 - **Wrong overlay CIDR** → cells cannot see each other's containers; fix: redeploy with consistent `network.network_cidr`.
 
 ---
@@ -477,6 +481,16 @@ sudo tcpdump -i eth0 -n udp port 4789 -c 50
 | Test cross-cell MTU | `ping -M do -s 1400 <remote-vtep-ip>` |
 | CF app GUID | `cf app APP_NAME --guid` |
 | View silk-daemon logs | `sudo journalctl -u silk-daemon -n 200` |
+
+---
+
+## Check Your Understanding
+
+1. A Diego Cell is running 253 containers and a new `cf push` fails with placement errors. What BoltDB command confirms the cell's `/24` is exhausted, and what is the first remediation step?
+2. After a hypervisor host loses power abruptly, `silk-daemon` reports that all IPs in `10.255.3.0/24` are allocated, but only 12 containers are actually running. What caused this and how do you safely recover?
+3. You change `network.network_cidr` from `10.255.0.0/16` to `10.244.0.0/16` in the BOSH manifest and redeploy only two of eight Diego Cells. What failure will the partially-redeployed environment exhibit, and why?
+4. A container's TCP connections to a remote service are silently dropped only when transferring large payloads. The overlay CIDR and security groups are correct. What is the most likely IPAM-adjacent cause and which two commands confirm it?
+5. The CF API returns `10.0.1.10:61007` for an app instance. A network engineer needs the container's overlay IP to write a C2C policy. Why does the API not expose it, and how can the engineer retrieve it?
 
 ---
 

@@ -4,9 +4,13 @@
 **Prerequisites:** CF-09 (Gorouter), CF-10 (TCP Router), CF-13 (C2C Policies)
 **Duration:** 10 min (Quick Read) / 60 min (Deep Dive)
 
+**Jump to:** [Quick Read](#quick-read-10-min) · [Deep Dive](#deep-dive) · [Practice](#practice-setup) · [Troubleshooting](#4-troubleshooting) · [Quick Reference](#quick-reference)
+
 ---
 
 ## Quick Read (10 min)
+
+After this lesson you will be able to: describe CF's layered TLS architecture from browser to container, distinguish the three Gorouter TLS termination modes, and execute a non-disruptive certificate rotation using CredHub and BOSH.
 
 **Core mental model:** CF runs a layered TLS stack. Every hop from the browser to your app can be encrypted, and the platform manages most certificates automatically via CredHub and BOSH. You own the edge wildcard; CF owns everything inside.
 
@@ -475,7 +479,7 @@ openssl s_client -connect 169.254.0.2:853 2>/dev/null \
 
 **Failure: `x509: certificate signed by unknown authority` in Gorouter logs**
 
-The Diego Cell's Envoy sidecar is presenting a certificate the Gorouter does not trust. Usually caused by cert rotation completing on cells but not on Gorouter, or a partial BOSH deploy that left some VMs behind.
+The Diego Cell's Envoy sidecar is presenting a certificate the Gorouter does not trust. Usually caused by cert rotation completing on cells but not on Gorouter, or a partial BOSH deploy that left some VMs behind. In banking environments running PCI-DSS-scoped CF foundations, this failure has caused audit findings when route integrity breakage left internal traffic temporarily unencrypted during an incomplete rolling deploy.
 
 ```bash
 # Check Gorouter error logs (from BOSH SSH router/0)
@@ -732,6 +736,16 @@ credhub find -n /cf --output-json \
 | View full cert chain from outside | `openssl s_client -connect app.apps.example.com:443 -showcerts` |
 | Check route emitter client cert | `openssl x509 -in /var/vcap/jobs/route_emitter/config/client.crt -noout -subject -enddate` |
 | Find certs expiring in 30 days | `credhub find -n /cf --output-json \| jq -r '.credentials[].name' \| xargs -I{} sh -c '... openssl x509 -noout -checkend 2592000 ...'` |
+
+---
+
+## Check Your Understanding
+
+1. CF's TLS stack has multiple independent hops from browser to container. Which hop is controlled entirely by the platform team (not developers), requires manual rotation, and is the only certificate the customer must supply?
+2. What is the functional difference between Gorouter `edge` mode and `route-integrity` mode, and what security risk does `edge` mode leave unaddressed on a Diego Cell?
+3. Instance identity certificates have a 24-hour TTL and encode app/space/org GUIDs in their SANs. Name the two environment variables that expose the cert and key to the running container, and describe one practical use case for them in app code.
+4. The CredHub double-deploy ("transitional CA") rotation strategy requires three sequential BOSH deploys. Why is a single deploy insufficient, and what failure would occur if you removed the old CA trust store in the same deploy that regenerated leaf certs?
+5. A custom domain cert upload succeeds but browsers report `UNABLE_TO_VERIFY_LEAF_SIGNATURE`. What is the most likely cause, and what is the corrective action?
 
 ---
 

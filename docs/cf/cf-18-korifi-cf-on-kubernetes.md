@@ -3,9 +3,13 @@
 **Track:** CF-F — Advanced CF Networking and Modern Runtimes
 **Prerequisites:** CF-01 (Architecture), CF-05 (Silk CNI), CF-10 (C2C Policies), CF-15 (BOSH DNS)
 
+**Jump to:** [Quick Read](#quick-read-10-min) · [Deep Dive](#deep-dive) · [Troubleshooting](#5-troubleshooting) · [Quick Reference](#quick-reference)
+
 ---
 
 ## Quick Read (10 min)
+
+After this lesson you will be able to: explain how Korifi translates the CF V3 API into Kubernetes-native objects, and diagnose routing, C2C policy, and build failures in a Korifi deployment using standard `kubectl` tooling.
 
 **Core idea:** Korifi is the Cloud Foundry V3 API running natively on Kubernetes. It translates `cf push` into Kubernetes-native objects — no Diego, no Gorouter, no BOSH. Same developer experience, entirely different control plane.
 
@@ -281,6 +285,8 @@ spec:
 ### Network policies — K8s native
 
 BOSH CF uses VXLAN overlay + VXLAN Policy Agent to implement C2C policies as iptables rules on Diego Cells. Korifi uses standard Kubernetes `NetworkPolicy` objects enforced by whatever CNI is installed (Calico, Cilium, etc.).
+
+> **Banking compliance note:** EU banks subject to DORA and EBA ICT outsourcing guidelines must demonstrate that network segmentation between application tiers is enforced by auditable controls. Korifi's C2C model satisfies this requirement more directly than BOSH CF: the generated `NetworkPolicy` objects are version-controlled, inspectable via `kubectl`, and can be fed into a Kyverno admission policy that rejects any `CFApp` deployment that lacks an explicit allow-list — producing a machine-readable audit trail that maps directly to the network segmentation evidence required by internal risk teams and external auditors.
 
 ```bash
 # CF CLI syntax unchanged
@@ -809,6 +815,18 @@ cf auth admin --client-credentials  # for admin bootstrap
 | UAA | External OIDC (Dex) | `kubectl get pods -n dex` |
 | Silk CNI + VPA | K8s CNI + NetworkPolicy | `kubectl get networkpolicy -A` |
 | CF blobstore | Container registry | `kubectl get secret image-registry-credentials -A` |
+
+---
+
+## Check Your Understanding
+
+1. When a developer runs `cf push` against a Korifi cluster, which Kubernetes CRDs are created to represent the application, its source code, and its build? List at least three.
+
+2. In BOSH CF, routes are registered via NATS heartbeats with a 20-second TTL. What is the equivalent mechanism in Korifi, and what happens to a route when the app is stopped?
+
+3. A `cf add-network-policy` command is issued in Korifi but the target app still cannot reach the destination. What `kubectl` commands would you run first to determine whether the NetworkPolicy was created and whether pod labels match the policy selector?
+
+4. What component does Korifi use to replace Diego staging cells, and what is the format of the build artifact it produces compared to a BOSH CF droplet?
 
 ---
 

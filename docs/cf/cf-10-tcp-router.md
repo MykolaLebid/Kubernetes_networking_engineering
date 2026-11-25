@@ -4,9 +4,13 @@
 **Prerequisite:** CF-09 (Gorouter TLS and Route Integrity) or equivalent  
 **Companion K8s lessons:** Lesson 17 — Ingress Controllers Deep Dive, Lesson 18 — Gateway API and L4 Routing, Lesson 19 — MetalLB and LoadBalancer Services
 
+**Jump to:** [Quick Read](#quick-read-10-min) · [Deep Dive](#deep-dive) · [Troubleshooting](#4-troubleshooting-tcp-routes) · [Quick Reference](#quick-reference)
+
 ---
 
 ## Quick Read (10 min)
+
+After this lesson you will be able to: explain how CF TCP Router routes non-HTTP traffic at Layer 4, create and manage TCP routes with the cf CLI, and diagnose common TCP routing failures using iptables, conntrack, and the Routing API.
 
 **What TCP Router is:** CF's dedicated Layer 4 router for non-HTTP workloads. While Gorouter handles HTTP/HTTPS at Layer 7 (with headers, sticky sessions, and route integrity), TCP Router forwards raw TCP connections by mapping an external port to a backend application instance. No HTTP parsing, no header injection, no TLS termination by default — just bytes in, bytes out.
 
@@ -491,6 +495,8 @@ cat /proc/sys/net/netfilter/nf_conntrack_tcp_timeout_established
 conntrack -E -p tcp 2>&1 | grep "DESTROY.*dport=61002"
 ```
 
+This failure mode is especially visible in two regulated sectors. In banking, FIX protocol engines (used for real-time order routing between trading systems) hold persistent TCP sessions for hours; a 10-minute AWS NLB idle timeout will silently tear down an active FIX session, causing missed executions and reconciliation failures — fix by setting the NLB idle timeout to 350 seconds and enabling TCP keepalive in the FIX engine configuration. In medtech, MQTT brokers connecting remote patient-monitoring devices over TCP maintain long-lived sessions to deliver telemetry; the same idle timeout drops device connections without a DISCONNECT message, causing the broker to hold stale session state and delay alarm delivery — fix by configuring MQTT keepalive to 60 seconds so devices send PINGREQ packets before the LB timeout fires.
+
 ### Diagnostic Command Summary
 
 ```bash
@@ -555,6 +561,16 @@ echo "=== TCP connect test ===" && \
 | Show conntrack TCP entries | `conntrack -L -p tcp` |
 | Update router group port range (admin) | `cf curl -X PUT /routing/v1/router_groups/<guid> -d '{"reservable_ports":"1024-1223"}'` |
 | Get router group GUID | `cf curl /routing/v1/router_groups \| python3 -c "import json,sys; [print(r['guid'],r['name']) for r in json.load(sys.stdin)]"` |
+
+---
+
+## Check Your Understanding
+
+1. What is the fundamental difference between how TCP Router and Gorouter select a backend for an incoming connection — and why does this matter for long-lived database connections?
+2. A developer runs `cf create-route tcp.cf.example.com --random-port` and receives an HTTP 507 error. What is the root cause and what operator action resolves it?
+3. Trace the full path of a TCP SYN packet from an external client to an application container: name each component it traverses and the transformation (if any) applied at each hop.
+4. Why do MQTT brokers and FIX protocol engines fail silently when the IaaS load balancer idle timeout is shorter than the application's session duration, and what is the recommended fix at both the platform and application layers?
+5. The Routing API shows a backend registered for port 1055, but `nc -vz tcp.cf.example.com 1055` receives a TCP RST immediately after connecting. What two checks on the Diego Cell would you run first, and what are you looking for in each?
 
 ---
 
