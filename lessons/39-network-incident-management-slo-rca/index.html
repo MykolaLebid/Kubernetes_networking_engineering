@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="CKNE & CCA exam prep + sector-specific compliance (HIPAA, PCI-DSS, IEC 62443, GDPR): 38 K8s networking lessons, CF networking, migration guide, and cheat sheets — from Linux primitives to AI GPU clusters.">
+        <meta name="description" content="CKNE & CCA exam prep + sector-specific compliance (HIPAA, PCI-DSS, IEC 62443, GDPR): 39 K8s networking lessons, CF networking, migration guide, and cheat sheets — from Linux primitives to AI GPU clusters.">
       
       
       
@@ -5206,7 +5206,7 @@
 </tr>
 <tr>
 <td><strong>OTel network semantic conventions (stable)</strong></td>
-<td><code>network.type</code>, <code>network.transport</code>, <code>net.peer.ip</code> are stable attributes</td>
+<td><code>network.type</code>, <code>network.transport</code>, <code>network.peer.address</code>, <code>network.peer.port</code> are stable; <code>network.connection.state</code>, <code>network.interface.name</code> are RC</td>
 <td>Cross-vendor correlation: Cilium spans + app spans share the same attribute names</td>
 </tr>
 <tr>

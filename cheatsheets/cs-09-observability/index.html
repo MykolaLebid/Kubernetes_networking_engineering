@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="CKNE & CCA exam prep + sector-specific compliance (HIPAA, PCI-DSS, IEC 62443, GDPR): 38 K8s networking lessons, CF networking, migration guide, and cheat sheets — from Linux primitives to AI GPU clusters.">
+        <meta name="description" content="CKNE & CCA exam prep + sector-specific compliance (HIPAA, PCI-DSS, IEC 62443, GDPR): 39 K8s networking lessons, CF networking, migration guide, and cheat sheets — from Linux primitives to AI GPU clusters.">
       
       
       
@@ -4871,8 +4871,16 @@ Example: 0.0005 × 2592000s = 1296s = 21.6 min</p>
 <td>eBPF map operation rate</td>
 </tr>
 <tr>
+<td><code>cilium_agent_memory_bytes</code></td>
+<td>Agent memory usage by component (1.20+)</td>
+</tr>
+<tr>
 <td><code>hubble_flows_processed_total</code></td>
 <td>Flows processed by Hubble Relay</td>
+</tr>
+<tr>
+<td><code>hubble_drop_total</code></td>
+<td>Drops by reason and protocol (Hubble)</td>
 </tr>
 <tr>
 <td><code>container_network_receive_bytes_total</code></td>
@@ -5134,8 +5142,9 @@ Example: 0.0005 × 2592000s = 1296s = 21.6 min</p>
 </tr>
 </tbody>
 </table>
-<p><strong>Key OTel semantic conventions for network events:</strong><br />
-<code>network.type</code> (ipv4/ipv6) · <code>network.transport</code> (tcp/udp) · <code>net.peer.ip</code> · <code>server.address</code> · <code>server.port</code></p>
+<p><strong>Key OTel semantic conventions for network events (stable):</strong><br />
+<code>network.type</code> (ipv4/ipv6) · <code>network.transport</code> (tcp/udp) · <code>network.peer.address</code> · <code>network.peer.port</code> · <code>network.protocol.name</code> · <code>network.protocol.version</code><br />
+RC (not yet stable): <code>network.connection.state</code> · <code>network.interface.name</code> · <code>network.io.direction</code></p>
 <hr />
 <h2 id="postmortem-sections-checklist">Postmortem Sections Checklist<a class="headerlink" href="#postmortem-sections-checklist" title="Permanent link">&para;</a></h2>
 <ul class="task-list">
