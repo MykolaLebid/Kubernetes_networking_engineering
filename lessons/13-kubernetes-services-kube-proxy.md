@@ -219,7 +219,7 @@ ip addr show kube-ipvs0
 
 ---
 
-### nftables Proxy Mode (Alpha, K8s v1.37+)
+### nftables Proxy Mode (Alpha, K8s v1.37+) {#nftables-proxy-mode-alpha-k8s-v137}
 
 nftables is the modern Linux packet-filtering framework that supersedes iptables (see [Lesson 03](03-iptables-and-netfilter.md)). kube-proxy's nftables mode uses the kernel's nftables API instead of legacy iptables chains — same semantics, cleaner atomic updates, better performance at scale.
 

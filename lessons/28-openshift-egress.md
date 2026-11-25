@@ -208,7 +208,7 @@ oc exec -n openshift-ovn-kubernetes $MASTER -- \
 
 ---
 
-## 6. EgressFirewall Configuration Reference
+## 6. EgressFirewall Configuration Reference {#6-egressfirewall-configuration-reference}
 
 | Parameter | Values | Effect | When to change |
 |-----------|--------|--------|---------------|

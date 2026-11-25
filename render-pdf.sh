@@ -32,6 +32,9 @@ HEADER
   done
 } > "$COMBINED"
 
+# Strip web-only "Jump to:" nav lines — they break Typst when anchors collide across combined files
+sed -i '' '/^\*\*Jump to:\*\*/d' "$COMBINED"
+
 TOTAL_DIAGRAMS=$(grep -c '```mermaid' "$COMBINED")
 echo "==> Combined: $(wc -l < "$COMBINED") lines, $TOTAL_DIAGRAMS Mermaid blocks"
 
