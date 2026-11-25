@@ -10,7 +10,7 @@ Two complete courses + cert prep guides + cheat sheets, covering Kubernetes and 
 
 | Course | Lessons | Tracks |
 |--------|---------|--------|
-| **K8s Networking** | 38 lessons (00–38) | A–J |
+| **K8s Networking** | 39 lessons (00–39) | A–J |
 | **CF Networking** | 23 lessons (cf-00–cf-22) | CF-A–CF-H |
 | **Cheat sheets** | 16 | K8s vs CF side-by-side, eBPF, AWS, OpenShift, AI/GPU |
 | **Migration guide** | 4 chapters | CF→K8s strategy, translation cookbook, coexistence |
@@ -38,7 +38,7 @@ Validation scripts for each track are in `labs/` — run after completing a trac
 
 ---
 
-## K8s Networking — 38 lessons
+## K8s Networking — 39 lessons
 
 ### Track A — Linux Foundations
 
@@ -127,6 +127,7 @@ Validation scripts for each track are in `labs/` — run after completing a trac
 | 36 | [KubeEdge and Industrial Edge Networking](lessons/36-kubeedge-industrial-edge-networking.md) | EdgeHub, MetaManager, Purdue model, IEC 62443, disconnected ops |
 | 37 | [Compliance Networking](lessons/37-compliance-networking.md) | HIPAA, PCI-DSS v4.0, IEC 62443, GDPR — exact NetworkPolicy YAML + auditor evidence |
 | 38 | [Multus CNI and Multi-Homed Pods](lessons/38-multus-cni.md) | macvlan/ipvlan/SR-IOV delegates, AI/GPU RDMA, OT/IT edge separation |
+| 39 | [Network Incident Management, SLOs, and RCA](lessons/39-network-incident-management-slo-rca.md) | SLOs, error budgets, multiwindow alerting, 5-why RCA, blameless postmortem, OTel/eBPF, compliance runbooks |
 
 ---
 
@@ -217,7 +218,7 @@ Phase 5  Service Mesh & Security  21–24   Istio, multi-cluster, hardening, obs
 Phase 6  OpenShift                25–28   OVN-K, Routes, EgressIP
 Phase 7  AWS                      29–32   EKS, VPC design, LB Controller, hybrid
 Phase 8  GitOps & AI              33–34   ArgoCD, RDMA/SR-IOV/rail topology
-Phase 9  Security & Compliance    35–38   Tetragon, KubeEdge, HIPAA/PCI/IEC/GDPR, Multus
+Phase 9  Security & Compliance    35–39   Tetragon, KubeEdge, HIPAA/PCI/IEC/GDPR, Multus, Incident Management/SLOs/RCA
 Phase 10 CF Networking            cf-01–cf-22   Garden, Silk, Gorouter, ASGs, BTP, compliance
 Phase 11 Migration & Cheat Sheets           CF→K8s patterns, 16 quick-reference sheets
 ```

@@ -132,6 +132,7 @@ nav:
       - "36 · KubeEdge and Industrial Edge Networking": lessons/36-kubeedge-industrial-edge-networking.md
       - "37 · Compliance Networking (HIPAA/PCI-DSS/IEC 62443/GDPR)": lessons/37-compliance-networking.md
       - "38 · Multus CNI and Multi-Homed Pods": lessons/38-multus-cni.md
+      - "39 · Network Incident Management, SLOs, and RCA": lessons/39-network-incident-management-slo-rca.md
     - "Certifications":
       - "CKNE + CCA Exam Prep": ckne-prep.md
       - "CKA + CKS Exam Prep": cka-cks-prep.md

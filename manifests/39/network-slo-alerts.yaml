@@ -1,0 +1,144 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: network-slo-alerts
+  namespace: monitoring
+  labels:
+    app: kube-prometheus-stack
+    release: prometheus
+spec:
+  groups:
+    - name: network-slo-availability
+      rules:
+        # Recording rule — FORWARDED ratio over 5m
+        - record: slo:hubble_forward_ratio:rate5m
+          expr: |
+            sum(rate(hubble_flows_processed_total{verdict="FORWARDED"}[5m]))
+            /
+            sum(rate(hubble_flows_processed_total[5m]))
+
+        # Recording rule — FORWARDED ratio over 1h (for slow-burn window)
+        - record: slo:hubble_forward_ratio:rate1h
+          expr: |
+            sum(rate(hubble_flows_processed_total{verdict="FORWARDED"}[1h]))
+            /
+            sum(rate(hubble_flows_processed_total[1h]))
+
+        # Fast burn: 14.4× burn rate → consuming 2% of monthly budget in 1 hour
+        - alert: NetworkFlowDropBudgetBurn_Fast
+          expr: |
+            (1 - slo:hubble_forward_ratio:rate5m) > (14.4 * 0.0005)
+          for: 2m
+          labels:
+            severity: page
+            slo: network-availability
+          annotations:
+            summary: "Network flow drop FAST burn rate"
+            description: "Drop rate {{ $value | humanizePercentage }} — consuming error budget at 14.4×"
+
+        # Slow burn: 6× burn rate over 6h → consuming 5% of monthly budget in 6 hours
+        - alert: NetworkFlowDropBudgetBurn_Slow
+          expr: |
+            (1 - slo:hubble_forward_ratio:rate1h) > (6 * 0.0005)
+          for: 15m
+          labels:
+            severity: ticket
+            slo: network-availability
+          annotations:
+            summary: "Network flow drop SLOW burn rate"
+            description: "Drop rate {{ $value | humanizePercentage }} — consuming error budget at 6×"
+
+        # DNS error rate SLO: success ≥ 99.9%
+        - alert: DNSErrorBudgetBurn
+          expr: |
+            rate(coredns_dns_responses_total{rcode=~"SERVFAIL|NXDOMAIN"}[5m])
+            /
+            rate(coredns_dns_requests_total[5m])
+            > 0.001
+          for: 5m
+          labels:
+            severity: page
+            slo: dns-availability
+          annotations:
+            summary: "DNS error rate exceeds 99.9% SLO"
+            description: "DNS error ratio {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+
+    - name: network-capacity
+      rules:
+        # conntrack headroom warning at 80%
+        - alert: ConntrackHeadroomLow
+          expr: |
+            node_nf_conntrack_entries / node_nf_conntrack_entries_limit > 0.80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "conntrack table {{ $value | humanizePercentage }} full — {{ $labels.instance }}"
+
+        # conntrack exhaustion at 95% → imminent TCP resets
+        - alert: ConntrackExhaustion
+          expr: |
+            node_nf_conntrack_entries / node_nf_conntrack_entries_limit > 0.95
+          for: 1m
+          labels:
+            severity: page
+          annotations:
+            summary: "conntrack table near exhaustion on {{ $labels.instance }}"
+
+        # Policy convergence p99 > 5s
+        - alert: CiliumPolicyConvergenceSlow
+          expr: |
+            histogram_quantile(0.99,
+              rate(cilium_policy_regeneration_time_stats_seconds_bucket[5m])
+            ) > 5
+          for: 3m
+          labels:
+            severity: warning
+          annotations:
+            summary: "NetworkPolicy p99 convergence {{ $value }}s — SLO is 5s"
+
+        # Cilium agent down
+        - alert: CiliumAgentDown
+          expr: |
+            up{job=~"cilium-agent|cilium"} == 0
+          for: 1m
+          labels:
+            severity: page
+          annotations:
+            summary: "Cilium agent down on {{ $labels.instance }}"
+
+    - name: network-compliance
+      rules:
+        # WireGuard encryption gap — HIPAA §164.312(e)(1), PCI-DSS 4.2.1
+        - alert: WireGuardEncryptionGap
+          expr: |
+            cilium_encryption_wireguard_interfaces < 1
+          for: 1m
+          labels:
+            severity: page
+            compliance: "HIPAA-164.312e1,PCI-DSS-4.2.1"
+          annotations:
+            summary: "WireGuard encryption lost on {{ $labels.instance }}"
+            description: "PHI/CDE traffic may be unencrypted. Immediate investigation required."
+
+        # Tetragon audit trail continuity — IEC 62443 SR 5.1, PCI-DSS Req 10
+        - alert: TetragonAuditGap
+          expr: |
+            increase(tetragon_events_total[5m]) == 0
+          for: 5m
+          labels:
+            severity: warning
+            compliance: "IEC62443-SR5.1,PCI-DSS-Req10"
+          annotations:
+            summary: "No Tetragon events for 5 minutes — audit trail may be interrupted"
+
+        # Egress policy violations
+        - alert: EgressPolicyViolation
+          expr: |
+            rate(cilium_drop_count_total{reason="Policy denied",direction="egress"}[5m]) > 10
+          for: 2m
+          labels:
+            severity: warning
+            compliance: "PCI-DSS-Req1.3"
+          annotations:
+            summary: "Egress policy denying {{ $value | humanize }} flows/s — investigate exfiltration risk"

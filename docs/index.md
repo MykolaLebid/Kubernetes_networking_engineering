@@ -9,7 +9,7 @@
 <div class="grid cards" markdown>
 
 - :fontawesome-brands-kubernetes: **Kubernetes Networking**  
-  38 lessons from Linux foundations through CNI, service meshes, OpenShift, AWS, GitOps, AI GPU clusters, and compliance (HIPAA/PCI-DSS/IEC 62443/GDPR).  
+  39 lessons from Linux foundations through CNI, service meshes, OpenShift, AWS, GitOps, AI GPU clusters, compliance (HIPAA/PCI-DSS/IEC 62443/GDPR), and network incident management with SLOs and RCA.  
   [Start Track A →](lessons/01-linux-networking-fundamentals.md)
 
 - :fontawesome-solid-cloud: **Cloud Foundry Networking**  
@@ -60,7 +60,7 @@
   RDMA · SR-IOV · Multus · RoCE · EFA · GPU Operator
 
 - :fontawesome-solid-shield-halved: **[Track J — Security & Compliance](lessons/35-tetragon-ebpf-runtime-security.md)**  
-  Tetragon · KubeEdge / industrial edge · HIPAA/PCI-DSS/IEC 62443/GDPR · Multus CNI
+  Tetragon · KubeEdge / industrial edge · HIPAA/PCI-DSS/IEC 62443/GDPR · Multus CNI · Incident Management & RCA
 
 </div>
 
@@ -116,7 +116,7 @@ flowchart LR
     G["Track G\nAWS\n29–32"] --> H
     H["Track H\nGitOps\n33"] --> I
     I["Track I\nAI Platform\n34"] --> J
-    J["Track J\nSecurity &\nCompliance\n35–38"]
+    J["Track J\nSecurity &\nCompliance\n35–39"]
 ```
 
 ---
@@ -125,7 +125,7 @@ flowchart LR
 
 | Metric | Value |
 |--------|-------|
-| Lessons | 38 (K8s) + 23 (CF) |
+| Lessons | 39 (K8s) + 23 (CF) |
 | Tracks | 10 (K8s) + 8 (CF) |
 | Mermaid diagrams | 110+ |
 | Troubleshooting entries | 260+ |
@@ -138,7 +138,7 @@ flowchart LR
 
 | Book | EPUB | PDF |
 |------|------|-----|
-| Kubernetes Networking (38 lessons) | [EPUB](https://github.com/MykolaLebid/Kubernetes_networking_engineering/raw/main/kubernetes-network-engineering.epub) | [PDF](https://github.com/MykolaLebid/Kubernetes_networking_engineering/raw/main/kubernetes-network-engineering.pdf) |
+| Kubernetes Networking (39 lessons) | [EPUB](https://github.com/MykolaLebid/Kubernetes_networking_engineering/raw/main/kubernetes-network-engineering.epub) | [PDF](https://github.com/MykolaLebid/Kubernetes_networking_engineering/raw/main/kubernetes-network-engineering.pdf) |
 | Cloud Foundry Networking (23 lessons) | [EPUB](https://github.com/MykolaLebid/Kubernetes_networking_engineering/raw/main/cf-networking.epub) | [PDF](https://github.com/MykolaLebid/Kubernetes_networking_engineering/raw/main/cf-networking.pdf) |
 
 EPUB files reflow on reMarkable and e-readers. PDF files are print-ready with page breaks.

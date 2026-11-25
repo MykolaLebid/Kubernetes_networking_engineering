@@ -16,12 +16,12 @@ All lesson content, manifests, lab scripts, and config files must be safe for pu
 
 Two complete courses + cheatsheets, published as a unified MkDocs-Material site named **"Platform Network Engineering"**.
 
-### K8s Networking course — `lessons/` (39 files, lessons 00–38)
+### K8s Networking course — `lessons/` (40 files, lessons 00–39)
 10 tracks (A–J), Theory/Practice split per lesson, Mermaid diagrams:
 - A: Linux foundations (01–07) · B: CNI/eBPF (08–12) · C: K8s networking (13–16)
 - D: Ingress/LB (17–20) · E: Service mesh (21–22) · F: Security (23–24)
 - G: OpenShift (25–28) · H: AWS/EKS (29–32) · I: GitOps + AI/GPU (33–34)
-- J: Security & Compliance (35–38): Tetragon, KubeEdge/edge, HIPAA/PCI-DSS/IEC 62443/GDPR, Multus CNI
+- J: Security & Compliance (35–39): Tetragon, KubeEdge/edge, HIPAA/PCI-DSS/IEC 62443/GDPR, Multus CNI, Network Incident Management/SLOs/RCA
 - Lesson 00: visual overview
 - `docs/ckne-prep.md` — CKNE + CCA cert exam prep guide
 - `docs/cka-cks-prep.md` — CKA + CKS exam prep guide (domain → lesson map)
