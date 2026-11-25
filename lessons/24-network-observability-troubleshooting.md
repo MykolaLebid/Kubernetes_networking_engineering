@@ -535,6 +535,465 @@ You can now trace a packet from a pod's application socket all the way to its de
 
 ---
 
+## 10. OpenTelemetry Integration
+
+OpenTelemetry (OTel) is the CNCF standard for collecting traces, metrics, and logs from any infrastructure layer. For Kubernetes network engineers it has two specific entry points: **OBI** (the eBPF-based zero-code auto-instrumentation agent) and the **Hubble OTLP exporter** (which turns Cilium flow records into distributed traces). Both feed the same OTel Collector pipeline and produce data you can query alongside your existing Prometheus and Hubble dashboards.
+
+> **K8s Engineer's Translation:** OTel does not replace Hubble or Prometheus — it unifies their output. L4 flow records from Cilium become trace spans. Node-exporter metrics become OTLP metrics. Pod logs become structured log records. All three land in the same backend so a single Grafana query can correlate a TCP drop (Hubble span) with a CPU spike (Prometheus metric) with an error log (Loki record).
+
+### 10.1 Architecture
+
+```mermaid
+flowchart LR
+    OBI["OBI DaemonSet\n(eBPF zero-code)"]
+    HUB["Cilium Hubble\n(L4 flow records)"]
+    SDK["App SDK\n(traces / logs)"]
+    COL["OTel Collector\n(fan-out hub)"]
+    PROM["Prometheus\n(metrics)"]
+    TEMPO["Grafana Tempo\n(traces)"]
+    LOKI["Loki\n(logs)"]
+
+    OBI -- OTLP/gRPC --> COL
+    HUB -- OTLP/gRPC --> COL
+    SDK -- OTLP/gRPC --> COL
+    COL -- remote_write --> PROM
+    COL -- OTLP --> TEMPO
+    COL -- loki_push --> LOKI
+
+    style COL fill:#e8f4fd,stroke:#2196F3
+    style OBI fill:#e8f5e9,stroke:#4CAF50
+    style HUB fill:#e8f5e9,stroke:#4CAF50
+```
+
+**Three signals:**
+
+| Signal | Stability (2026) | Used for |
+|--------|-----------------|----------|
+| Traces | Stable — all major languages | Request paths, latency root-cause |
+| Metrics | Stable — Go, Java, Python, .NET | Throughput, error rates, saturation |
+| Logs | Stable in .NET/PHP; RC in Go | Structured events, Tetragon audit |
+| Profiles | **Alpha** | CPU/memory flamegraphs — not production-ready |
+
+**Minimal Collector config** (receiver → batch → dual export):
+
+```yaml
+# otel-collector-config.yaml
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+
+exporters:
+  prometheusremotewrite:
+    endpoint: http://prometheus:9090/api/v1/write
+  otlp/tempo:
+    endpoint: http://tempo:4317
+    tls:
+      insecure: true
+  loki:
+    endpoint: http://loki:3100/loki/api/v1/push
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp/tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [prometheusremotewrite]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [loki]
+```
+
+Deploy as a Deployment:
+
+```bash
+kubectl create configmap otel-collector-config \
+  --from-file=config.yaml=otel-collector-config.yaml \
+  -n monitoring
+
+kubectl apply -f - <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: otel-collector
+  template:
+    metadata:
+      labels:
+        app: otel-collector
+    spec:
+      containers:
+        - name: collector
+          image: otel/opentelemetry-collector-contrib:latest
+          args: ["--config=/conf/config.yaml"]
+          ports:
+            - containerPort: 4317   # OTLP gRPC
+            - containerPort: 4318   # OTLP HTTP
+          volumeMounts:
+            - name: config
+              mountPath: /conf
+      volumes:
+        - name: config
+          configMap:
+            name: otel-collector-config
+EOF
+```
+
+---
+
+### 10.2 OBI v1.0 — eBPF Zero-Code Instrumentation
+
+**OBI** (OpenTelemetry eBPF Instrumentation) was originally Grafana's Beyla project. Grafana donated it to the CNCF/OTel project in 2025; it was renamed to OBI and reached v1.0 GA in 2026.
+
+**What it does:** hooks into the Linux kernel via eBPF (kernel 5.8+) to intercept HTTP, gRPC, SQL, and other protocol calls at the system-call boundary. No sidecar. No code change. No pod restart. Runs as a cluster-wide DaemonSet.
+
+**Supported protocols:** HTTP/HTTPS, HTTP/2, gRPC, SQL (MySQL/PostgreSQL), Redis, MongoDB, Kafka, GraphQL, Elasticsearch/OpenSearch, AWS S3
+
+**Languages with distributed trace context propagation:** Go, Node.js, Python, NGINX, PHP
+
+> **K8s Engineer's Translation:** OBI is to distributed tracing what Hubble is to network flows — zero-configuration visibility. The difference is layer: Hubble sees L4 TCP/UDP flows; OBI sees L7 protocol semantics (HTTP method, SQL query, Kafka topic) without touching the application binary.
+
+```yaml
+# obi-daemonset.yaml
+# Image: ghcr.io/open-telemetry/opentelemetry-ebpf-instrumentation/beyla (verify tag at release page)
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: obi
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: obi
+  template:
+    metadata:
+      labels:
+        app: obi
+    spec:
+      hostPID: true
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      tolerations:
+        - operator: Exists           # run on all nodes including control-plane
+      containers:
+        - name: obi
+          # Replace <tag> with the current release from the OBI GitHub releases page
+          image: ghcr.io/open-telemetry/opentelemetry-ebpf-instrumentation/beyla:<tag>
+          securityContext:
+            privileged: true
+            capabilities:
+              add: [SYS_ADMIN, SYS_PTRACE, NET_RAW]
+          env:
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector.monitoring:4317"
+            - name: BEYLA_OPEN_PORT           # instrument processes listening on this port
+              value: "80,443,8080,8443"
+            - name: BEYLA_DISCOVERY_SERVICES
+              value: "true"                   # auto-discover K8s services
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "k8s.cluster.name=prod"
+          volumeMounts:
+            - name: kernel-debug
+              mountPath: /sys/kernel/debug
+      volumes:
+        - name: kernel-debug
+          hostPath:
+            path: /sys/kernel/debug
+```
+
+```bash
+kubectl apply -f obi-daemonset.yaml
+
+# Verify OBI is running and exporting spans
+kubectl logs -n monitoring -l app=obi --tail=20
+# expect: "Starting Beyla" + "Sending spans to otel-collector.monitoring:4317"
+
+# View L7 spans in Tempo via Grafana:
+# Grafana → Explore → Tempo → Search → Service=your-service → see HTTP spans
+```
+
+---
+
+### 10.3 K8s Operator + Instrumentation CRD
+
+The [OpenTelemetry Operator](https://github.com/open-telemetry/opentelemetry-operator) adds two CRDs:
+
+| CRD | Purpose |
+|-----|---------|
+| `OpenTelemetryCollector` | Declarative Collector deployment managed by the operator |
+| `Instrumentation` | Auto-inject OTel SDK into pods by namespace or annotation |
+
+**Install the operator:**
+
+```bash
+kubectl apply -f https://github.com/open-telemetry/opentelemetry-operator/releases/latest/download/opentelemetry-operator.yaml
+# expect: CRDs installed, operator pod running in opentelemetry-operator-system namespace
+
+kubectl get crds | grep opentelemetry
+# expect:
+#   instrumentations.opentelemetry.io
+#   opentelemetrycollectors.opentelemetry.io
+```
+
+**Deploy a Collector via CRD** (operator manages pods, services, config reload):
+
+```yaml
+apiVersion: opentelemetry.io/v1alpha1
+kind: OpenTelemetryCollector
+metadata:
+  name: cluster-collector
+  namespace: monitoring
+spec:
+  mode: deployment   # or: daemonset, sidecar, statefulset
+  config: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+    processors:
+      batch: {}
+    exporters:
+      otlp/tempo:
+        endpoint: http://tempo:4317
+        tls:
+          insecure: true
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [otlp/tempo]
+```
+
+**Auto-inject SDK with Instrumentation CRD** — no code change, no restart:
+
+```yaml
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: auto-inject
+  namespace: default
+spec:
+  exporter:
+    endpoint: http://cluster-collector-collector.monitoring:4317
+  propagators:
+    - tracecontext
+    - baggage
+  python:
+    env:
+      - name: OTEL_LOGS_EXPORTER
+        value: otlp
+  java:
+    env:
+      - name: OTEL_METRICS_EXPORTER
+        value: otlp
+```
+
+```bash
+# Annotate a pod to inject Python SDK (no code change, no image rebuild):
+kubectl annotate pod my-python-pod \
+  instrumentation.opentelemetry.io/inject-python="true"
+
+# Or annotate a Deployment to inject Java SDK into all pods:
+kubectl patch deployment my-java-app -p \
+  '{"spec":{"template":{"metadata":{"annotations":{"instrumentation.opentelemetry.io/inject-java":"true"}}}}}'
+
+# expect: pod restarts; initContainer injects the OTel Java agent JAR
+# JAVA_TOOL_OPTIONS=-javaagent:/otel-auto-instrumentation-java/javaagent.jar set automatically
+```
+
+**Annotation-based Collector discovery** (no ConfigMap edit when new services are deployed):
+
+```yaml
+# Add to any pod that exposes Prometheus metrics via /metrics:
+metadata:
+  annotations:
+    io.opentelemetry.discovery.metrics/enabled: "true"
+    io.opentelemetry.discovery.metrics/scraper: "nginx"   # receiver type
+    io.opentelemetry.discovery.metrics/port: "9113"
+```
+
+The Collector's receiver creator detects this annotation and instantiates an nginx receiver targeting that pod's port automatically.
+
+---
+
+### 10.4 Cilium Hubble OTLP Export
+
+Cilium 1.15+ can export Hubble flow records directly as OTLP spans to any OTel Collector. Each L4 flow becomes a span with network semantic convention attributes.
+
+```bash
+# Enable Hubble OTLP export via Helm (Cilium 1.15+):
+helm upgrade cilium cilium/cilium \
+  --reuse-values \
+  --namespace kube-system \
+  --set hubble.export.opentelemetry.enabled=true \
+  --set hubble.export.opentelemetry.endpoint="otel-collector.monitoring:4317"
+
+# Verify spans are flowing:
+kubectl logs -n kube-system -l k8s-app=hubble-relay --tail=20 | grep -i otlp
+# expect: "OTLP export started" + span count incrementing
+```
+
+**What each Hubble OTLP span contains:**
+
+| Span attribute | Value | Semantic convention |
+|----------------|-------|---------------------|
+| `span.name` | `TCP FORWARDED` / `TCP DROPPED` | Hubble verdict |
+| `network.transport` | `tcp` / `udp` | Stable |
+| `network.peer.address` | Destination pod IP | Stable |
+| `network.peer.port` | Destination port | Stable |
+| `source.workload.name` | Kubernetes pod name (source) | Cilium extension |
+| `destination.workload.name` | Kubernetes pod name (dest) | Cilium extension |
+| `network.type` | `ipv4` / `ipv6` | Stable |
+| `network.connection.state` | `established` / `syn_sent` | RC |
+
+```mermaid
+sequenceDiagram
+    participant HUB as Hubble Relay
+    participant COL as OTel Collector
+    participant TEMPO as Grafana Tempo
+    participant ENG as Engineer (Grafana)
+
+    HUB->>COL: OTLP/gRPC — L4 flow as span
+    Note over HUB,COL: 1 flow record = 1 span<br>src/dst pod IP + verdict + attrs
+    COL->>COL: transform processor<br>(drop health-check flows, enrich with K8s labels)
+    COL->>TEMPO: OTLP — stored span
+    ENG->>TEMPO: query: service=cilium, dropped=true
+    TEMPO-->>ENG: trace showing which pod pairs had drops + at what time
+```
+
+---
+
+### 10.5 Network Semantic Conventions
+
+OTel defines a stable set of attribute names for network telemetry. Using these names ensures interoperability between OBI spans, Hubble spans, and backend queries.
+
+| Attribute | Stability | Example value | Notes |
+|-----------|-----------|---------------|-------|
+| `network.local.address` | **Stable** | `10.0.1.5` | Source IP |
+| `network.local.port` | **Stable** | `8080` | Source port |
+| `network.peer.address` | **Stable** | `10.0.2.3` | Destination IP |
+| `network.peer.port` | **Stable** | `443` | Destination port |
+| `network.protocol.name` | **Stable** | `tcp` | L4 protocol |
+| `network.protocol.version` | **Stable** | `1.1` | HTTP/TLS version |
+| `network.transport` | **Stable** | `tcp` | Transport layer |
+| `network.type` | **Stable** | `ipv4` | IP version |
+| `network.connection.state` | RC | `established` | TCP state |
+| `network.interface.name` | RC | `eth0` | NIC name |
+| `network.io.direction` | RC | `receive` | Traffic direction |
+| `network.peer.as.number` | Experimental | `64512` | BGP ASN — see [Lesson 06](06-bgp-fundamentals.md) |
+| `network.peer.as.organization` | Experimental | `Cloudflare` | BGP peer org name |
+| `network.local.as.number` | Experimental | `65000` | Local BGP ASN |
+
+> **Note on PII:** `network.local.mac.address`, `network.peer.mac.address`, and `network.carrier.*` attributes are Experimental and carry PII warnings — do not emit to externally-accessible backends without scrubbing.
+
+---
+
+### 10.6 OTTL — Transform and Filter at the Collector
+
+OTTL (OpenTelemetry Transformation Language) reached v1 stable in 2026. It is used in the `transform` and `filter` processors to manipulate any telemetry signal before export — without touching application code.
+
+**Common network-engineering use cases:**
+
+```yaml
+# otel-collector-config-with-ottl.yaml
+processors:
+  # 1. Drop high-cardinality attributes that explode metric cardinality
+  transform/drop_cardinality:
+    trace_statements:
+      - context: span
+        statements:
+          - delete_key(attributes, "http.url")       # full URL — too many unique values
+          - delete_key(attributes, "db.statement")   # SQL text — PII + cardinality
+
+  # 2. Rename network attributes to match your internal naming convention
+  transform/rename_net:
+    trace_statements:
+      - context: span
+        statements:
+          - set(attributes["dst_ip"], attributes["network.peer.address"])
+          - set(attributes["dst_port"], attributes["network.peer.port"])
+
+  # 3. Drop health-check and liveness probe spans entirely
+  filter/drop_healthchecks:
+    traces:
+      span:
+        - 'attributes["http.target"] == "/healthz"'
+        - 'attributes["http.target"] == "/readyz"'
+        - 'attributes["http.target"] == "/metrics"'
+
+  # 4. Keep only DROPPED Hubble flows (ignore FORWARDED for storage cost)
+  filter/hubble_drops_only:
+    traces:
+      span:
+        - 'name != "TCP DROPPED" and name != "UDP DROPPED"'
+
+  batch:
+    timeout: 1s
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors:
+        - transform/drop_cardinality
+        - transform/rename_net
+        - filter/drop_healthchecks
+        - batch
+      exporters: [otlp/tempo]
+    traces/hubble:
+      receivers: [otlp]
+      processors:
+        - filter/hubble_drops_only
+        - batch
+      exporters: [otlp/tempo]
+```
+
+```bash
+# Validate OTTL config before deploy:
+otelcol validate --config=otel-collector-config-with-ottl.yaml
+# expect: "Config is valid" — catches syntax errors in OTTL statements
+
+# Common OTTL functions:
+# set(target, value)              — assign a value
+# delete_key(map, key)            — remove an attribute
+# keep_keys(map, [key1, key2])    — drop all but listed keys
+# truncate_all(map, limit)        — truncate all string values to limit bytes
+# replace_match(target, pattern, replacement) — regex replace
+```
+
+---
+
+### See Also
+
+| Lesson | Relevance |
+|--------|-----------|
+| [Lesson 10 — eBPF and XDP](10-ebpf-xdp.md) | How OBI hooks into the kernel — eBPF program types used by zero-code instrumentation |
+| [Lesson 12 — Cilium CNI and eBPF Dataplane](12-cilium-cni-ebpf.md) | Hubble architecture and how flow records are generated before OTLP export |
+| [Lesson 21 — Service Mesh with Istio](21-service-mesh-istio.md) | OTel sidecar instrumentation as an alternative to OBI for Envoy-proxied services |
+| [Lesson 39 — Network Incident Management, SLOs, and RCA](39-network-incident-management-slo-rca.md) | Full OTel + eBPF stack for SLO tracking and root-cause analysis in production |
+
+---
+
 ## Check Your Understanding
 
 1. **[Concept question]** Why does the L1-to-L7 troubleshooting methodology require confirming each layer before moving up, rather than starting at the Kubernetes service layer where the symptom is visible?

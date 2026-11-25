@@ -127,15 +127,15 @@ flowchart LR
     style Backend fill:#3d1a5a,color:#fff
 ```
 
-**Key 2025 developments that change the picture:**
+**Key 2025/2026 developments that change the picture:**
 
 | Capability | What changed | Why it matters |
 |---|---|---|
-| **Cilium native OTel export** | Cilium 1.15+ exports Hubble flows as OTLP traces | Network hops appear as spans in Grafana Tempo — no sidecar |
-| **OTel network semantic conventions (stable)** | `network.type`, `network.transport`, `network.peer.address`, `network.peer.port` are stable; `network.connection.state`, `network.interface.name` are RC | Cross-vendor correlation: Cilium spans + app spans share the same attribute names |
-| **eBPF OTel Collector receiver** | OTel Collector gains an eBPF receiver (kernel 5.8+) | L4 TCP events become OTel spans without code changes |
+| **Cilium native OTel export** | Cilium 1.15+ (OTLP export introduced); current stable: 1.20.x; exports Hubble flows as OTLP traces | Network hops appear as spans in Grafana Tempo — no sidecar |
+| **OTel network semantic conventions (stable)** | `network.type`, `network.transport`, `network.local.address`, `network.local.port`, `network.peer.address`, `network.peer.port` are stable; `network.connection.state`, `network.interface.name` are RC | Cross-vendor correlation: Cilium spans + app spans share the same attribute names |
+| **eBPF OTel Collector receiver** | OTel Collector gains an eBPF receiver (kernel 5.8+); **OBI v1.0 GA (2026)** — 10 protocol categories: HTTP/HTTPS/2, gRPC, SQL, Redis, MongoDB, Kafka, GraphQL, Elasticsearch, AWS S3 | L4 TCP events and app-layer events become OTel spans without code changes |
 | **Tetragon + OTel** | Tetragon 1.1+ emits process/network events as OTel logs | Security events and network events in the same trace context |
-| **Continuous profiling (Parca/Pyroscope)** | eBPF CPU profiles linked to trace IDs | Correlate a network latency spike with a CPU-bound kernel function |
+| **Continuous profiling (Parca/Pyroscope)** | eBPF CPU profiles linked to trace IDs. **Note:** OTel Profiles signal is Alpha (pprof-based); Parca and Grafana Pyroscope are standalone tools — not yet spec-compliant OTel profiling; integration planned but not GA | Correlate a network latency spike with a CPU-bound kernel function |
 
 **What this enables for RCA:** A single Grafana trace shows: app span → Cilium policy verdict span → kernel conntrack lookup → eBPF XDP decision — without touching application code.
 

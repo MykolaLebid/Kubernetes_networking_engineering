@@ -5,7 +5,7 @@
 | Layer | Kubernetes Tool | CF / BTP Equivalent | Notes |
 |---|---|---|---|
 | Flow visibility | Hubble (Cilium) | Loggregator / RLP Gateway | Cilium 1.15+ exports Hubble flows as OTLP traces |
-| eBPF auto-instrumentation | Beyla / OTel eBPF Instrumentation (OBI) | — | Grafana donated Beyla to OTel project 2025 |
+| eBPF auto-instrumentation | OBI v1.0 (OpenTelemetry eBPF Instrumentation, formerly Beyla) | — | GA 2026; zero-code, 10 protocol categories |
 | Metrics scraping | Prometheus | Log Cache / Metrics Forwarder | OTel Collector can bridge both |
 | Distributed traces | Grafana Tempo / Jaeger | Zipkin (via service mesh) | Cilium spans appear as network hops in Tempo |
 | Logs | Grafana Loki | Loggregator + syslog drains | Tetragon events → structured JSON → Loki |
@@ -195,14 +195,18 @@ Symptom: network fault
 | Component | Role |
 |---|---|
 | **Cilium Hubble OTLP export** | Hubble flows → OTLP traces (network hops as spans in Tempo) |
-| **OTel eBPF Instrumentation (OBI)** | Beyla donated to OTel project 2025; eBPF auto-instrumentation without code changes |
-| **OTel Collector** | Receives OTLP from Cilium + app SDKs; fans out to Prometheus/Tempo/Loki |
+| **OTel eBPF Instrumentation (OBI)** | **v1.0 GA (2026)** — formerly Beyla (donated to OTel/CNCF); zero-code eBPF auto-instrumentation; protocols: HTTP/HTTPS, HTTP/2, gRPC, SQL, Redis, MongoDB, Kafka, GraphQL, Elasticsearch/OpenSearch, AWS S3 |
+| **OTel Collector** | Receives OTLP from Cilium + app SDKs; fans out to Prometheus/Tempo/Loki; **OTTL v1 (stable)** — transform/filter query language for processors: drop high-cardinality attrs, rename metrics, filter health-check spans |
+| **K8s Operator** | `OpenTelemetryCollector` CRD — declarative Collector deployment; `Instrumentation` CRD — auto-injects SDK via pod annotation (`instrumentation.opentelemetry.io/inject-python: "true"`); supports .NET, Java, Node.js, Python, Go, NGINX, Apache HTTPD; no code change needed |
 | **Tetragon → Loki** | Process/network security events as structured JSON logs with trace context |
 | **Grafana Tempo** | Trace storage; correlate Cilium network-hop spans with app spans |
 
 **Key OTel semantic conventions for network events (stable):**  
-`network.type` (ipv4/ipv6) · `network.transport` (tcp/udp) · `network.peer.address` · `network.peer.port` · `network.protocol.name` · `network.protocol.version`  
-RC (not yet stable): `network.connection.state` · `network.interface.name` · `network.io.direction`
+`network.type` (ipv4/ipv6) · `network.transport` (tcp/udp) · `network.local.address` · `network.local.port` · `network.peer.address` · `network.peer.port` · `network.protocol.name` · `network.protocol.version`  
+RC (not yet stable): `network.connection.state` · `network.interface.name` · `network.io.direction`  
+Experimental (BGP context): `network.peer.as.number` · `network.peer.as.organization` · `network.local.as.number` (BGP AS number/org — see K8s lesson 06)
+
+> **OTel Profiles signal is Alpha** (pprof-based data model). Parca and Grafana Pyroscope are standalone tools — not yet integrated into the OTel spec pipeline.
 
 ---
 

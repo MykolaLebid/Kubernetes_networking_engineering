@@ -126,8 +126,9 @@ nav:
       - "32 · AWS Hybrid and Multi-Cluster": lessons/32-aws-hybrid-multicluster.md
     - "Track H — GitOps":
       - "33 · ArgoCD and GitOps": lessons/33-argocd-gitops.md
-    - "Track I — AI Platform":
+    - "Track I — AI Platform & Observability":
       - "34 · AI Platform Networking": lessons/34-ai-platform-networking.md
+      - "40 · OpenTelemetry for Network Engineers": lessons/40-opentelemetry-network-observability.md
     - "Track J — Security & Compliance":
       - "35 · Tetragon: eBPF Runtime Security": lessons/35-tetragon-ebpf-runtime-security.md
       - "36 · KubeEdge and Industrial Edge Networking": lessons/36-kubeedge-industrial-edge-networking.md
