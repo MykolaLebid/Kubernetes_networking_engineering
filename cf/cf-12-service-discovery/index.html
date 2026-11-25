@@ -3363,6 +3363,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5082,6 +5093,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5131,8 +5153,10 @@
 <h1 id="cf-12-service-discovery-deep-dive">CF-12: Service Discovery Deep Dive<a class="headerlink" href="#cf-12-service-discovery-deep-dive" title="Permanent link">&para;</a></h1>
 <p><strong>Track:</strong> CF-C — Application Networking
 <strong>Prerequisites:</strong> CF-09 (Gorouter Internals), CF-10 (C2C Policies), CF-11 (BOSH DNS)</p>
+<p><strong>Jump to:</strong> <a href="#quick-read-10-min">Quick Read</a> · <a href="#deep-dive">Deep Dive</a> · <a href="#4-troubleshooting-service-discovery">Troubleshooting</a> · <a href="#quick-reference">Quick Reference</a></p>
 <hr />
 <h2 id="quick-read-10-min">Quick Read (10 min)<a class="headerlink" href="#quick-read-10-min" title="Permanent link">&para;</a></h2>
+<p>After this lesson you will be able to: explain how CF routes HTTP requests through Gorouter using NATS-based registration and how container-to-container discovery works via BOSH DNS and the <code>apps.internal</code> domain, and diagnose failures in both discovery planes using CLI and BOSH SSH commands.</p>
 <p><strong>The essential mental model for CF service discovery:</strong></p>
 <ul>
 <li>CF has <strong>two discovery planes</strong>: HTTP (Gorouter) and C2C (Silk overlay)</li>
@@ -5199,6 +5223,7 @@
 </table>
 <hr />
 <h2 id="deep-dive">Deep Dive<a class="headerlink" href="#deep-dive" title="Permanent link">&para;</a></h2>
+<p>The sections below examine each discovery plane in detail: how Gorouter assembles its in-memory routing table from NATS messages, how BOSH DNS performs health-aware resolution for <code>apps.internal</code> names, and how the VXLAN Policy Agent enforces C2C access control at the iptables layer. Work through sections 1–3 in order before moving to the troubleshooting and production checklist sections.</p>
 <hr />
 <h2 id="practice-setup">Practice Setup<a class="headerlink" href="#practice-setup" title="Permanent link">&para;</a></h2>
 <p>You need two terminals for every exercise in this lesson.</p>
@@ -5410,7 +5435,7 @@
 </span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>cf<span class="w"> </span>ssh<span class="w"> </span>myapp<span class="w"> </span>-t<span class="w"> </span>-c<span class="w"> </span><span class="s1">'for i in 1 2 3 4 5; do \</span>
 </span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="s1">  echo "Query $i:"; dig +short mybackend.apps.internal; sleep 2; done'</span>
 </span></code></pre></div>
-<p>The result: a client using BOSH DNS for C2C discovery will naturally avoid connecting to crashed instances without any client-side retry logic, circuit breaker, or Endpoints watch.</p>
+<p>The result: a client using BOSH DNS for C2C discovery will naturally avoid connecting to crashed instances without any client-side retry logic, circuit breaker, or Endpoints watch. In a banking or medtech environment where a backend microservice handles sensitive transactions, this DNS-layer health filtering means a crashing instance is removed from the discovery pool within seconds — before client applications have a chance to accumulate connection errors that require manual intervention.</p>
 <h3 id="per-instance-addressing">Per-instance addressing<a class="headerlink" href="#per-instance-addressing" title="Permanent link">&para;</a></h3>
 <p>BOSH DNS supports per-instance addressing with the syntax <code>&lt;index&gt;.&lt;hostname&gt;.apps.internal</code>:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Always reach instance 0 specifically</span>
@@ -5763,6 +5788,25 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li>
+<p>CF has two discovery planes. What determines which plane handles a given request, and what is the key difference in how each plane locates a destination app?</p>
+</li>
+<li>
+<p>A Route Emitter publishes <code>router.register</code> messages every 20 seconds and the Gorouter TTL is 2 minutes. What happens to routing if a Diego Cell loses NATS connectivity for 90 seconds? For 150 seconds?</p>
+</li>
+<li>
+<p>You run <code>cf ssh myapp -t -c 'dig +short mybackend.apps.internal'</code> and get no output (no IPs returned). Walk through the two distinct root causes that could produce this result and the first command you would run to distinguish between them.</p>
+</li>
+<li>
+<p>Explain why CF containers use <code>ndots:0</code> while K8s pods use <code>ndots:5</code>, and describe one operational scenario where the K8s <code>ndots:5</code> default causes measurable latency overhead that CF avoids.</p>
+</li>
+<li>
+<p>A source app can resolve <code>mybackend.apps.internal</code> to a valid overlay IP but <code>nc -zv mybackend.apps.internal 8080</code> times out. What is the most likely cause, and which two commands — one using <code>cf</code> CLI and one on the Diego Cell — would you run to confirm and fix it?</p>
+</li>
+</ol>
 <hr />
 <h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <p><strong>Related K8s lessons in this course:</strong></p>

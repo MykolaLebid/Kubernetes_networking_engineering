@@ -3235,6 +3235,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4994,6 +5005,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5044,8 +5066,10 @@
 <p><strong>Track:</strong> CF-C — Ingress and Routing<br />
 <strong>Prerequisite:</strong> CF-02 (Garden Container Networking), CF-04 (Silk CNI) or equivalent<br />
 <strong>Companion K8s lessons:</strong> Lesson 15 — Ingress Controllers, Lesson 16 — Gateway API, Lesson 19 — Service Mesh TLS</p>
+<p><strong>Jump to:</strong> <a href="#1-gorouter-architecture-and-the-routing-table">Theory</a> · <a href="#practice-setup">Practice</a> · <a href="#4-troubleshooting">Troubleshooting</a> · <a href="#quick-reference">Quick Reference</a></p>
 <hr />
 <h2 id="quick-read-10-min">Quick Read (10 min)<a class="headerlink" href="#quick-read-10-min" title="Permanent link">&para;</a></h2>
+<p>After this lesson you will be able to: explain how Gorouter builds and maintains its routing table via NATS, diagnose the five most common Gorouter failure modes, and translate CF routing concepts to their K8s Ingress equivalents.</p>
 <p><strong>What Gorouter is:</strong> CF's built-in HTTP/WebSocket L7 reverse proxy. Every inbound request to any <code>cf push</code>-deployed app flows through one or more Gorouter instances sitting behind a load balancer. No Nginx, no Envoy, no Ingress YAML required — Gorouter is the platform's answer to all of those.</p>
 <p><strong>Key mental model:</strong></p>
 <ul>
@@ -5115,6 +5139,7 @@
 <p><strong>What you will learn in the Deep Dive:</strong> how Gorouter's routing table is built and maintained, the full NATS registration flow, TLS termination modes, sticky sessions, WebSocket handling, TCP Router for non-HTTP traffic, and how to diagnose route registration failures.</p>
 <hr />
 <h2 id="deep-dive">Deep Dive<a class="headerlink" href="#deep-dive" title="Permanent link">&para;</a></h2>
+<p>The Quick Read above gives you the operational mental model; the sections below work through each subsystem in detail — routing table internals, the full NATS registration sequence, every TLS mode, and the five failure modes you are most likely to encounter in production. Work through them in order if you are new to CF routing, or jump directly to a numbered section if you are diagnosing a specific issue.</p>
 <hr />
 <h2 id="practice-setup">Practice Setup<a class="headerlink" href="#practice-setup" title="Permanent link">&para;</a></h2>
 <p>You need two terminals for every exercise in this lesson.</p>
@@ -5410,6 +5435,9 @@
 </span><span id="__span-11-15"><a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>sudo<span class="w"> </span>/var/vcap/packages/nats/bin/nats-sub<span class="w"> </span>-s<span class="w"> </span>nats://nats:<span class="nv">$NATS_PASSWORD</span>@10.0.0.6:4222<span class="w"> </span><span class="s2">"router.register"</span><span class="w"> </span><span class="p">&amp;</span>
 </span><span id="__span-11-16"><a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="c1"># Wait 20s — should see registration messages</span>
 </span></code></pre></div>
+<blockquote>
+<p><strong>Banking/fintech context:</strong> In regulated environments running payment-processing apps on SAP BTP CF, a 502 window during rolling deploys can violate SLA commitments for transaction endpoints. Teams in this sector typically pre-warm routes by keeping the old version mapped until the new instance emits at least one successful <code>router.register</code>, verified via NATS subscription, before unmapping the old route.</p>
+</blockquote>
 <h3 id="failure-mode-2-routes-not-appearing-502-persistent">Failure Mode 2: Routes Not Appearing (502 Persistent)<a class="headerlink" href="#failure-mode-2-routes-not-appearing-502-persistent" title="Permanent link">&para;</a></h3>
 <p><strong>Symptom:</strong> 502 persists even after the app is confirmed running. No <code>router.register</code> messages seen on NATS.</p>
 <p><strong>Diagnosis:</strong></p>
@@ -5609,6 +5637,15 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li>What is the default TTL Gorouter sets on a routing table entry, and what event causes that entry to expire before its TTL is reached?</li>
+<li>A <code>cf push</code> completes successfully and <code>cf app myapp</code> shows <code>instances: 1/1</code>, but HTTP requests return 502. Walk through the NATS registration flow to identify where the breakdown could be.</li>
+<li>How does Gorouter implement sticky sessions, and what happens to a pinned session when the target instance is rescheduled to a different Diego Cell?</li>
+<li>Explain the difference between TLS edge termination and full re-encrypt mode in Gorouter. Under which compliance requirements would you enable full re-encrypt, and what does route integrity verification protect against?</li>
+<li>How does CF's blue-green deployment via route mapping differ from weighted traffic splitting using K8s Gateway API HTTPRoute <code>backendRefs</code>?</li>
+</ol>
 <hr />
 <h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <p><strong>K8s lessons in this course:</strong></p>

@@ -5289,6 +5289,12 @@
 <td>MetalLB L2 mode on a home LAN; services get local IPs from a 192.168.x.x pool</td>
 <td>Kubernetes services accessible on the home network at stable IPs without router configuration</td>
 </tr>
+<tr>
+<td>Hospital PACS cluster (medtech)</td>
+<td>Bare-metal PACS imaging cluster requiring stable VIPs; rolling deploys caused two nodes to briefly co-announce the same VIP in L2 mode, triggering ARP storms that disrupted in-flight DICOM transfers</td>
+<td>MetalLB BGP mode with per-node next-hops advertised to ToR switch; each node announces the VIP as its own /32 route so the router arbitrates via ECMP rather than ARP</td>
+<td>ARP storms eliminated; rolling deploys complete without network disruption; ECMP provides even traffic distribution across PACS nodes</td>
+</tr>
 </tbody>
 </table>
 <hr />

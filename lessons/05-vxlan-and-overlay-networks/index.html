@@ -5473,6 +5473,12 @@
 <td>Geneve UDP :6081 with extensible VNI header</td>
 <td>Supports future metadata embedding in tunnel headers for observability without separate sidecar</td>
 </tr>
+<tr>
+<td>Medical device manufacturer (IEC 62443)</td>
+<td>Bare-metal K8s cluster with VXLAN-isolated subnets per IEC 62443 security zone; OT sensor data crossed zone boundaries over the overlay</td>
+<td>VXLAN per-zone VNI segmentation + MTU configuration on bare metal</td>
+<td>MTU misconfiguration left pod interfaces at 1500 instead of 1450, causing silent 1-byte payload corruption on OT sensor packets crossing zones; detected only after checksum failures surfaced in sensor telemetry</td>
+</tr>
 </tbody>
 </table>
 <hr />

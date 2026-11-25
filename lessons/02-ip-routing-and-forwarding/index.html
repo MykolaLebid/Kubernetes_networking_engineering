@@ -1029,17 +1029,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#summary" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Summary
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#check-your-understanding" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5092,17 +5081,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#summary" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Summary
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#check-your-understanding" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5370,6 +5348,12 @@ Requires all nodes to be on the same L2 segment (same VLAN/subnet). Fails across
 <td>Each Kubernetes node runs BIRD which injects per-pod /32 host routes into the Linux routing table</td>
 <td>Host routes /32 + LPM precedence over /24</td>
 <td>Per-pod routing without ARP flooding; ECMP across nodes for load balanced services</td>
+</tr>
+<tr>
+<td>Bank trading platform</td>
+<td>ECMP L4 hashing for FIX protocol flows; strict rp_filter=1 dropped half the packets on return paths because asymmetric routing sent replies via a different interface</td>
+<td>ECMP nexthop routing + rp_filter + L4 hash policy</td>
+<td>Setting rp_filter=2 (loose) restored bidirectional flow for all FIX sessions without disabling reverse path validation entirely</td>
 </tr>
 </tbody>
 </table>
@@ -5665,42 +5649,6 @@ Requires all nodes to be on the same L2 segment (same VLAN/subnet). Fails across
 <tr>
 <td>Set L4 ECMP hash</td>
 <td><code>sysctl -w net.ipv4.fib_multipath_hash_policy=1</code></td>
-</tr>
-</tbody>
-</table>
-<hr />
-<h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Concept</th>
-<th>Command</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Show routing table</td>
-<td><code>ip route show</code></td>
-</tr>
-<tr>
-<td>Test routing decision</td>
-<td><code>ip route get &lt;dst&gt;</code></td>
-</tr>
-<tr>
-<td>Add static route</td>
-<td><code>ip route add &lt;prefix&gt; via &lt;gw&gt;</code></td>
-</tr>
-<tr>
-<td>Enable forwarding</td>
-<td><code>sysctl net.ipv4.ip_forward=1</code></td>
-</tr>
-<tr>
-<td>Monitor route changes</td>
-<td><code>ip monitor route</code></td>
-</tr>
-<tr>
-<td>Multi-path hash policy</td>
-<td><code>net.ipv4.fib_multipath_hash_policy=1</code></td>
 </tr>
 </tbody>
 </table>

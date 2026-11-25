@@ -5651,7 +5651,7 @@
 </span></code></pre></div>
 <hr />
 <h2 id="11-aws-efa-elastic-fabric-adapter">11. AWS EFA — Elastic Fabric Adapter<a class="headerlink" href="#11-aws-efa-elastic-fabric-adapter" title="Permanent link">&para;</a></h2>
-<p>AWS's custom RDMA-capable interconnect for P4d/P5 instances running LLM training.</p>
+<p>AWS's custom RDMA-capable interconnect for P4d/P5 instances running LLM training. See <a href="../29-aws-eks-networking/">Lesson 29 — AWS EKS Networking</a> for the full VPC and EKS networking context in which EFA operates.</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>AWS EFA Architecture:
 </span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
 </span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>  P4d.24xlarge (8× A100 GPU, 4× EFA)
@@ -5904,6 +5904,12 @@
 <td>Stable Diffusion and SDXL training</td>
 <td>H100 DGX clusters with rail-optimized topology and Volcano gang scheduling</td>
 <td>Eliminated training stalls from partial pod starts; 40% utilization improvement</td>
+</tr>
+<tr>
+<td>Big Tech (LLM training)</td>
+<td>Multi-node GPU training job for a large language model</td>
+<td>NCCL all-reduce routing misconfigured to use eth0 instead of the dedicated RDMA interface</td>
+<td>Effective bandwidth dropped from 400 Gbps to 25 Gbps, increasing a 2-hour training run to 32 hours; fix was setting <code>NCCL_IB_HCA</code> and <code>NCCL_SOCKET_IFNAME</code> explicitly to target the RDMA interface</td>
 </tr>
 </tbody>
 </table>
@@ -6369,7 +6375,9 @@
 </tbody>
 </table>
 <hr />
-<p><strong>← Previous:</strong> <a href="../33-argocd-gitops/">Lesson 33 — ArgoCD and GitOps for Network Configuration</a></p>
+<p><strong>Previous:</strong> <a href="../33-argocd-gitops/">Lesson 33 — ArgoCD and GitOps</a><br />
+<strong>Next:</strong> <a href="../35-tetragon-ebpf-runtime-security/">Lesson 35 — Tetragon: eBPF Runtime Security</a><br />
+<strong>See also:</strong> <a href="../29-aws-eks-networking/">Lesson 29 — AWS EKS Networking</a> · <a href="../38-multus-cni/">Lesson 38 — Multus CNI</a></p>
 
 
 

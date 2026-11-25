@@ -3131,6 +3131,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5028,6 +5039,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5076,8 +5098,10 @@
 
 <h1 id="application-security-groups-egress-control">Application Security Groups — Egress Control<a class="headerlink" href="#application-security-groups-egress-control" title="Permanent link">&para;</a></h1>
 <p><strong>Track:</strong> CF-B | <strong>Lesson:</strong> CF-07 | <strong>Duration:</strong> 45–60 min</p>
+<p><strong>Jump to:</strong> <a href="#quick-read-10-min">Quick Read</a> · <a href="#deep-dive">Deep Dive</a> · <a href="#practice-setup">Practice</a> · <a href="#4-troubleshooting">Troubleshooting</a> · <a href="#quick-reference">Quick Reference</a></p>
 <hr />
 <h2 id="quick-read-10-min">Quick Read (10 min)<a class="headerlink" href="#quick-read-10-min" title="Permanent link">&para;</a></h2>
+<p>After this lesson you will be able to: design and apply Application Security Groups to control CF app egress, distinguish global from space-scoped bindings, and audit ASG rules against PCI-DSS, HIPAA, and GDPR requirements.</p>
 <p><strong>What ASGs are:</strong> Stateful allow-rules that control outbound (egress) traffic from CF app containers to external destinations. They are the CF equivalent of Kubernetes egress NetworkPolicy rules — but coarser-grained and lifecycle-scoped.</p>
 <p><strong>Key mental model:</strong>
 - ASGs are <strong>allow-only</strong>; default posture is deny-all egress
@@ -5442,6 +5466,7 @@
 </span></code></pre></div></p>
 <h3 id="common-failure-mode-4-unexpected-lateral-movement-rfc-1918-reachable-from-app">Common failure mode 4: Unexpected lateral movement — RFC 1918 reachable from app<a class="headerlink" href="#common-failure-mode-4-unexpected-lateral-movement-rfc-1918-reachable-from-app" title="Permanent link">&para;</a></h3>
 <p><strong>Symptom:</strong> Security audit reveals app containers can reach internal infrastructure IPs.</p>
+<p>In banking environments, an overly broad RFC 1918 ASG can expose core banking systems or SWIFT integration endpoints to any app on the platform; in medical device manufacturing, the same misconfiguration can allow app containers to reach OT network segments that are only logically separated by IP range, making ASG scope audits a mandatory step in both pre-launch security reviews and ongoing change management.</p>
 <p><strong>Diagnosis:</strong>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Check if someone added a broad RFC 1918 ASG</span>
 </span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>cf<span class="w"> </span>security-groups
@@ -5640,6 +5665,15 @@
 <blockquote>
 <p><strong>Full compliance mapping:</strong> See <a href="../cf-21-compliance-networking/">CF-21 — Compliance Networking</a> for the complete HIPAA/PCI-DSS/IEC 62443/GDPR control matrix with exact ASG JSON for each framework.</p>
 </blockquote>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li>What is the difference between a <strong>staging ASG</strong> and a <strong>running ASG</strong>, and why must they be managed independently?</li>
+<li>An app in <code>myorg/production</code> cannot reach a PostgreSQL instance at <code>10.100.50.5:5432</code>. The global <code>public_networks</code> and <code>dns</code> ASGs are bound. What is the most likely cause, and what command creates the fix?</li>
+<li>You run <code>cf update-security-group</code> to tighten an ASG rule, but containers in the affected space still see the old iptables behavior 10 minutes later. Name two things you would check first.</li>
+<li>A security audit flags that an app container can reach <code>10.0.0.0/8</code> — the BOSH director subnet. Which ASG command sequence would you run to identify and remediate the source of that permission?</li>
+<li>Why is binding <code>public_networks</code> globally to a space that processes EU personal data considered a GDPR Art. 25 finding, even if no data is actually exfiltrated?</li>
+</ol>
 <hr />
 <h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <p><strong>Related K8s lessons in this course:</strong></p>

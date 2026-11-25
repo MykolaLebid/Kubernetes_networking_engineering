@@ -3070,6 +3070,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5018,6 +5029,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5066,8 +5088,10 @@
 
 <h1 id="silk-cni-cfs-vxlan-overlay">Silk CNI — CF's VXLAN Overlay<a class="headerlink" href="#silk-cni-cfs-vxlan-overlay" title="Permanent link">&para;</a></h1>
 <p><strong>Track:</strong> CF-B | <strong>Lesson:</strong> CF-05 | <strong>Time:</strong> 10 min quick read / 45 min deep dive</p>
+<p><strong>Jump to:</strong> <a href="#quick-read-10-min">Quick Read</a> · <a href="#deep-dive">Deep Dive</a> · <a href="#4-troubleshooting">Troubleshooting</a> · <a href="#quick-reference">Quick Reference</a></p>
 <hr />
 <h2 id="quick-read-10-min">Quick Read (10 min)<a class="headerlink" href="#quick-read-10-min" title="Permanent link">&para;</a></h2>
+<p>After this lesson you will be able to: explain how Silk CNI builds a flat VXLAN overlay across Diego Cells, trace a container-to-container packet end-to-end, and diagnose the four most common overlay failures using BOSH SSH and CF CLI commands.</p>
 <p><strong>What Silk CNI does in one sentence:</strong> Silk is CF's built-in CNI plugin that creates a flat VXLAN overlay network so every container on every Diego Cell can talk to every other container using a stable, routable IP address — without needing the underlay network to know anything about containers.</p>
 <p><strong>Mental model checklist:</strong></p>
 <ul>
@@ -5451,6 +5475,9 @@
 <li>Stale VTEP routes → <code>sudo monit restart silk-daemon</code> on affected Cell</li>
 <li>Underlay firewall blocking UDP 4789 → open it in IaaS security groups</li>
 </ul>
+<blockquote>
+<p><strong>Banking sector note:</strong> In regulated financial environments, IaaS security groups are often managed by a separate network operations team with change-control lead times of 24–72 hours. When UDP 4789 is blocked between Diego Cells, all inter-Cell C2C traffic silently fails; include this port in the initial infrastructure runbook and validate it during every Diego Cell rollout to avoid a production incident during a high-traffic trading window.</p>
+</blockquote>
 <hr />
 <h4 id="failure-mtu-mismatch-causing-silent-packet-loss">Failure: MTU mismatch causing silent packet loss<a class="headerlink" href="#failure-mtu-mismatch-causing-silent-packet-loss" title="Permanent link">&para;</a></h4>
 <p><strong>Symptom:</strong> Small requests work, large responses are silently dropped or connections hang.</p>
@@ -5615,7 +5642,28 @@
 </tbody>
 </table>
 <hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li>
+<p>A Diego Cell is assigned the subnet <code>10.255.7.0/24</code>. What is the VTEP MAC address for that Cell, and how does the Silk Daemon derive it without querying the Silk Controller for MAC information?</p>
+</li>
+<li>
+<p>You run <code>cf push myapp</code> and the app stays stuck in "Starting" with a "Diego error: insufficient resources" message, yet the Diego Cells have plenty of CPU and memory headroom. What is the most likely networking cause, and what is the first command you would run to confirm it?</p>
+</li>
+<li>
+<p>An app works fine for small HTTP responses but silently hangs when downloading files larger than ~1 MB. The overlay CIDR is <code>10.255.0.0/16</code> and the IaaS underlay MTU is 1500. Walk through the MTU chain from the IaaS NIC to the container <code>eth0</code> and explain where the misconfiguration is most likely to exist.</p>
+</li>
+<li>
+<p>Explain the difference in packet path when Container A communicates with Container B on the same Diego Cell versus with Container C on a different Diego Cell. At which layer does policy enforcement happen in each case?</p>
+</li>
+<li>
+<p>The Silk Daemon on Cell 2 has stale FDB entries pointing to the old underlay IP of a Diego Cell that was recently rebuilt. What observable symptom would you see, and which single command is the fastest remediation?</p>
+</li>
+</ol>
+<hr />
 <h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
+<p><strong>Previous lesson:</strong> <a href="cf-04-garden-container-runtime.md">CF-04 — Garden Container Runtime</a> — how Garden invokes the Silk CNI binary and manages container network namespaces.</p>
+<p><strong>Next lesson:</strong> <a href="cf-06-gorouter-http-routing.md">CF-06 — GoRouter and HTTP Routing</a> — how traffic enters the CF platform from outside and how Gorouter load-balances across container overlay IPs.</p>
 <p><strong>Related K8s lessons in this course:</strong></p>
 <ul>
 <li><strong>Lesson 08 — Flannel and VXLAN Overlay Networks:</strong> Direct K8s equivalent of Silk CNI. Same VXLAN encapsulation, same FDB/ARP programming pattern, same MTU calculation.</li>

@@ -2904,6 +2904,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4928,6 +4939,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4976,8 +4998,10 @@
 
 <h1 id="bosh-dns-and-platform-service-discovery">BOSH DNS and Platform Service Discovery<a class="headerlink" href="#bosh-dns-and-platform-service-discovery" title="Permanent link">&para;</a></h1>
 <p><strong>Track:</strong> CF-A | <strong>Lesson:</strong> CF-03 | <strong>Prerequisites:</strong> CF-01 (Overlay Networking), CF-02 (Gorouter and Traffic Flow)</p>
+<p><strong>Jump to:</strong> <a href="#1-bosh-dns-architecture">Theory</a> · <a href="#practice-setup">Practice</a> · <a href="#4-troubleshooting-bosh-dns-and-service-discovery">Troubleshooting</a> · <a href="#quick-reference">Quick Reference</a></p>
 <hr />
 <h2 id="quick-read-10-min">Quick Read (10 min)<a class="headerlink" href="#quick-read-10-min" title="Permanent link">&para;</a></h2>
+<p>After this lesson you will be able to: explain how BOSH DNS resolves both platform component addresses and app-to-app addresses, and diagnose the most common <code>apps.internal</code> failures using <code>dig</code> and CF CLI commands.</p>
 <p><strong>Core mental model:</strong> BOSH DNS is CF's internal DNS system. It is health-aware, runs on every VM, and resolves both platform component addresses and app-to-app addresses. The <code>apps.internal</code> domain is the namespace for container-to-container service discovery.</p>
 <p><strong>Key facts:</strong></p>
 <ul>
@@ -5346,136 +5370,98 @@
 <hr />
 <h2 id="4-troubleshooting-bosh-dns-and-service-discovery">4. Troubleshooting BOSH DNS and Service Discovery<a class="headerlink" href="#4-troubleshooting-bosh-dns-and-service-discovery" title="Permanent link">&para;</a></h2>
 <h3 id="common-failure-modes">Common failure modes<a class="headerlink" href="#common-failure-modes" title="Permanent link">&para;</a></h3>
-<p><strong>Failure Mode 1: <code>apps.internal</code> DNS returns NXDOMAIN</strong></p>
-<p>Symptom: <code>dig my-service.apps.internal</code> returns <code>NXDOMAIN</code> or empty answer.</p>
-<p>Causes and fixes:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># Check 1: Is the internal route actually mapped?</span>
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>cf<span class="w"> </span>routes<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>apps.internal
-</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="c1"># If not present:</span>
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>cf<span class="w"> </span>map-route<span class="w"> </span>my-service-app<span class="w"> </span>apps.internal<span class="w"> </span>--hostname<span class="w"> </span>my-service
-</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>
-</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="c1"># Check 2: Is the app actually running?</span>
-</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>cf<span class="w"> </span>app<span class="w"> </span>my-service-app
-</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="c1"># State must be "running" for DNS to resolve</span>
-</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>
-</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="c1"># Check 3: Is the app healthy? Check health check</span>
-</span><span id="__span-16-11"><a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>cf<span class="w"> </span>events<span class="w"> </span>my-service-app
-</span><span id="__span-16-12"><a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a>cf<span class="w"> </span>logs<span class="w"> </span>my-service-app<span class="w"> </span>--recent<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-i<span class="w"> </span>health
-</span><span id="__span-16-13"><a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a>
-</span><span id="__span-16-14"><a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a><span class="c1"># Check 4: From inside a container, test DNS directly</span>
-</span><span id="__span-16-15"><a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a>cf<span class="w"> </span>ssh<span class="w"> </span>my-caller-app
-</span><span id="__span-16-16"><a id="__codelineno-16-16" name="__codelineno-16-16" href="#__codelineno-16-16"></a>dig<span class="w"> </span>@169.254.0.2<span class="w"> </span>my-service.apps.internal
-</span><span id="__span-16-17"><a id="__codelineno-16-17" name="__codelineno-16-17" href="#__codelineno-16-17"></a><span class="c1"># If this works but app curl fails, it is a C2C policy issue, not DNS</span>
-</span></code></pre></div>
-<p><strong>Failure Mode 2: DNS resolves but connection is refused (C2C policy missing)</strong></p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Symptom: DNS gives an IP but curl hangs or connection refused</span>
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>dig<span class="w"> </span>my-service.apps.internal<span class="w">  </span><span class="c1"># Returns 10.255.1.5</span>
-</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>curl<span class="w"> </span>http://my-service.apps.internal:8080<span class="w">  </span><span class="c1"># Connection refused / timeout</span>
-</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>
-</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="c1"># Check C2C policies</span>
-</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>cf<span class="w"> </span>network-policies
-</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="c1"># If no policy exists for caller -&gt; service:</span>
-</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>cf<span class="w"> </span>add-network-policy<span class="w"> </span>my-caller-app<span class="w"> </span>my-service-app<span class="w"> </span>--protocol<span class="w"> </span>tcp<span class="w"> </span>--port<span class="w"> </span><span class="m">8080</span>
-</span><span id="__span-17-9"><a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>
-</span><span id="__span-17-10"><a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="c1"># Verify from inside the caller container</span>
-</span><span id="__span-17-11"><a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>cf<span class="w"> </span>ssh<span class="w"> </span>my-caller-app
-</span><span id="__span-17-12"><a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a><span class="c1"># Try direct IP connection (bypasses DNS to isolate the issue)</span>
-</span><span id="__span-17-13"><a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a>curl<span class="w"> </span>http://10.255.1.5:8080
-</span></code></pre></div>
-<p><strong>Failure Mode 3: BOSH DNS agent not responding</strong></p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># From bosh ssh on a Diego Cell</span>
-</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="c1"># Check if bosh-dns is running</span>
-</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>sudo<span class="w"> </span>monit<span class="w"> </span>summary<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>bosh-dns
-</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>
-</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="c1"># If not running, check logs</span>
-</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>sudo<span class="w"> </span>tail<span class="w"> </span>-100<span class="w"> </span>/var/vcap/sys/log/bosh-dns/bosh-dns.stdout.log
-</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>sudo<span class="w"> </span>tail<span class="w"> </span>-100<span class="w"> </span>/var/vcap/sys/log/bosh-dns/bosh-dns.stderr.log
-</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>
-</span><span id="__span-18-9"><a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="c1"># Restart bosh-dns (requires root)</span>
-</span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>sudo<span class="w"> </span>monit<span class="w"> </span>restart<span class="w"> </span>bosh-dns
-</span><span id="__span-18-11"><a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>
-</span><span id="__span-18-12"><a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a><span class="c1"># Test after restart</span>
-</span><span id="__span-18-13"><a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a>dig<span class="w"> </span>@169.254.0.2<span class="w"> </span>nats.service.cf.internal
-</span><span id="__span-18-14"><a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a><span class="c1"># Should return the NATS IP(s)</span>
-</span></code></pre></div>
-<p><strong>Failure Mode 4: Stale DNS entries after app redeploy</strong></p>
-<p>After <code>cf push</code>, app instances get new IPs on the VXLAN overlay. If a client caches the old IPs, connections fail.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># Check if DNS is returning old IPs</span>
-</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>dig<span class="w"> </span>@169.254.0.2<span class="w"> </span>my-service.apps.internal
-</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
-</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="c1"># Compare against actual container IPs from CAPI</span>
-</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>cf<span class="w"> </span>curl<span class="w"> </span>/v3/apps/<span class="k">$(</span>cf<span class="w"> </span>app<span class="w"> </span>my-service-app<span class="w"> </span>--guid<span class="k">)</span>/processes/web/stats<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">'.[].host'</span>
-</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>
-</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="c1"># If IPs do not match, the DNS record has not refreshed yet</span>
-</span><span id="__span-19-9"><a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a><span class="c1"># Wait up to 20 seconds (Route Emitter interval) and retry</span>
-</span><span id="__span-19-10"><a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>sleep<span class="w"> </span><span class="m">25</span>
-</span><span id="__span-19-11"><a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a>dig<span class="w"> </span>@169.254.0.2<span class="w"> </span>my-service.apps.internal
-</span></code></pre></div>
-<p><strong>Failure Mode 5: Wrong port in curl / connection refused on <code>apps.internal</code></strong></p>
-<p>Apps expose their PORT as the <code>$PORT</code> env var (usually 8080). The port used in <code>apps.internal</code> calls must match what the app listens on.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="c1"># From inside caller container</span>
-</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>cf<span class="w"> </span>ssh<span class="w"> </span>my-caller-app
-</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>
-</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="c1"># Check what port the target app exposes</span>
-</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="c1"># (You need to check cf app details or the app manifest)</span>
-</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="c1"># Common mistake: using port 80 instead of 8080</span>
-</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a>curl<span class="w"> </span>http://my-service.apps.internal:80<span class="w">   </span><span class="c1"># WRONG - nothing listens on 80 in CF</span>
-</span><span id="__span-20-8"><a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a>curl<span class="w"> </span>http://my-service.apps.internal:8080<span class="w"> </span><span class="c1"># CORRECT - $PORT default is 8080</span>
-</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Root cause</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dig my-service.apps.internal</code> returns <code>NXDOMAIN</code></td>
+<td>Internal route not mapped, or app is not running/healthy</td>
+<td>Run <code>cf map-route my-service-app apps.internal --hostname my-service</code>; confirm <code>cf app my-service-app</code> shows state <code>running</code></td>
+</tr>
+<tr>
+<td>DNS resolves an IP but <code>curl</code> hangs or connection is refused</td>
+<td>C2C network policy missing between caller and target</td>
+<td>Run <code>cf add-network-policy my-caller-app my-service-app --protocol tcp --port 8080</code></td>
+</tr>
+<tr>
+<td>All <code>apps.internal</code> DNS queries fail from containers on a Diego Cell</td>
+<td><code>bosh-dns</code> process is not running on that Cell</td>
+<td>SSH to the Cell with <code>bosh ssh</code>, run <code>sudo monit restart bosh-dns</code>, verify with <code>dig @169.254.0.2 nats.service.cf.internal</code></td>
+</tr>
+<tr>
+<td>DNS returns IPs that are no longer reachable after <code>cf push</code></td>
+<td>Client is caching stale IPs beyond the DNS TTL; Route Emitter has not propagated new IPs yet</td>
+<td>Wait up to 20 seconds for Route Emitter refresh; ensure app runtimes re-resolve DNS every 60 seconds or less</td>
+</tr>
+<tr>
+<td><code>curl http://my-service.apps.internal:80</code> returns connection refused</td>
+<td>Wrong port — CF apps listen on <code>$PORT</code> (default 8080), not port 80</td>
+<td>Use port 8080: <code>curl http://my-service.apps.internal:8080</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Banking scenario:</strong> In a retail banking platform running payment microservices on CF, a <code>cf push</code> of the account-balance service caused the transaction-history service to return errors for up to 90 seconds after deployment. The root cause was that the transaction-history service's HTTP client cached DNS responses for 5 minutes, far exceeding the 60-second <code>apps.internal</code> TTL. After the push, the client continued connecting to the old container IP, which had already been released. The fix was to configure the HTTP connection pool to re-resolve DNS every 30 seconds, bringing stale-IP errors to zero on subsequent deployments.</p>
+</blockquote>
 <h3 id="diagnostic-command-cheatsheet">Diagnostic command cheatsheet<a class="headerlink" href="#diagnostic-command-cheatsheet" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1"># --- From Mac / cf CLI ---</span>
-</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>
-</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="c1"># List all internal routes</span>
-</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>cf<span class="w"> </span>routes<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>apps.internal
-</span><span id="__span-21-5"><a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>
-</span><span id="__span-21-6"><a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="c1"># Check if an app has an internal route</span>
-</span><span id="__span-21-7"><a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a>cf<span class="w"> </span>routes<span class="w"> </span>--orglevel<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>my-app<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>apps.internal
-</span><span id="__span-21-8"><a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a>
-</span><span id="__span-21-9"><a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a><span class="c1"># List all C2C network policies</span>
-</span><span id="__span-21-10"><a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a>cf<span class="w"> </span>network-policies
-</span><span id="__span-21-11"><a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a>
-</span><span id="__span-21-12"><a id="__codelineno-21-12" name="__codelineno-21-12" href="#__codelineno-21-12"></a><span class="c1"># Check app health and instances</span>
-</span><span id="__span-21-13"><a id="__codelineno-21-13" name="__codelineno-21-13" href="#__codelineno-21-13"></a>cf<span class="w"> </span>app<span class="w"> </span>my-service-app
-</span><span id="__span-21-14"><a id="__codelineno-21-14" name="__codelineno-21-14" href="#__codelineno-21-14"></a>
-</span><span id="__span-21-15"><a id="__codelineno-21-15" name="__codelineno-21-15" href="#__codelineno-21-15"></a><span class="c1"># View recent app events (crashes, health check failures)</span>
-</span><span id="__span-21-16"><a id="__codelineno-21-16" name="__codelineno-21-16" href="#__codelineno-21-16"></a>cf<span class="w"> </span>events<span class="w"> </span>my-service-app
-</span><span id="__span-21-17"><a id="__codelineno-21-17" name="__codelineno-21-17" href="#__codelineno-21-17"></a>
-</span><span id="__span-21-18"><a id="__codelineno-21-18" name="__codelineno-21-18" href="#__codelineno-21-18"></a><span class="c1"># --- From inside an app container (cf ssh) ---</span>
-</span><span id="__span-21-19"><a id="__codelineno-21-19" name="__codelineno-21-19" href="#__codelineno-21-19"></a>
-</span><span id="__span-21-20"><a id="__codelineno-21-20" name="__codelineno-21-20" href="#__codelineno-21-20"></a><span class="c1"># Test DNS resolution</span>
-</span><span id="__span-21-21"><a id="__codelineno-21-21" name="__codelineno-21-21" href="#__codelineno-21-21"></a>dig<span class="w"> </span>@169.254.0.2<span class="w"> </span>my-service.apps.internal
-</span><span id="__span-21-22"><a id="__codelineno-21-22" name="__codelineno-21-22" href="#__codelineno-21-22"></a>dig<span class="w"> </span>@169.254.0.2<span class="w"> </span><span class="m">0</span>.my-service.apps.internal
-</span><span id="__span-21-23"><a id="__codelineno-21-23" name="__codelineno-21-23" href="#__codelineno-21-23"></a>
-</span><span id="__span-21-24"><a id="__codelineno-21-24" name="__codelineno-21-24" href="#__codelineno-21-24"></a><span class="c1"># Test DNS without specifying resolver (uses /etc/resolv.conf)</span>
-</span><span id="__span-21-25"><a id="__codelineno-21-25" name="__codelineno-21-25" href="#__codelineno-21-25"></a>nslookup<span class="w"> </span>my-service.apps.internal
-</span><span id="__span-21-26"><a id="__codelineno-21-26" name="__codelineno-21-26" href="#__codelineno-21-26"></a>
-</span><span id="__span-21-27"><a id="__codelineno-21-27" name="__codelineno-21-27" href="#__codelineno-21-27"></a><span class="c1"># Test HTTP connectivity</span>
-</span><span id="__span-21-28"><a id="__codelineno-21-28" name="__codelineno-21-28" href="#__codelineno-21-28"></a>curl<span class="w"> </span>-v<span class="w"> </span>http://my-service.apps.internal:8080/health
-</span><span id="__span-21-29"><a id="__codelineno-21-29" name="__codelineno-21-29" href="#__codelineno-21-29"></a>
-</span><span id="__span-21-30"><a id="__codelineno-21-30" name="__codelineno-21-30" href="#__codelineno-21-30"></a><span class="c1"># Check resolv.conf</span>
-</span><span id="__span-21-31"><a id="__codelineno-21-31" name="__codelineno-21-31" href="#__codelineno-21-31"></a>cat<span class="w"> </span>/etc/resolv.conf
-</span><span id="__span-21-32"><a id="__codelineno-21-32" name="__codelineno-21-32" href="#__codelineno-21-32"></a>
-</span><span id="__span-21-33"><a id="__codelineno-21-33" name="__codelineno-21-33" href="#__codelineno-21-33"></a><span class="c1"># --- From bosh ssh on Diego Cell ---</span>
-</span><span id="__span-21-34"><a id="__codelineno-21-34" name="__codelineno-21-34" href="#__codelineno-21-34"></a>
-</span><span id="__span-21-35"><a id="__codelineno-21-35" name="__codelineno-21-35" href="#__codelineno-21-35"></a><span class="c1"># Check bosh-dns health</span>
-</span><span id="__span-21-36"><a id="__codelineno-21-36" name="__codelineno-21-36" href="#__codelineno-21-36"></a>sudo<span class="w"> </span>monit<span class="w"> </span>summary<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>bosh-dns
-</span><span id="__span-21-37"><a id="__codelineno-21-37" name="__codelineno-21-37" href="#__codelineno-21-37"></a>
-</span><span id="__span-21-38"><a id="__codelineno-21-38" name="__codelineno-21-38" href="#__codelineno-21-38"></a><span class="c1"># Resolve platform service names</span>
-</span><span id="__span-21-39"><a id="__codelineno-21-39" name="__codelineno-21-39" href="#__codelineno-21-39"></a>dig<span class="w"> </span>@169.254.0.2<span class="w"> </span>nats.service.cf.internal
-</span><span id="__span-21-40"><a id="__codelineno-21-40" name="__codelineno-21-40" href="#__codelineno-21-40"></a>dig<span class="w"> </span>@169.254.0.2<span class="w"> </span>uaa.service.cf.internal
-</span><span id="__span-21-41"><a id="__codelineno-21-41" name="__codelineno-21-41" href="#__codelineno-21-41"></a>dig<span class="w"> </span>@169.254.0.2<span class="w"> </span>cloud-controller.service.cf.internal
-</span><span id="__span-21-42"><a id="__codelineno-21-42" name="__codelineno-21-42" href="#__codelineno-21-42"></a>
-</span><span id="__span-21-43"><a id="__codelineno-21-43" name="__codelineno-21-43" href="#__codelineno-21-43"></a><span class="c1"># Check bosh-dns configuration files</span>
-</span><span id="__span-21-44"><a id="__codelineno-21-44" name="__codelineno-21-44" href="#__codelineno-21-44"></a>ls<span class="w"> </span>/var/vcap/jobs/bosh-dns/
-</span><span id="__span-21-45"><a id="__codelineno-21-45" name="__codelineno-21-45" href="#__codelineno-21-45"></a>cat<span class="w"> </span>/var/vcap/jobs/bosh-dns/config/bosh-dns.json
-</span><span id="__span-21-46"><a id="__codelineno-21-46" name="__codelineno-21-46" href="#__codelineno-21-46"></a>
-</span><span id="__span-21-47"><a id="__codelineno-21-47" name="__codelineno-21-47" href="#__codelineno-21-47"></a><span class="c1"># Check alias configuration</span>
-</span><span id="__span-21-48"><a id="__codelineno-21-48" name="__codelineno-21-48" href="#__codelineno-21-48"></a>ls<span class="w"> </span>/var/vcap/jobs/bosh-dns-aliases/<span class="w"> </span><span class="m">2</span>&gt;/dev/null<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-21-49"><a id="__codelineno-21-49" name="__codelineno-21-49" href="#__codelineno-21-49"></a><span class="w">  </span>ls<span class="w"> </span>/var/vcap/data/dns/aliases/
-</span><span id="__span-21-50"><a id="__codelineno-21-50" name="__codelineno-21-50" href="#__codelineno-21-50"></a>
-</span><span id="__span-21-51"><a id="__codelineno-21-51" name="__codelineno-21-51" href="#__codelineno-21-51"></a><span class="c1"># View bosh-dns logs</span>
-</span><span id="__span-21-52"><a id="__codelineno-21-52" name="__codelineno-21-52" href="#__codelineno-21-52"></a>sudo<span class="w"> </span>tail<span class="w"> </span>-f<span class="w"> </span>/var/vcap/sys/log/bosh-dns/bosh-dns.stdout.log
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># --- From Mac / cf CLI ---</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="c1"># List all internal routes</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>cf<span class="w"> </span>routes<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>apps.internal
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="c1"># Check if an app has an internal route</span>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>cf<span class="w"> </span>routes<span class="w"> </span>--orglevel<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>my-app<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>apps.internal
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>
+</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="c1"># List all C2C network policies</span>
+</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a>cf<span class="w"> </span>network-policies
+</span><span id="__span-16-11"><a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a>
+</span><span id="__span-16-12"><a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a><span class="c1"># Check app health and instances</span>
+</span><span id="__span-16-13"><a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a>cf<span class="w"> </span>app<span class="w"> </span>my-service-app
+</span><span id="__span-16-14"><a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a>
+</span><span id="__span-16-15"><a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a><span class="c1"># View recent app events (crashes, health check failures)</span>
+</span><span id="__span-16-16"><a id="__codelineno-16-16" name="__codelineno-16-16" href="#__codelineno-16-16"></a>cf<span class="w"> </span>events<span class="w"> </span>my-service-app
+</span><span id="__span-16-17"><a id="__codelineno-16-17" name="__codelineno-16-17" href="#__codelineno-16-17"></a>
+</span><span id="__span-16-18"><a id="__codelineno-16-18" name="__codelineno-16-18" href="#__codelineno-16-18"></a><span class="c1"># --- From inside an app container (cf ssh) ---</span>
+</span><span id="__span-16-19"><a id="__codelineno-16-19" name="__codelineno-16-19" href="#__codelineno-16-19"></a>
+</span><span id="__span-16-20"><a id="__codelineno-16-20" name="__codelineno-16-20" href="#__codelineno-16-20"></a><span class="c1"># Test DNS resolution</span>
+</span><span id="__span-16-21"><a id="__codelineno-16-21" name="__codelineno-16-21" href="#__codelineno-16-21"></a>dig<span class="w"> </span>@169.254.0.2<span class="w"> </span>my-service.apps.internal
+</span><span id="__span-16-22"><a id="__codelineno-16-22" name="__codelineno-16-22" href="#__codelineno-16-22"></a>dig<span class="w"> </span>@169.254.0.2<span class="w"> </span><span class="m">0</span>.my-service.apps.internal
+</span><span id="__span-16-23"><a id="__codelineno-16-23" name="__codelineno-16-23" href="#__codelineno-16-23"></a>
+</span><span id="__span-16-24"><a id="__codelineno-16-24" name="__codelineno-16-24" href="#__codelineno-16-24"></a><span class="c1"># Test DNS without specifying resolver (uses /etc/resolv.conf)</span>
+</span><span id="__span-16-25"><a id="__codelineno-16-25" name="__codelineno-16-25" href="#__codelineno-16-25"></a>nslookup<span class="w"> </span>my-service.apps.internal
+</span><span id="__span-16-26"><a id="__codelineno-16-26" name="__codelineno-16-26" href="#__codelineno-16-26"></a>
+</span><span id="__span-16-27"><a id="__codelineno-16-27" name="__codelineno-16-27" href="#__codelineno-16-27"></a><span class="c1"># Test HTTP connectivity</span>
+</span><span id="__span-16-28"><a id="__codelineno-16-28" name="__codelineno-16-28" href="#__codelineno-16-28"></a>curl<span class="w"> </span>-v<span class="w"> </span>http://my-service.apps.internal:8080/health
+</span><span id="__span-16-29"><a id="__codelineno-16-29" name="__codelineno-16-29" href="#__codelineno-16-29"></a>
+</span><span id="__span-16-30"><a id="__codelineno-16-30" name="__codelineno-16-30" href="#__codelineno-16-30"></a><span class="c1"># Check resolv.conf</span>
+</span><span id="__span-16-31"><a id="__codelineno-16-31" name="__codelineno-16-31" href="#__codelineno-16-31"></a>cat<span class="w"> </span>/etc/resolv.conf
+</span><span id="__span-16-32"><a id="__codelineno-16-32" name="__codelineno-16-32" href="#__codelineno-16-32"></a>
+</span><span id="__span-16-33"><a id="__codelineno-16-33" name="__codelineno-16-33" href="#__codelineno-16-33"></a><span class="c1"># --- From bosh ssh on Diego Cell ---</span>
+</span><span id="__span-16-34"><a id="__codelineno-16-34" name="__codelineno-16-34" href="#__codelineno-16-34"></a>
+</span><span id="__span-16-35"><a id="__codelineno-16-35" name="__codelineno-16-35" href="#__codelineno-16-35"></a><span class="c1"># Check bosh-dns health</span>
+</span><span id="__span-16-36"><a id="__codelineno-16-36" name="__codelineno-16-36" href="#__codelineno-16-36"></a>sudo<span class="w"> </span>monit<span class="w"> </span>summary<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>bosh-dns
+</span><span id="__span-16-37"><a id="__codelineno-16-37" name="__codelineno-16-37" href="#__codelineno-16-37"></a>
+</span><span id="__span-16-38"><a id="__codelineno-16-38" name="__codelineno-16-38" href="#__codelineno-16-38"></a><span class="c1"># Resolve platform service names</span>
+</span><span id="__span-16-39"><a id="__codelineno-16-39" name="__codelineno-16-39" href="#__codelineno-16-39"></a>dig<span class="w"> </span>@169.254.0.2<span class="w"> </span>nats.service.cf.internal
+</span><span id="__span-16-40"><a id="__codelineno-16-40" name="__codelineno-16-40" href="#__codelineno-16-40"></a>dig<span class="w"> </span>@169.254.0.2<span class="w"> </span>uaa.service.cf.internal
+</span><span id="__span-16-41"><a id="__codelineno-16-41" name="__codelineno-16-41" href="#__codelineno-16-41"></a>dig<span class="w"> </span>@169.254.0.2<span class="w"> </span>cloud-controller.service.cf.internal
+</span><span id="__span-16-42"><a id="__codelineno-16-42" name="__codelineno-16-42" href="#__codelineno-16-42"></a>
+</span><span id="__span-16-43"><a id="__codelineno-16-43" name="__codelineno-16-43" href="#__codelineno-16-43"></a><span class="c1"># Check bosh-dns configuration files</span>
+</span><span id="__span-16-44"><a id="__codelineno-16-44" name="__codelineno-16-44" href="#__codelineno-16-44"></a>ls<span class="w"> </span>/var/vcap/jobs/bosh-dns/
+</span><span id="__span-16-45"><a id="__codelineno-16-45" name="__codelineno-16-45" href="#__codelineno-16-45"></a>cat<span class="w"> </span>/var/vcap/jobs/bosh-dns/config/bosh-dns.json
+</span><span id="__span-16-46"><a id="__codelineno-16-46" name="__codelineno-16-46" href="#__codelineno-16-46"></a>
+</span><span id="__span-16-47"><a id="__codelineno-16-47" name="__codelineno-16-47" href="#__codelineno-16-47"></a><span class="c1"># Check alias configuration</span>
+</span><span id="__span-16-48"><a id="__codelineno-16-48" name="__codelineno-16-48" href="#__codelineno-16-48"></a>ls<span class="w"> </span>/var/vcap/jobs/bosh-dns-aliases/<span class="w"> </span><span class="m">2</span>&gt;/dev/null<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-16-49"><a id="__codelineno-16-49" name="__codelineno-16-49" href="#__codelineno-16-49"></a><span class="w">  </span>ls<span class="w"> </span>/var/vcap/data/dns/aliases/
+</span><span id="__span-16-50"><a id="__codelineno-16-50" name="__codelineno-16-50" href="#__codelineno-16-50"></a>
+</span><span id="__span-16-51"><a id="__codelineno-16-51" name="__codelineno-16-51" href="#__codelineno-16-51"></a><span class="c1"># View bosh-dns logs</span>
+</span><span id="__span-16-52"><a id="__codelineno-16-52" name="__codelineno-16-52" href="#__codelineno-16-52"></a>sudo<span class="w"> </span>tail<span class="w"> </span>-f<span class="w"> </span>/var/vcap/sys/log/bosh-dns/bosh-dns.stdout.log
 </span></code></pre></div>
 <hr />
 <h2 id="production-checklist">Production Checklist<a class="headerlink" href="#production-checklist" title="Permanent link">&para;</a></h2>
@@ -5567,6 +5553,15 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li>What IP address does BOSH DNS listen on, and why is a link-local address used instead of <code>127.0.0.1</code>?</li>
+<li>You run <code>dig my-service.apps.internal</code> from inside a CF app container and receive <code>NXDOMAIN</code>. List two distinct causes you would check first and the command to verify each.</li>
+<li>An app resolves <code>my-service.apps.internal</code> and receives a valid IP, but <code>curl</code> to that IP on port 8080 times out. What is the most likely cause, and how do you fix it?</li>
+<li>How does CF's per-instance DNS record format (<code>0.my-service.apps.internal</code>) compare to StatefulSet pod DNS in Kubernetes, and in what scenario would you use it?</li>
+<li>A client app caches DNS responses for 5 minutes. After a <code>cf push</code> of the target service, the client experiences errors for up to 5 minutes. Explain the mechanism and the recommended remediation.</li>
+</ol>
 <hr />
 <h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <table>

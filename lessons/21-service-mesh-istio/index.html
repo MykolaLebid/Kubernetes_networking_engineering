@@ -5668,6 +5668,12 @@
 <td>PeerAuthentication PERMISSIVE during migration; switched to STRICT per namespace after sidecar coverage reached 100%</td>
 <td>Zero downtime migration; services coexisted with and without mTLS during the transition period</td>
 </tr>
+<tr>
+<td>Hospital EMR Platform (medtech)</td>
+<td>HIPAA ePHI encryption-in-transit requirement for internal service communication; PERMISSIVE mode failed a compliance audit when the auditor captured plaintext traffic between EMR microservices</td>
+<td>PeerAuthentication STRICT enforced per namespace; auditors verified mTLS using <code>istioctl authn tls-check</code> output showing STATUS OK + STRICT on all in-scope services</td>
+<td>Passed re-audit; all ePHI flows cryptographically protected in transit without application-layer code changes</td>
+</tr>
 </tbody>
 </table>
 <hr />

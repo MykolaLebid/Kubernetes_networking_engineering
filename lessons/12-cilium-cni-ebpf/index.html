@@ -5375,6 +5375,12 @@
 <td>kube-proxy replacement with eBPF, Hubble for observability, identity-based policy replacing IP rules</td>
 <td>50% reduction in networking CPU overhead; policy rules survive pod restarts without IP-based rule updates</td>
 </tr>
+<tr>
+<td>Hospital system (medtech)</td>
+<td>HIPAA-regulated EHR platform running PHI workloads on Kubernetes; strict pod isolation required</td>
+<td>CiliumNetworkPolicy for PHI namespace isolation; Hubble flow logs for compliance audit</td>
+<td>A misconfigured allow rule opened the PHI namespace to all pods in the cluster; Hubble flow logs surfaced the exposure after 6 hours, enabling targeted remediation before external data left the cluster</td>
+</tr>
 </tbody>
 </table>
 <hr />
@@ -5566,8 +5572,8 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Enable Hubble relay (<code>hubble.relay.enabled=true</code>) so flows are visible across all nodes</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Size the eBPF CT table for expected connection count (<code>bpf-ct-global-tcp-max</code>: default 512Ki)</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Tune <code>bpf.masquerade=true</code> to move masquerade off iptables once kube-proxy is replaced</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Deploy Tetragon alongside Cilium for runtime security audit of syscalls and file access</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Use <code>CiliumClusterwideNetworkPolicy</code> default-deny with <code>fromEntities: cluster</code> before cluster goes to production</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Deploy <a href="../35-tetragon-ebpf-runtime-security/">Tetragon</a> alongside Cilium for runtime security audit of syscalls and file access</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Use <code>CiliumClusterwideNetworkPolicy</code> default-deny with <code>fromEntities: cluster</code> before cluster goes to production — see <a href="23-network-policy-security.md">Lesson 23 — Network Policy and Security Hardening</a> for hardening patterns</li>
 </ul>
 <hr />
 <h2 id="common-anti-patterns">Common Anti-Patterns<a class="headerlink" href="#common-anti-patterns" title="Permanent link">&para;</a></h2>
@@ -5771,6 +5777,7 @@
 </tbody>
 </table>
 <hr />
+<p>See also: <a href="../35-tetragon-ebpf-runtime-security/">Lesson 35 — Tetragon</a> · <a href="../37-compliance-networking/">Lesson 37 — Compliance Networking</a></p>
 <p><strong>← Previous:</strong> <a href="../11-calico-cni-deep-dive/">Lesson 11 — Calico CNI Deep Dive</a>   |   <strong>Next:</strong> <a href="../13-kubernetes-services-kube-proxy/">Lesson 13 — Kubernetes Services and kube-proxy</a></p>
 
 

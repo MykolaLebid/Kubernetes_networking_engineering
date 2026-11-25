@@ -5573,6 +5573,12 @@
 <td>Custom IngressControllers with <code>namespaceOwnership: Strict</code></td>
 <td>Separate routers for cardholder and non-cardholder traffic with audit logging</td>
 </tr>
+<tr>
+<td>Banking (PCI-DSS payment portal)</td>
+<td>Blue-green route cutover during payment processing window</td>
+<td>HAProxy access logs + weighted <code>alternateBackends</code> route</td>
+<td>Old route remained bound for 2 minutes due to HAProxy TTL lag, sending 2% of transactions to the old version — detectable only via HAProxy access logs</td>
+</tr>
 </tbody>
 </table>
 <hr />
@@ -5625,72 +5631,7 @@
 </span><span id="__span-14-29"><a id="__codelineno-14-29" name="__codelineno-14-29" href="#__codelineno-14-29"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">'.items[] | select(.status.ingress[0].conditions[0].status != "True") | .metadata.name'</span>
 </span></code></pre></div>
 <h3 id="configuration-reference">Configuration Reference<a class="headerlink" href="#configuration-reference" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Parameter</th>
-<th>Default</th>
-<th>Effect</th>
-<th>When to change</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>spec.replicas</code></td>
-<td><code>2</code></td>
-<td>Number of HAProxy router pods</td>
-<td>Increase for high throughput</td>
-</tr>
-<tr>
-<td><code>spec.domain</code></td>
-<td>cluster install value</td>
-<td>Wildcard DNS base for auto-generated hostnames</td>
-<td>Set at install; changing disrupts all routes</td>
-</tr>
-<tr>
-<td><code>endpointPublishingStrategy.type</code></td>
-<td><code>LoadBalancerService</code></td>
-<td>How the router is exposed (LB, NodePort, HostNetwork)</td>
-<td>Use <code>HostNetwork</code> on bare metal</td>
-</tr>
-<tr>
-<td><code>tuningOptions.maxConnections</code></td>
-<td><code>50000</code></td>
-<td>HAProxy global maxconn</td>
-<td>Increase for high-connection workloads</td>
-</tr>
-<tr>
-<td><code>tuningOptions.threadCount</code></td>
-<td>auto</td>
-<td>HAProxy worker threads</td>
-<td>Set to vCPU count of infra nodes</td>
-</tr>
-<tr>
-<td><code>httpHeaders.forwardedHeaderPolicy</code></td>
-<td><code>Append</code></td>
-<td>Handling of <code>X-Forwarded-For</code></td>
-<td>Set <code>Replace</code> if upstream proxy already sets it</td>
-</tr>
-<tr>
-<td><code>logging.access.destination.type</code></td>
-<td><code>Container</code></td>
-<td>Access log destination</td>
-<td>Use <code>Syslog</code> for centralized logging</td>
-</tr>
-<tr>
-<td><code>routeAdmission.wildcardPolicy</code></td>
-<td><code>WildcardsDisallowed</code></td>
-<td>Whether <code>*.example.com</code> routes are accepted</td>
-<td>Set <code>WildcardsAllowed</code> for multi-tenant platforms</td>
-</tr>
-<tr>
-<td><code>routeAdmission.namespaceOwnership</code></td>
-<td><code>InterNamespaceAllowed</code></td>
-<td>Whether routes can claim hostnames across namespaces</td>
-<td>Set <code>Strict</code> for tenant isolation</td>
-</tr>
-</tbody>
-</table>
+<p>See IngressController Configuration Reference in Theory Section 4 above.</p>
 <hr />
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <table>

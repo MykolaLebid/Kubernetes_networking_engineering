@@ -5433,6 +5433,12 @@
 <td>Custom CoreDNS stub zones forwarding <code>internal.cloudflare.com</code> to internal resolvers</td>
 <td>Zero DNS leakage of internal service names to public Internet; deterministic corporate name resolution</td>
 </tr>
+<tr>
+<td>PCI-DSS payment processor</td>
+<td>High-volume checkout pipeline requiring sub-100ms end-to-end latency</td>
+<td><code>ndots:5</code> caused 6 DNS queries per transaction at peak load; switched to <code>ndots:1</code> + FQDNs for all external payment gateway hostnames</td>
+<td>DNS overhead dropped from 300ms to 8ms per checkout; zero change to application code required</td>
+</tr>
 </tbody>
 </table>
 <hr />
@@ -5495,66 +5501,7 @@
 </span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>kubectl<span class="w"> </span>get<span class="w"> </span>pods<span class="w"> </span>-n<span class="w"> </span>kube-system<span class="w"> </span>-l<span class="w"> </span>k8s-app<span class="o">=</span>kube-dns<span class="w"> </span>-o<span class="w"> </span>wide
 </span></code></pre></div>
 <h3 id="configuration-reference">Configuration Reference<a class="headerlink" href="#configuration-reference" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Corefile Directive</th>
-<th>Default</th>
-<th>Effect</th>
-<th>When to Change</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>cache &lt;ttl&gt;</code></td>
-<td>30 s</td>
-<td>TTL for positive DNS responses</td>
-<td>Increase to 300 s for stable external names; lower for rapid DNS changes</td>
-</tr>
-<tr>
-<td><code>cache denial &lt;ttl&gt;</code></td>
-<td>5 s</td>
-<td>TTL for NXDOMAIN responses</td>
-<td>Raise to 30 s to reduce negative-query flood from bad hostnames</td>
-</tr>
-<tr>
-<td><code>forward . &lt;addr&gt;</code></td>
-<td>Node <code>/etc/resolv.conf</code></td>
-<td>Upstream DNS server</td>
-<td>Point to corporate resolver or Route53 for split-horizon DNS</td>
-</tr>
-<tr>
-<td><code>autopath @kubernetes</code></td>
-<td>disabled</td>
-<td>Collapses search-list into one query</td>
-<td>Enable to eliminate ndots:5 latency without changing pod dnsConfig</td>
-</tr>
-<tr>
-<td><code>max_concurrent &lt;n&gt;</code></td>
-<td>unlimited</td>
-<td>Cap inflight upstream queries</td>
-<td>Set 1000 to prevent amplification during DNS storms</td>
-</tr>
-<tr>
-<td><code>reload</code></td>
-<td>30 s</td>
-<td>Corefile hot-reload interval</td>
-<td>Lower in dev; remove in production for predictable config changes</td>
-</tr>
-<tr>
-<td>Pod <code>ndots: "1"</code></td>
-<td>"5"</td>
-<td>Dots threshold for search expansion</td>
-<td>Set to "1" for pods making many external calls; eliminates 3 wasted queries</td>
-</tr>
-<tr>
-<td>NodeLocal DNSCache</td>
-<td>disabled</td>
-<td>Per-node cache on <code>169.254.20.10</code></td>
-<td>Always deploy in production — eliminates conntrack UDP race conditions</td>
-</tr>
-</tbody>
-</table>
+<p>See Corefile parameter reference in Theory Section 3 above.</p>
 <hr />
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <table>

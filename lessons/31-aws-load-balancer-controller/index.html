@@ -5350,6 +5350,12 @@
 <td>WAFv2 ACL attached to ALB via annotation</td>
 <td>Blocked 95% of bot traffic on checkout endpoints without code changes</td>
 </tr>
+<tr>
+<td>Regional bank (PCI-DSS)</td>
+<td>Cardholder data boundary enforcement</td>
+<td>WAFv2 on ALB for PCI-DSS scope; missing <code>wafv2.amazonaws.com</code> VPC endpoint caused WAF rule updates to fail silently</td>
+<td>Outdated ruleset remained active for 48 hours; fix: add Interface VPC endpoint for <code>wafv2.amazonaws.com</code> in private subnets</td>
+</tr>
 </tbody>
 </table>
 <hr />

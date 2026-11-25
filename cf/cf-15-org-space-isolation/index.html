@@ -3591,6 +3591,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5240,6 +5251,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5289,8 +5311,10 @@
 <h1 id="cf-15-orgspace-isolation-and-multi-tenancy-networking">CF-15: Org/Space Isolation and Multi-Tenancy Networking<a class="headerlink" href="#cf-15-orgspace-isolation-and-multi-tenancy-networking" title="Permanent link">&para;</a></h1>
 <p><strong>Track:</strong> CF-D — Multi-Tenancy and Isolation
 <strong>Prerequisites:</strong> CF-01 (Architecture Overview), CF-07 (ASGs), CF-13 (C2C Network Policies)</p>
+<p><strong>Jump to:</strong> <a href="#quick-read-10-min">Quick Read</a> · <a href="#deep-dive">Deep Dive</a> · <a href="#6-troubleshooting">Troubleshooting</a> · <a href="#quick-reference">Quick Reference</a></p>
 <hr />
 <h2 id="quick-read-10-min">Quick Read (10 min)<a class="headerlink" href="#quick-read-10-min" title="Permanent link">&para;</a></h2>
+<p>After this lesson you will be able to: explain how CF enforces multi-tenant isolation across the routing, network, and policy layers simultaneously, and diagnose isolation failures using cf CLI and Diego Cell iptables commands.</p>
 <p><strong>Core mental model:</strong> CF multi-tenancy is enforced at three layers simultaneously — routing (Gorouter), network (Silk/iptables), and policy (ASGs + C2C). Orgs own quota. Spaces own network policy scope. Apps live in spaces and get isolated container networks by default.</p>
 <p><strong>Key facts:</strong></p>
 <ul>
@@ -5642,12 +5666,13 @@
 <h2 id="4-c2c-policies-and-cross-space-traffic">4. C2C Policies and Cross-Space Traffic<a class="headerlink" href="#4-c2c-policies-and-cross-space-traffic" title="Permanent link">&para;</a></h2>
 <p>C2C (container-to-container) networking uses app GUIDs as policy identifiers. A GUID is stable across <code>cf push</code> cycles, so a policy added today survives tomorrow's deployment without manual update.</p>
 <h3 id="how-c2c-traverses-the-vxlan-overlay">How C2C traverses the VXLAN overlay<a class="headerlink" href="#how-c2c-traverses-the-vxlan-overlay" title="Permanent link">&para;</a></h3>
+<p>Consider a fintech platform where the <code>payment-api</code> app (Space: <code>pci-cde</code>, <code>10.255.1.10</code>) must call the <code>fraud-scoring</code> service (Space: <code>fraud-detection</code>, <code>10.255.2.10</code>) without exposing either service to the public internet. By default Silk drops all C2C traffic, so the connection is blocked even though both apps are in the same CF org. A single cross-space C2C policy is the only control that opens the conduit — no load balancer, no Gorouter hop, and no SNAT in the path.</p>
 <ol>
-<li>App 1 (Space A, <code>10.255.1.10</code>) sends a packet destined for App 2 (Space B, <code>10.255.2.10</code>)</li>
+<li><code>payment-api</code> (Space: <code>pci-cde</code>, <code>10.255.1.10</code>) sends a packet destined for <code>fraud-scoring</code> (Space: <code>fraud-detection</code>, <code>10.255.2.10</code>)</li>
 <li>The packet hits the iptables FORWARD chain on Diego Cell 1</li>
 <li>The VXLAN Policy Agent has pre-populated iptables rules derived from stored policies; if <code>10.255.1.10 → 10.255.2.10 tcp:8080</code> is allowed, the packet proceeds</li>
 <li>The packet is VXLAN-encapsulated and sent to Diego Cell 2's underlay IP on UDP 4789</li>
-<li>Diego Cell 2 decapsulates and delivers to App 2's container network namespace</li>
+<li>Diego Cell 2 decapsulates and delivers to <code>fraud-scoring</code>'s container network namespace</li>
 <li>If no policy exists, iptables silently DROPs the packet — no ICMP unreachable is generated</li>
 </ol>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Terminal 1 — create a C2C policy between apps in different spaces</span>
@@ -6142,6 +6167,15 @@
 <blockquote>
 <p><strong>Full compliance mapping:</strong> See <a href="../cf-21-compliance-networking/">CF-21 — Compliance Networking</a> for the complete control matrix with CF CLI commands as auditor evidence for each framework.</p>
 </blockquote>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li>A CF Org is described as a "quota boundary, not a network boundary." What does this mean in practice — specifically, what network-level communication is NOT blocked between containers in two different orgs on the same Diego Cell?</li>
+<li>You bind a space-scoped ASG to <code>space-a</code> that opens TCP port 5432 to <code>10.0.0.0/8</code>. An app in <code>space-b</code> on the same platform tries to reach the same database and times out. What is the reason, and what is the correct fix?</li>
+<li>A C2C policy between <code>payment-api</code> and <code>fraud-scoring</code> exists, <code>dig fraud-scoring.apps.internal</code> returns the correct overlay IP, but <code>curl</code> from inside <code>payment-api</code> still hangs with no RST. Walk through the two most likely causes and the diagnostic command for each.</li>
+<li>Two teams in different spaces both map <code>my-service.apps.example.com</code> in the shared domain. What traffic behavior results, and what is the CF-native mechanism to prevent this conflict?</li>
+<li>The VXLAN Policy Agent polls the Policy Server every 5 seconds. After you run <code>cf add-network-policy</code>, how can you confirm on the Diego Cell that the iptables FORWARD chain has actually been updated for the new policy?</li>
+</ol>
 <hr />
 <h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <p><strong>Related K8s lessons in this course:</strong></p>

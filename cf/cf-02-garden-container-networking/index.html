@@ -2876,6 +2876,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4928,6 +4939,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4978,8 +5000,10 @@
 <p><strong>Track:</strong> CF-A — Foundation<br />
 <strong>Prerequisite:</strong> CF-01 (Diego Architecture) or equivalent<br />
 <strong>Companion K8s lessons:</strong> Lesson 07 — CNI Deep Dive, Lesson 08 — Pod Networking Internals</p>
+<p><strong>Jump to:</strong> <a href="#quick-read-10-min">Quick Read</a> · <a href="#deep-dive">Deep Dive</a> · <a href="#practice-setup">Practice Setup</a> · <a href="#4-troubleshooting-garden-and-silk-networking">Troubleshooting</a> · <a href="#quick-reference">Quick Reference</a></p>
 <hr />
 <h2 id="quick-read-10-min">Quick Read (10 min)<a class="headerlink" href="#quick-read-10-min" title="Permanent link">&para;</a></h2>
+<p>After this lesson you will be able to: explain how Garden constructs container network namespaces using Silk CNI, and diagnose the four most common container networking failures on a Diego Cell.</p>
 <p><strong>What Garden is:</strong> CF's container runtime — a wrapper around runc + containerd that adds CF-specific lifecycle management, resource limits, and network namespace wiring. Every <code>cf push</code> creates one or more Garden containers per instance.</p>
 <p><strong>Key mental model:</strong></p>
 <ul>
@@ -5414,7 +5438,7 @@
 <p><strong>Common causes:</strong></p>
 <ul>
 <li>IaaS security group blocking UDP 4789 between Diego Cells</li>
-<li>MTU mismatch causing fragmentation (Silk MTU not accounting for encapsulation overhead)</li>
+<li>MTU mismatch causing fragmentation (Silk MTU not accounting for encapsulation overhead). In a PCI-DSS cardholder data environment, MTU fragmentation is a recurring audit finding: a misconfigured Silk MTU can cause TCP sessions carrying card-present transaction data to silently drop, breaking the payment flow in ways that are difficult to attribute without packet-level evidence from <code>tcpdump</code> on the VTEP interface.</li>
 <li>Silk daemon on one cell has stale FDB entries — restart silk-daemon</li>
 <li>Underlay network asymmetric routing causing VXLAN packets to drop</li>
 </ul>
@@ -5538,6 +5562,15 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li>A Garden container on a Diego Cell with a /24 subnet has been assigned IP <code>10.255.7.45</code>. What is the IP of the bridge gateway for that container, and how many containers can share the same cell before the subnet is exhausted?</li>
+<li>After running <code>cf add-network-policy app-a --destination-app app-b --port 9000 --protocol tcp</code>, app-a still cannot reach app-b. You confirm the policy appears in <code>cf network-policies</code>. What two components would you check on the Diego Cell, and what log file would you inspect first?</li>
+<li>Silk VXLAN encapsulation adds 50 bytes of overhead. If the IaaS underlay MTU is 1500 bytes and the Silk container MTU is left at 1500, what failure symptom would you observe and which command inside a container confirms the misconfiguration?</li>
+<li>A new app instance crashes immediately with "container failed to start". The Silk daemon is running and the CNI log shows no errors, but <code>ip addr show | grep 10.255 | wc -l</code> returns 255 on the Diego Cell. What is the most likely cause and what is the remediation?</li>
+<li>An ASG named <code>allow-db</code> permits TCP port 5432 to <code>203.0.113.0/24</code>. An app bound to that ASG still cannot reach a PostgreSQL instance at <code>203.0.113.10</code>. Name two distinct causes unrelated to the ASG rules themselves that you would rule out first using <code>cf ssh</code>.</li>
+</ol>
 <hr />
 <h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <p><strong>Kubernetes lessons in this course that map to CF concepts covered here:</strong></p>

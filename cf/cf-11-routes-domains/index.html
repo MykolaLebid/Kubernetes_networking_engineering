@@ -3307,6 +3307,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5037,6 +5048,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5097,8 +5119,10 @@
 <h1 id="cf-11-routes-domains-and-route-services">CF-11: Routes, Domains, and Route Services<a class="headerlink" href="#cf-11-routes-domains-and-route-services" title="Permanent link">&para;</a></h1>
 <p><strong>Track:</strong> CF-C — Cloud Foundry Application Networking
 <strong>Prerequisites:</strong> CF-09 (Gorouter Internals), CF-10 (TCP Routing)</p>
+<p><strong>Jump to:</strong> <a href="#quick-read-10-min">Quick Read</a> · <a href="#deep-dive">Deep Dive</a> · <a href="#4-troubleshooting-routes-and-domains">Troubleshooting</a> · <a href="#quick-reference">Quick Reference</a></p>
 <hr />
 <h2 id="quick-read-10-min">Quick Read (10 min)<a class="headerlink" href="#quick-read-10-min" title="Permanent link">&para;</a></h2>
+<p>After this lesson you will be able to: map and unmap routes across shared and private domains, bind route services to intercept traffic for auth or rate-limiting, and diagnose the five most common Gorouter routing failures including stale TTL and route conflicts.</p>
 <p><strong>Core mental model:</strong> In CF, a route is a DNS name + optional path that maps to one or more app instances. Domains are the namespace from which routes are carved. Route services intercept traffic before it reaches the app.</p>
 <p><strong>Essential facts:</strong></p>
 <ul>
@@ -5112,7 +5136,7 @@
 <p><strong>What breaks most often:</strong></p>
 <ol>
 <li><code>404</code> — route unmapped or Gorouter table stale (wait up to 2 min or push again).</li>
-<li><code>502</code> — backend app crashed; route still registered for 2 min after crash.</li>
+<li><code>502</code> — backend app crashed; route still registered for 2 min after crash. In regulated banking environments running payment APIs on CF, a 2-minute window of <code>502</code> responses after an unplanned crash can breach SLA thresholds and trigger incident escalation; always pair <code>cf unmap-route</code> with pre-stop hooks in production.</li>
 <li>Route conflict — another org/space owns the same hostname on a shared domain.</li>
 </ol>
 <p><strong>Mermaid — Route Resolution Path:</strong></p>
@@ -5588,6 +5612,15 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li>What is the maximum time a route entry can remain in the Gorouter table after a backend app crashes, and what HTTP status code will clients see during that window?</li>
+<li>A developer reports that <code>myapp.apps.example.com</code> returns <code>404</code> immediately after a <code>cf push</code>. List the two most likely causes and the commands you would run to confirm each.</li>
+<li>You need to send 10% of traffic to a canary version of an app while keeping 90% on the stable version. Which CF API resource and which CLI or <code>cf curl</code> commands support this, and what is the valid weight range?</li>
+<li>Explain the purpose of the <code>X-CF-Proxy-Signature</code> header. What attack does it prevent, and what log message would you search for on the Gorouter VM to detect a failure?</li>
+<li>What is the difference between a shared domain and a private domain in CF, and which role (platform admin vs. org manager) is responsible for creating each?</li>
+</ol>
 <hr />
 <h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <p><strong>Related CF lessons:</strong></p>

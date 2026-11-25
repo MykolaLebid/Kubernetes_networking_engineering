@@ -5640,6 +5640,12 @@
 <td>ArgoCD selfHeal=true on all NetworkPolicy resources</td>
 <td>Automated revert of any manual NetworkPolicy changes within 3 minutes</td>
 </tr>
+<tr>
+<td>Banking (tax-season rollout)</td>
+<td>Missing sync-wave annotation on payment API stack</td>
+<td>Sync waves for Ingress/NetworkPolicy ordering</td>
+<td>Ingress was created before the NetworkPolicy, exposing the payment API for ~90 seconds until ArgoCD reverted on the next reconcile cycle; root cause traced to absent <code>argocd.argoproj.io/sync-wave</code> annotation on the NetworkPolicy</td>
+</tr>
 </tbody>
 </table>
 <hr />

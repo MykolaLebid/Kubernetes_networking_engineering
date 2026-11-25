@@ -5477,6 +5477,12 @@
 <td>CNI chaining, NetworkAttachmentDefinition CRD, delegates ADD to multiple plugins per pod</td>
 <td>Telco workloads get separate management, data, and control-plane interfaces from a single CNI framework</td>
 </tr>
+<tr>
+<td>Big-tech e-commerce (EKS)</td>
+<td>IPAM exhaustion during a Black Friday EKS scale-out caused 400 pods stuck in ContainerCreating for 8 minutes until WARM_IP_TARGET was raised from 2 to 10</td>
+<td>aws-vpc-cni IPAM warm pool, EC2 ENI secondary IP pre-provisioning, WARM_IP_TARGET tuning</td>
+<td>Raising WARM_IP_TARGET eliminated the ENI allocation bottleneck; pods reached Running state within seconds of scheduling during subsequent traffic spikes</td>
+</tr>
 </tbody>
 </table>
 <hr />

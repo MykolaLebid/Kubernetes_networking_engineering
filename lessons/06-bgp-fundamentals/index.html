@@ -5608,6 +5608,12 @@
 <td>BGP service advertisement + BGP community + ECMP multipath</td>
 <td>Bare-metal clusters get external IP reachability identical to cloud load balancers without cloud dependency</td>
 </tr>
+<tr>
+<td>Banking / PCI-DSS (bare-metal payment cluster)</td>
+<td>PCI-DSS environment: BGP session dropped during scheduled maintenance because MD5 password was rotated on the ToR switch but not updated in Calico BGPPeer — payment API unreachable for 4 minutes</td>
+<td>BGP MD5 TCP authentication + BGPPeer <code>password</code> field</td>
+<td>Ops runbook updated to rotate MD5 credentials atomically (switch + BGPPeer manifest in the same change window); monitoring alert added for any BGP session leaving <code>Established</code></td>
+</tr>
 </tbody>
 </table>
 <hr />

@@ -5544,6 +5544,7 @@
 </span><span id="__span-8-20"><a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a><span class="w">          </span><span class="nt">matchActions</span><span class="p">:</span>
 </span><span id="__span-8-21"><a id="__codelineno-8-21" name="__codelineno-8-21" href="#__codelineno-8-21"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Sigkill</span><span class="w">   </span><span class="c1"># kill the process</span>
 </span></code></pre></div>
+<p>For production TracingPolicy authoring, see <a href="../35-tetragon-ebpf-runtime-security/">Lesson 35 — Tetragon: eBPF Runtime Security</a>.</p>
 <hr />
 <h2 id="8-bpftool-essential-debug-tool">8. bpftool — Essential Debug Tool<a class="headerlink" href="#8-bpftool-essential-debug-tool" title="Permanent link">&para;</a></h2>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># List all loaded programs</span>
@@ -5632,6 +5633,12 @@
 <td>Uses eBPF-based profiling tools in production to identify hot paths in microservices</td>
 <td>kprobe/tracepoint hooks, BPF_MAP_TYPE_PERF_EVENT_ARRAY for event streaming, bpftrace</td>
 <td>Continuous flamegraph profiling with &lt;1% CPU overhead; replaced heavyweight Java profiling agents</td>
+</tr>
+<tr>
+<td>Banking (PCI-DSS)</td>
+<td>Enforces PCI-DSS network segmentation across a high-volume transaction platform</td>
+<td>Cilium identity-based eBPF policy at TC hook layer, replacing kernel iptables rules</td>
+<td>Replaced 50,000 iptables rules with identity-based eBPF policy; kube-proxy CPU dropped from 12% to 0.3% under peak transaction load</td>
 </tr>
 </tbody>
 </table>
@@ -6019,6 +6026,7 @@
 </table>
 <hr />
 <p><strong>← Previous:</strong> <a href="../09-cni-specification/">Lesson 09 — CNI Specification and Plugin Architecture</a>   |   <strong>Next:</strong> <a href="../11-calico-cni-deep-dive/">Lesson 11 — Calico CNI Deep Dive</a></p>
+<p><strong>Forward links:</strong> <a href="../11-calico-cni-deep-dive/">Lesson 11 — Calico CNI Deep Dive</a> · <a href="12-cilium-cni-deep-dive.md">Lesson 12 — Cilium CNI Deep Dive</a></p>
 
 
 

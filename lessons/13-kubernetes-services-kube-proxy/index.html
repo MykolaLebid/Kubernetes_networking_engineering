@@ -5609,6 +5609,12 @@
 <td><code>trafficDistribution: PreferClose</code> with zone-aware topology constraints</td>
 <td>Reduced cross-AZ data transfer costs; improved p99 service latency for regional users</td>
 </tr>
+<tr>
+<td>Hospital EHR platform (medtech)</td>
+<td>HIPAA-regulated EHR system requiring real client IPs in audit logs</td>
+<td><code>externalTrafficPolicy: Local</code> on LoadBalancer service to suppress SNAT and preserve source IPs</td>
+<td>Node failure caused the cloud LB to route traffic to nodes with no local pods; 30% of requests dropped for 90 seconds until LB health checks removed the unhealthy nodes — highlighting the need to configure kube-proxy health port 10256 as the LB health check endpoint</td>
+</tr>
 </tbody>
 </table>
 <hr />

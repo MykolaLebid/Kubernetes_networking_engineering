@@ -3738,6 +3738,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5050,6 +5061,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5100,8 +5122,10 @@
 <p><strong>Track:</strong> CF-F — Migration and Interoperability
 <strong>Prerequisites:</strong> CF-05 (Silk CNI), CF-06 (VXLAN Policy Agent), CF-07 (ASGs), CF-09 (Gorouter), CF-10 (TCP Router), CF-13 (C2C Policies), CF-18 (Korifi)
 <strong>Time:</strong> Quick Read 10 min | Deep Dive 60-90 min</p>
+<p><strong>Jump to:</strong> <a href="#quick-read-10-min">Quick Read</a> · <a href="#deep-dive">Deep Dive</a> · <a href="#4-troubleshooting-migration-issues">Troubleshooting</a> · <a href="#quick-reference">Quick Reference</a></p>
 <hr />
 <h2 id="quick-read-10-min">Quick Read (10 min)<a class="headerlink" href="#quick-read-10-min" title="Permanent link">&para;</a></h2>
+<p>After this lesson you will be able to: map every CF networking primitive (Gorouter, ASGs, C2C policies, BOSH DNS, Silk VXLAN) to its explicit Kubernetes equivalent, and execute an incremental CF-to-K8s migration using the Strangler Fig traffic-split pattern without breaking connectivity.</p>
 <p><strong>Core idea:</strong> Migrating from CF to Kubernetes means making every networking decision CF made <em>invisibly</em> on your behalf into <em>explicit</em> YAML. The Strangler Fig pattern lets you do this incrementally — CF and K8s run side by side, with traffic gradually shifting.</p>
 <p><strong>The five CF networking primitives and their K8s equivalents:</strong></p>
 <ul>
@@ -6085,6 +6109,7 @@
 <h3 id="44-mtu-induced-packet-loss-large-requests-fail">4.4 MTU-Induced Packet Loss (Large Requests Fail)<a class="headerlink" href="#44-mtu-induced-packet-loss-large-requests-fail" title="Permanent link">&para;</a></h3>
 <p><strong>Symptom:</strong> Small requests succeed. Large file uploads, SQL result sets, or bulk API responses fail silently or with connection reset. No application-level error.</p>
 <p><strong>Cause:</strong> Pod MTU in K8s does not match the value Silk used. Packets above MSS are fragmented or silently dropped.</p>
+<p>In medtech migrations running HL7 FHIR bulk-export payloads (routinely 2-10 MB per batch), an MTU miscalculation caused intermittent TCP resets that only appeared under load — patient data exports appeared to succeed but truncated silently, a silent data-integrity risk that only surfaced during end-to-end validation testing.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="c1"># Diagnose: test MTU with ping (DF = don't fragment bit)</span>
 </span><span id="__span-36-2"><a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>migration-space<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-it<span class="w"> </span>deployment/frontend<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-36-3"><a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a><span class="w">  </span>ping<span class="w"> </span>-M<span class="w"> </span><span class="k">do</span><span class="w"> </span>-s<span class="w"> </span><span class="m">1400</span><span class="w"> </span><span class="m">10</span>.10.20.5
@@ -6290,6 +6315,25 @@
 </span><span id="__span-41-6"><a id="__codelineno-41-6" name="__codelineno-41-6" href="#__codelineno-41-6"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>kube-system<span class="w"> </span>logs<span class="w"> </span>-l<span class="w"> </span>k8s-app<span class="o">=</span>kube-dns<span class="w">      </span><span class="c1"># CoreDNS logs</span>
 </span><span id="__span-41-7"><a id="__codelineno-41-7" name="__codelineno-41-7" href="#__codelineno-41-7"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>kube-system<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ds/cilium<span class="w"> </span>--<span class="w"> </span>cilium<span class="w"> </span>policy<span class="w"> </span>get<span class="w">  </span><span class="c1"># Cilium policy state</span>
 </span></code></pre></div>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li>
+<p>CF ships with <code>public_networks</code> and <code>dns</code> ASGs that allow internet access by default. When you migrate to Kubernetes and apply any egress NetworkPolicy to a namespace, what happens to traffic that is not explicitly covered by a rule, and what must you create first to replicate CF's security model?</p>
+</li>
+<li>
+<p>A CF C2C policy is defined between <code>frontend</code> (source) and <code>backend-api</code> (destination) on TCP port 8080. After translation, the K8s NetworkPolicy exists but service-to-service traffic is still blocked. What is the most likely cause, and which <code>kubectl</code> command lets you verify it?</p>
+</li>
+<li>
+<p>Your migrated app calls <code>backend-api.apps.internal</code> and receives NXDOMAIN in K8s. Describe two remediation options and explain the operational trade-off between them.</p>
+</li>
+<li>
+<p>During the Strangler Fig traffic split, you have 20% of traffic going to K8s and 80% to CF Gorouter. A stateful Java app using JSESSIONID starts returning session errors for the K8s-routed 20%. What is missing and how do you fix it?</p>
+</li>
+<li>
+<p>Silk VTEP on a Diego Cell reports <code>mtu 1410</code>. After migrating to Cilium on GCP nodes (underlay MTU 1460), large SQL result sets fail silently. What CNI ConfigMap value must you set, and how do you confirm the new MTU is applied inside a running pod?</p>
+</li>
+</ol>
 <hr />
 <h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <ul>

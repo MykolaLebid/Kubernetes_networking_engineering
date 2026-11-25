@@ -3495,6 +3495,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5160,6 +5171,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5208,8 +5230,10 @@
 
 <h1 id="cf-network-policies-c2c-security-model">CF Network Policies — C2C Security Model<a class="headerlink" href="#cf-network-policies-c2c-security-model" title="Permanent link">&para;</a></h1>
 <p><strong>Track:</strong> CF-D | <strong>Lesson:</strong> 13 | <strong>Duration:</strong> 45 min (Deep Dive) / 10 min (Quick Read)</p>
+<p><strong>Jump to:</strong> <a href="#quick-read-10-min">Quick Read</a> · <a href="#deep-dive">Deep Dive</a> · <a href="#4-troubleshooting">Troubleshooting</a> · <a href="#quick-reference">Quick Reference</a></p>
 <hr />
 <h2 id="quick-read-10-min">Quick Read (10 min)<a class="headerlink" href="#quick-read-10-min" title="Permanent link">&para;</a></h2>
+<p>After this lesson you will be able to: explain how CF enforces container-to-container isolation with default-deny iptables rules, and create, inspect, and remove network policies using the cf CLI and BOSH SSH tools.</p>
 <p><strong>What this lesson covers:</strong> How Cloud Foundry implements container-to-container (C2C) networking with a default-deny security model enforced by iptables and the VXLAN Policy Agent.</p>
 <h3 id="core-mental-model">Core Mental Model<a class="headerlink" href="#core-mental-model" title="Permanent link">&para;</a></h3>
 <ul>
@@ -5506,11 +5530,11 @@
 <hr />
 <h2 id="3-advanced-c2c-patterns">3. Advanced C2C Patterns<a class="headerlink" href="#3-advanced-c2c-patterns" title="Permanent link">&para;</a></h2>
 <h3 id="microservice-mesh-without-a-service-mesh">Microservice Mesh Without a Service Mesh<a class="headerlink" href="#microservice-mesh-without-a-service-mesh" title="Permanent link">&para;</a></h3>
-<p>For a 3-tier app (frontend → API → database), you need explicit policies at each hop:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Frontend can reach API</span>
+<p>In a PCI-DSS-compliant banking deployment, strict tier isolation is a hard requirement: the card-data environment (CDE) must be segmented from the web tier, and the web tier must have no direct path to the database. CF network policies enforce this topology explicitly — a misconfigured or missing policy generates a DROP at the iptables level, providing an auditable control boundary that satisfies PCI-DSS Requirement 1 (network segmentation).</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Frontend (web tier) can reach the payment API (CDE boundary)</span>
 </span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>cf<span class="w"> </span>add-network-policy<span class="w"> </span>frontend<span class="w"> </span>--destination-app<span class="w"> </span>api-service<span class="w"> </span>--port<span class="w"> </span><span class="m">8080</span><span class="w"> </span>--protocol<span class="w"> </span>tcp
 </span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># API can reach database</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># Payment API can reach the database proxy (CDE internal)</span>
 </span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>cf<span class="w"> </span>add-network-policy<span class="w"> </span>api-service<span class="w"> </span>--destination-app<span class="w"> </span>postgres-proxy<span class="w"> </span>--port<span class="w"> </span><span class="m">5432</span><span class="w"> </span>--protocol<span class="w"> </span>tcp
 </span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>
 </span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="c1"># Database cannot reach anything (no policies from db)</span>
@@ -5787,6 +5811,25 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li>
+<p>By default, can two apps in the same CF space communicate over C2C without any network policy? Explain which iptables chain enforces this restriction and on which component it runs.</p>
+</li>
+<li>
+<p>A network policy is created with <code>cf add-network-policy</code>. After what maximum delay will the policy be active on all Diego Cells, and which component is responsible for translating the policy into iptables rules?</p>
+</li>
+<li>
+<p>You push a new version of <code>app-b</code> with <code>cf push</code>. Does the existing network policy from <code>app-a</code> to <code>app-b</code> break? Explain why or why not, referencing how CF identifies the destination app in a policy.</p>
+</li>
+<li>
+<p>A developer reports that <code>curl http://app-b.apps.internal:8080</code> from inside <code>app-a</code> returns "Could not resolve host", but <code>curl http://10.255.2.7:8080</code> works. What component is likely failing, and what is the first diagnostic command you would run?</p>
+</li>
+<li>
+<p>In a Korifi deployment, what Kubernetes resource type replaces a CF network policy, and in which namespace does that resource appear?</p>
+</li>
+</ol>
 <hr />
 <h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <p>These Kubernetes lessons cover the same concepts at the K8s layer:</p>

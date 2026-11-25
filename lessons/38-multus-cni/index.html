@@ -4858,7 +4858,7 @@
 </tr>
 <tr>
 <td><strong>Telco CNFs (5G UPF, vRouter)</strong></td>
-<td>User-plane and control-plane traffic must be separated; DPDK requires dedicated NIC</td>
+<td>User-plane and control-plane traffic must be separated; DPDK (Data Plane Development Kit — bypass kernel networking for line-rate packet processing) requires dedicated NIC</td>
 <td><code>eth0</code> (management) + <code>net1</code> (N3/N6 user-plane) + <code>net2</code> (N4 control)</td>
 </tr>
 <tr>
@@ -4977,6 +4977,7 @@
 <div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>NCCL_SOCKET_IFNAME=net1
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>NCCL_IB_HCA=mlx5_0        # Mellanox HCA on net1
 </span></code></pre></div></p>
+<p>See <a href="../34-ai-platform-networking/">Lesson 34 — AI Platform Networking</a> for SR-IOV device plugin setup and rail topology.</p>
 <hr />
 <h2 id="5-use-case-industrial-edge-otit-separation">5. Use Case: Industrial Edge (OT/IT Separation)<a class="headerlink" href="#5-use-case-industrial-edge-otit-separation" title="Permanent link">&para;</a></h2>
 <pre class="mermaid"><code>flowchart LR
@@ -4994,7 +4995,7 @@
     E0b &lt;--&gt;|"K8s control, pod scheduling"| ITNet
     N1b &lt;--&gt;|"MQTT :1883, OPC-UA :4840"| OTNet
     ITNet -.-&gt;|"firewall: blocked"| OTNet</code></pre>
-<p>This isolates OT traffic completely from the K8s overlay — no CNI policy or iptables rule can accidentally bridge them, because they are on physically separate network paths.</p>
+<p>This isolates OT traffic completely from the K8s overlay — no CNI policy or iptables rule can accidentally bridge them, because they are on physically separate network paths. See <a href="../36-kubeedge-industrial-edge-networking/">Lesson 36 — KubeEdge</a> for the full IEC 62443 zone model.</p>
 <hr />
 <h2 id="practice">Practice<a class="headerlink" href="#practice" title="Permanent link">&para;</a></h2>
 <h3 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h3>
@@ -5227,6 +5228,11 @@
 <td>SR-IOV not enabled in BIOS or VF count not set</td>
 <td><code>echo 8 &gt; /sys/class/net/ens2f0/device/sriov_numvfs</code> on node; check BIOS SR-IOV setting</td>
 </tr>
+<tr>
+<td>Medtech: OT device-bus traffic leaking onto hospital IT network, audit trail for device commands invalidated (FDA 21 CFR Part 11)</td>
+<td>NAD <code>master</code> interface set to the shared K8s NIC (<code>eth0</code>) instead of the isolated OT VLAN interface — medical device gateway pod mixes device-bus (<code>net1</code>) and hospital IT on the same physical link</td>
+<td>Set NAD <code>master</code> to the dedicated OT VLAN interface (e.g. <code>eth1</code>) that is physically isolated; verify with <code>ip link show</code> on the node and test OT/IT path separation before deployment</td>
+</tr>
 </tbody>
 </table>
 <hr />
@@ -5236,7 +5242,7 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> NetworkAttachmentDefinitions are namespace-scoped — create them in every namespace that needs them</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Parent interface name (<code>master</code>) in NAD config matches actual node interface name</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> SR-IOV VF count configured via node feature discovery or operator — not manually</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> IPAM ranges per NAD do not overlap between nodes (use <code>whereabouts</code> for cluster-wide IPAM instead of <code>host-local</code>)</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> IPAM (IP Address Management) ranges per NAD do not overlap between nodes (use <code>whereabouts</code> for cluster-wide IPAM instead of <code>host-local</code>)</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> GPU training pods set <code>NCCL_SOCKET_IFNAME</code> to the RDMA interface name</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> OT/IT isolation: OT interface NAD uses a master that is physically on the OT VLAN — not the K8s overlay NIC</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> NetworkPolicy on <code>eth0</code> still applies — Multus secondary interfaces are NOT controlled by K8s NetworkPolicy</li>

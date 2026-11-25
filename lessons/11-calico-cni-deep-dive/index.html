@@ -5632,6 +5632,12 @@
 <td>Route reflectors replacing full BGP mesh, Typha at scale, WireGuard node encryption</td>
 <td>O(N) BGP sessions instead of O(N²) full mesh; encrypted east-west traffic at multi-Gbps throughput</td>
 </tr>
+<tr>
+<td>Medtech (FDA 21 CFR Part 11 regulated device manufacturer)</td>
+<td>FDA 21 CFR Part 11 workload: a leaked IPAM IP reassigned to a new pod caused audit-log attribution failures — two distinct patient-data pods shared the same source IP in network logs, invalidating the audit trail</td>
+<td>Calico IPAM block management, <code>calicoctl ipam release</code>, <code>calicoctl ipam check</code> to detect orphaned IP allocations</td>
+<td>Mandatory periodic IPAM reconciliation added to CI pipeline; leaked IPs now detected before reassignment, preserving per-pod audit-trail integrity required for 21 CFR Part 11 compliance</td>
+</tr>
 </tbody>
 </table>
 <hr />

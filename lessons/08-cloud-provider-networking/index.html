@@ -5702,6 +5702,12 @@
 <td>Cloud-native CNI with direct VPC routing and cloud load balancer integration</td>
 <td>Deterministic pod-to-pod latency with no tunnel overhead during peak traffic spikes</td>
 </tr>
+<tr>
+<td>Regulated EU bank (AKS)</td>
+<td>Core-banking migration on AKS: 2000 pods across 20 nodes exhausted a /24 subnet using Azure CNI classic, triggering an emergency overlay mode migration mid-rollout</td>
+<td>Azure CNI classic assigns each pod a VNet IP from the node subnet; a /24 provides only 251 usable addresses, far below the 2000 pods required</td>
+<td>Cluster was migrated to Azure CNI Overlay mode; pod IPs moved to a separate overlay CIDR, freeing VNet IPs for nodes and preventing further address exhaustion</td>
+</tr>
 </tbody>
 </table>
 <hr />

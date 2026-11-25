@@ -5217,6 +5217,12 @@
 <td>veth pairs + network namespaces + ip_forward</td>
 <td>Provides workload isolation at scale without touching the physical NIC or hypervisor</td>
 </tr>
+<tr>
+<td>Hospital EMR (medtech)</td>
+<td>Bare-metal K8s cluster running electronic medical records: <code>nf_conntrack_max</code> left at kernel default (65536) caused conntrack table exhaustion under peak load, silently dropping TCP sessions mid-transaction during patient data writes</td>
+<td><code>net.netfilter.nf_conntrack_max</code> sysctl</td>
+<td>Raising <code>nf_conntrack_max</code> to 1000000 eliminated silent write failures and restored transaction integrity</td>
+</tr>
 </tbody>
 </table>
 <hr />
@@ -5621,6 +5627,7 @@
 </table>
 <hr />
 <p><strong>Next:</strong> <a href="../02-ip-routing-and-forwarding/">Lesson 02 — IP Routing and Forwarding in Linux</a></p>
+<p><strong>These primitives recur in:</strong> <a href="../08-cloud-provider-networking/">Lesson 08 — CNI Specification</a> · <a href="../13-kubernetes-services-kube-proxy/">Lesson 13 — Kubernetes Services</a> · <a href="../23-network-security-hardening/">Lesson 23 — Network Security Hardening</a></p>
 
 
 

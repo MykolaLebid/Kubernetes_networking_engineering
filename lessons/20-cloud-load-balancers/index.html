@@ -1689,17 +1689,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#configuration-reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration Reference
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -5075,17 +5064,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#configuration-reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration Reference
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -5204,6 +5182,7 @@
 <hr />
 <h2 id="theory">Theory<a class="headerlink" href="#theory" title="Permanent link">&para;</a></h2>
 <h2 id="1-how-cloud-lbs-are-provisioned">1. How Cloud LBs Are Provisioned<a class="headerlink" href="#1-how-cloud-lbs-are-provisioned" title="Permanent link">&para;</a></h2>
+<p>The Cloud Controller Manager (CCM) is a Kubernetes control-plane component that integrates with a specific cloud provider's API to manage cloud resources such as load balancers, nodes, and routes on behalf of the cluster.</p>
 <pre class="mermaid"><code>flowchart TD
     SA["kubectl apply Service type: LoadBalancer"]
     KCM["kube-controller-manager service-controller v1.28"]
@@ -5622,30 +5601,6 @@
 <li>Set <code>externalTrafficPolicy: Local</code> (Section 6) and confirm pod-less nodes are removed from LB targets</li>
 <li>Test <code>externalTrafficPolicy: Cluster</code> to see SNAT behavior in pod access logs</li>
 </ol>
-<h3 id="configuration-reference">Configuration Reference<a class="headerlink" href="#configuration-reference" title="Permanent link">&para;</a></h3>
-<p>Key parameter tables are embedded in the Theory sections above:</p>
-<table>
-<thead>
-<tr>
-<th>Section</th>
-<th>Table</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Section 2 — AWS</td>
-<td>Key AWS Annotations: <code>aws-load-balancer-type</code>, <code>nlb-target-type</code>, <code>scheme</code>, <code>cross-zone</code>, <code>preserve_client_ip</code></td>
-</tr>
-<tr>
-<td>Section 5 — Comparison</td>
-<td>Cross-Provider Comparison: AWS NLB vs GCP NLB vs Azure SLB features</td>
-</tr>
-<tr>
-<td>Section 6 — ExternalTrafficPolicy</td>
-<td>Policy behavior: client IP preservation vs traffic balance</td>
-</tr>
-</tbody>
-</table>
 <hr />
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <table>

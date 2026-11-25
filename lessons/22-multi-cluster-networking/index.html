@@ -5458,6 +5458,12 @@
 <td>Submariner with <code>--globalnet</code> mode; IPsec tunnels between gateway nodes; Lighthouse DNS for clusterset.local</td>
 <td>Clusters with identical 10.244.0.0/16 pod CIDRs coexist; cross-cluster traffic uses Globalnet SNATed global IPs</td>
 </tr>
+<tr>
+<td>Hospital group (medtech, HIPAA)</td>
+<td>Federating patient-record microservices across on-prem and cloud clusters under HIPAA compliance</td>
+<td>Submariner with <code>--globalnet</code>; on-prem pod CIDR collided with cloud VPC CIDR causing silent cross-cluster C2C traffic drops</td>
+<td>IP collision between on-prem pod CIDR and cloud VPC CIDR identified; Globalnet SNAT global CIDR allocated per cluster to eliminate overlap and restore cross-cluster connectivity</td>
+</tr>
 </tbody>
 </table>
 <hr />

@@ -1484,17 +1484,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#configuration-reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration Reference
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -5019,17 +5008,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#configuration-reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration Reference
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -5140,7 +5118,7 @@
 <h1 id="lesson-16-network-policies-microsegmentation">Lesson 16 — Network Policies: Microsegmentation<a class="headerlink" href="#lesson-16-network-policies-microsegmentation" title="Permanent link">&para;</a></h1>
 <blockquote>
 <p><strong>Track:</strong> Network Foundation — Bare Metal &amp; Cloud<br />
-<strong>Prerequisites:</strong> <a href="../13-kubernetes-services-kube-proxy/">Lesson 13 — Kubernetes Services</a><br />
+<strong>Prerequisites:</strong> <a href="../13-kubernetes-services-kube-proxy/">Lesson 13 — Kubernetes Services</a> · <a href="10-ebpf-networking.md">Lesson 10 — eBPF</a> · <a href="12-cilium-cni.md">Lesson 12 — Cilium</a><br />
 <strong>Duration:</strong> ~2.5 hours</p>
 <p><strong>Goal:</strong> Configure NetworkPolicy resources to implement microsegmentation, enforce default-deny namespaces, test connectivity enforcement with Cilium and Calico tooling, and avoid common selector and DNS egress pitfalls.</p>
 </blockquote>
@@ -5568,6 +5546,12 @@
 <td>Cilium L7 NetworkPolicy enforcing HTTP path-level access rules</td>
 <td>Blocked unauthorized cross-tenant API calls at layer 7; reduced blast radius of compromised merchant pods</td>
 </tr>
+<tr>
+<td>Medtech ISV (HIPAA)</td>
+<td>HIPAA-scoped PHI namespace on a managed Kubernetes cluster; no default-deny policy was applied at deployment</td>
+<td>Missing default-deny left all pods reachable from kube-system; gap was not flagged by internal monitoring and was discovered during an external PCI audit 3 months after deployment</td>
+<td>Retrospective remediation required re-auditing all namespace-to-namespace traffic logs; default-deny-all policy and automated policy-compliance scanning added to the deployment pipeline to prevent recurrence</td>
+</tr>
 </tbody>
 </table>
 <hr />
@@ -5695,61 +5679,6 @@
 </span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="c1"># Validate NetworkPolicy YAML before applying</span>
 </span><span id="__span-18-11"><a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>kubectl<span class="w"> </span>apply<span class="w"> </span>--dry-run<span class="o">=</span>server<span class="w"> </span>-f<span class="w"> </span>policy.yaml
 </span></code></pre></div>
-<h3 id="configuration-reference">Configuration Reference<a class="headerlink" href="#configuration-reference" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Parameter</th>
-<th>Default</th>
-<th>Effect</th>
-<th>When to Change</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>podSelector: {}</code></td>
-<td>Selects no pods</td>
-<td>With <code>policyTypes</code>, selects ALL pods in namespace</td>
-<td>Use for namespace-wide default-deny baseline policy</td>
-</tr>
-<tr>
-<td><code>policyTypes: [Ingress, Egress]</code></td>
-<td>Ingress only if ingress rules present</td>
-<td>Governs both traffic directions</td>
-<td>Always declare explicitly to avoid implicit inferences</td>
-</tr>
-<tr>
-<td><code>from: []</code> / <code>to: []</code> empty list</td>
-<td>—</td>
-<td>Denies ALL ingress or ALL egress</td>
-<td>Use alongside <code>podSelector: {}</code> for default-deny pattern</td>
-</tr>
-<tr>
-<td><code>namespaceSelector</code> + <code>podSelector</code> same <code>from</code> entry</td>
-<td>—</td>
-<td>AND logic: pod must match AND be in matching namespace</td>
-<td>Cross-namespace access with pod-level specificity</td>
-</tr>
-<tr>
-<td><code>namespaceSelector</code> + <code>podSelector</code> separate <code>from</code> entries</td>
-<td>—</td>
-<td>OR logic: either selector alone allows access</td>
-<td>Permits broader access than intended — use same-entry AND form</td>
-</tr>
-<tr>
-<td><code>ipBlock: cidr</code> with <code>except</code></td>
-<td>—</td>
-<td>Allow/block external CIDR with exclusions</td>
-<td>On-prem resources, cloud health check IPs, monitoring agents</td>
-</tr>
-<tr>
-<td><code>port: 53 protocol: UDP</code> and <code>protocol: TCP</code></td>
-<td>—</td>
-<td>DNS exception for egress policy</td>
-<td>Required whenever any egress policy is applied to avoid DNS breakage</td>
-</tr>
-</tbody>
-</table>
 <hr />
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <table>
@@ -6021,6 +5950,7 @@
 </table>
 <hr />
 <p><strong>← Previous:</strong> <a href="../15-ipv6-dual-stack/">Lesson 15 — IPv6 and Dual-Stack Kubernetes</a>   |   <strong>Next:</strong> <a href="../17-ingress-controllers/">Lesson 17 — Ingress Controllers and L7 Load Balancing</a></p>
+<p>See also: <a href="../35-tetragon-ebpf-runtime-security/">Lesson 35 — Tetragon</a> · <a href="../../compliance-paths/">docs/compliance-paths.md</a></p>
 
 
 

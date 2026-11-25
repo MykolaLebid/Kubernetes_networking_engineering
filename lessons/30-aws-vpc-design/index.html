@@ -5439,6 +5439,12 @@
 <td>Secondary CIDR 100.64.0.0/16 for pod subnet isolation</td>
 <td>Separated pod IPs from node IPs avoiding RFC1918 exhaustion with on-prem overlap</td>
 </tr>
+<tr>
+<td>Hospital imaging platform (medtech)</td>
+<td>HIPAA-regulated EKS cluster running diagnostic image workloads</td>
+<td>Missing ECR VPC endpoints (ecr.api + ecr.dkr)</td>
+<td>Docker image pulls traversed the public NAT gateway during a scale event — HIPAA-covered container images and credentials briefly crossed the public internet; adding VPC endpoints eliminated the exposure and reduced NAT data-transfer costs</td>
+</tr>
 </tbody>
 </table>
 <hr />
@@ -5545,48 +5551,7 @@
 </tr>
 </tbody>
 </table>
-<p><strong>Required VPC Endpoints:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Endpoint</th>
-<th>Type</th>
-<th>Why needed</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>com.amazonaws.&lt;region&gt;.ecr.api</code></td>
-<td>Interface</td>
-<td>Authenticate ECR image pulls</td>
-</tr>
-<tr>
-<td><code>com.amazonaws.&lt;region&gt;.ecr.dkr</code></td>
-<td>Interface</td>
-<td>Pull image layers from ECR</td>
-</tr>
-<tr>
-<td><code>com.amazonaws.&lt;region&gt;.s3</code></td>
-<td>Gateway (free)</td>
-<td>Pull image layers (ECR uses S3 backend)</td>
-</tr>
-<tr>
-<td><code>com.amazonaws.&lt;region&gt;.sts</code></td>
-<td>Interface</td>
-<td>IRSA token exchange</td>
-</tr>
-<tr>
-<td><code>com.amazonaws.&lt;region&gt;.ec2</code></td>
-<td>Interface</td>
-<td>VPC CNI calls EC2 API</td>
-</tr>
-<tr>
-<td><code>com.amazonaws.&lt;region&gt;.elasticloadbalancing</code></td>
-<td>Interface</td>
-<td>AWS Load Balancer Controller</td>
-</tr>
-</tbody>
-</table>
+<p>See VPC endpoint reference in Theory Section 8 above.</p>
 <hr />
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <table>

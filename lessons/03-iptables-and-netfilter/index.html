@@ -5409,6 +5409,12 @@
 <td>filter/FORWARD chain with pod CIDR src/dst ACCEPT rules</td>
 <td>Network policy enforcement without an overlay or SDN controller</td>
 </tr>
+<tr>
+<td>Hospital PACS (medtech)</td>
+<td>Bulk DICOM image transfers exhausted the conntrack table on radiology cluster nodes, silently dropping TCP connections with no application-level error</td>
+<td>conntrack <code>nf_conntrack_max</code> tuning + kube-proxy IPVS mode</td>
+<td>Raising <code>nf_conntrack_max</code> and switching kube-proxy to IPVS eliminated silent drops and stabilised image retrieval under peak radiology load</td>
+</tr>
 </tbody>
 </table>
 <hr />
@@ -5422,47 +5428,26 @@
 </span></code></pre></div>
 <h3 id="hands-on-lab">Hands-On Lab<a class="headerlink" href="#hands-on-lab" title="Permanent link">&para;</a></h3>
 <p>Trace a packet through Netfilter hooks and inspect kube-proxy rules.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># Inspect kube-proxy chains</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>iptables<span class="w"> </span>-t<span class="w"> </span>nat<span class="w"> </span>-L<span class="w"> </span>KUBE-SERVICES<span class="w"> </span>-n<span class="w"> </span>--line-numbers
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>iptables<span class="w"> </span>-t<span class="w"> </span>nat<span class="w"> </span>-L<span class="w"> </span>KUBE-SVC-XXXX<span class="w"> </span>-n<span class="w">       </span><span class="c1"># per-Service chain</span>
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>iptables<span class="w"> </span>-t<span class="w"> </span>nat<span class="w"> </span>-L<span class="w"> </span>KUBE-SEP-XXXX<span class="w"> </span>-n<span class="w">       </span><span class="c1"># per-Endpoint chain</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>
-</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="c1"># View conntrack table</span>
-</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>conntrack<span class="w"> </span>-L
-</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>conntrack<span class="w"> </span>-L<span class="w"> </span>--proto<span class="w"> </span>tcp<span class="w"> </span>--state<span class="w"> </span>ESTABLISHED
-</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>
-</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="c1"># Monitor new connections</span>
-</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>conntrack<span class="w"> </span>-E<span class="w"> </span>--event-mask<span class="w"> </span>NEW
-</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>
-</span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="c1"># Table size (critical to tune for high-throughput clusters)</span>
-</span><span id="__span-11-14"><a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a>cat<span class="w"> </span>/proc/sys/net/netfilter/nf_conntrack_max
-</span><span id="__span-11-15"><a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>sysctl<span class="w"> </span>-w<span class="w"> </span>net.netfilter.nf_conntrack_max<span class="o">=</span><span class="m">1000000</span>
-</span><span id="__span-11-16"><a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a>
-</span><span id="__span-11-17"><a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a><span class="c1"># Current usage</span>
-</span><span id="__span-11-18"><a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a>cat<span class="w"> </span>/proc/sys/net/netfilter/nf_conntrack_count
-</span><span id="__span-11-19"><a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a>
-</span><span id="__span-11-20"><a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a><span class="c1"># Bucket count (hash table size)</span>
-</span><span id="__span-11-21"><a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a>cat<span class="w"> </span>/proc/sys/net/netfilter/nf_conntrack_buckets
-</span></code></pre></div>
+<p>Run the commands from Section 4 above inside <code>minikube ssh</code> to observe each chain.</p>
 <h4 id="packet-tracing">Packet Tracing<a class="headerlink" href="#packet-tracing" title="Permanent link">&para;</a></h4>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Trace a packet through the netfilter hooks (requires kernel module)</span>
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>modprobe<span class="w"> </span>nf_log_ipv4
-</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>iptables<span class="w"> </span>-t<span class="w"> </span>raw<span class="w"> </span>-A<span class="w"> </span>PREROUTING<span class="w"> </span>-s<span class="w"> </span><span class="m">10</span>.244.0.5<span class="w"> </span>-j<span class="w"> </span>TRACE
-</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>iptables<span class="w"> </span>-t<span class="w"> </span>raw<span class="w"> </span>-A<span class="w"> </span>OUTPUT<span class="w"> </span>-d<span class="w"> </span><span class="m">10</span>.244.0.5<span class="w"> </span>-j<span class="w"> </span>TRACE
-</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="c1"># Then watch kernel logs</span>
-</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>dmesg<span class="w"> </span>-wH<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>TRACE
-</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>
-</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="c1"># Count drops per chain</span>
-</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>iptables<span class="w"> </span>-t<span class="w"> </span>filter<span class="w"> </span>-L<span class="w"> </span>FORWARD<span class="w"> </span>-v<span class="w"> </span>-n
-</span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="c1"># Pkts in and out columns show traffic; zero out means matching but passing</span>
-</span><span id="__span-12-11"><a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>
-</span><span id="__span-12-12"><a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a><span class="c1"># Watch iptables rule hit counts live</span>
-</span><span id="__span-12-13"><a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>watch<span class="w"> </span>-n1<span class="w"> </span><span class="s1">'iptables -t nat -L KUBE-SERVICES -v -n | head -30'</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># Trace a packet through the netfilter hooks (requires kernel module)</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>modprobe<span class="w"> </span>nf_log_ipv4
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>iptables<span class="w"> </span>-t<span class="w"> </span>raw<span class="w"> </span>-A<span class="w"> </span>PREROUTING<span class="w"> </span>-s<span class="w"> </span><span class="m">10</span>.244.0.5<span class="w"> </span>-j<span class="w"> </span>TRACE
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>iptables<span class="w"> </span>-t<span class="w"> </span>raw<span class="w"> </span>-A<span class="w"> </span>OUTPUT<span class="w"> </span>-d<span class="w"> </span><span class="m">10</span>.244.0.5<span class="w"> </span>-j<span class="w"> </span>TRACE
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="c1"># Then watch kernel logs</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>dmesg<span class="w"> </span>-wH<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>TRACE
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="c1"># Count drops per chain</span>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>iptables<span class="w"> </span>-t<span class="w"> </span>filter<span class="w"> </span>-L<span class="w"> </span>FORWARD<span class="w"> </span>-v<span class="w"> </span>-n
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="c1"># Pkts in and out columns show traffic; zero out means matching but passing</span>
+</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>
+</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="c1"># Watch iptables rule hit counts live</span>
+</span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>watch<span class="w"> </span>-n1<span class="w"> </span><span class="s1">'iptables -t nat -L KUBE-SERVICES -v -n | head -30'</span>
 </span></code></pre></div>
 <h4 id="conntrack-exhaustion-check">Conntrack Exhaustion Check<a class="headerlink" href="#conntrack-exhaustion-check" title="Permanent link">&para;</a></h4>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Check for conntrack drops</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>dmesg<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-i<span class="w"> </span><span class="s2">"nf_conntrack: table full"</span>
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>cat<span class="w"> </span>/proc/net/stat/nf_conntrack<span class="w"> </span><span class="p">|</span><span class="w"> </span>awk<span class="w"> </span><span class="s1">'{print $1, $2, $3}'</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Check for conntrack drops</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>dmesg<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-i<span class="w"> </span><span class="s2">"nf_conntrack: table full"</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>cat<span class="w"> </span>/proc/net/stat/nf_conntrack<span class="w"> </span><span class="p">|</span><span class="w"> </span>awk<span class="w"> </span><span class="s1">'{print $1, $2, $3}'</span>
 </span></code></pre></div>
 <h3 id="configuration-reference">Configuration Reference<a class="headerlink" href="#configuration-reference" title="Permanent link">&para;</a></h3>
 <table>
@@ -5743,7 +5728,7 @@
 </ol>
 <details><summary>Answer</summary>
 
-   <div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>iptables<span class="w"> </span>-t<span class="w"> </span>nat<span class="w"> </span>-L<span class="w"> </span>KUBE-SERVICES<span class="w"> </span>-n<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="m">10</span>.96.42.10
+   <div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>iptables<span class="w"> </span>-t<span class="w"> </span>nat<span class="w"> </span>-L<span class="w"> </span>KUBE-SERVICES<span class="w"> </span>-n<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="m">10</span>.96.42.10
 </span></code></pre></div>
    This shows the `KUBE-SVC-XXXX` chain name for the service. Then run `iptables -t nat -L KUBE-SVC-XXXX -n` to see the probabilistic load-balancing rules, and `iptables -t nat -L KUBE-SEP-YYYY -n` to see the DNAT rule for each individual endpoint.
 

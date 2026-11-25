@@ -1837,17 +1837,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#configuration-reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration Reference
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -4831,17 +4820,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#configuration-reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration Reference
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -5343,6 +5321,12 @@
 <td>OpenShift + OVN-Kubernetes + SR-IOV</td>
 <td>Kubernetes-native VNF hosting replacing proprietary NFVI stacks</td>
 </tr>
+<tr>
+<td>SAP BTP (Banking)</td>
+<td>Multi-tenant OpenShift deployment: a misconfigured auto-policy deletion script wiped NetworkPolicies from 12 tenant namespaces during a maintenance window, causing monitoring blackout and triggering a MaRisk incident</td>
+<td>Namespace isolation via auto-created NetworkPolicies; <code>allow-from-openshift-monitoring</code> policy</td>
+<td>Incident drove enforcement of GitOps-only policy management and pre-flight dry-run checks before any maintenance automation</td>
+</tr>
 </tbody>
 </table>
 <hr />
@@ -5391,56 +5375,6 @@
 </span><span id="__span-13-23"><a id="__codelineno-13-23" name="__codelineno-13-23" href="#__codelineno-13-23"></a><span class="w">  </span>/usr/bin/gather_network_logs
 </span><span id="__span-13-24"><a id="__codelineno-13-24" name="__codelineno-13-24" href="#__codelineno-13-24"></a><span class="c1"># produces /must-gather/network/ with OVN NB/SB DB dumps and flow tables</span>
 </span></code></pre></div>
-<h3 id="configuration-reference">Configuration Reference<a class="headerlink" href="#configuration-reference" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Parameter</th>
-<th>Default</th>
-<th>Effect</th>
-<th>When to change</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>spec.defaultNetwork.type</code></td>
-<td><code>OVNKubernetes</code></td>
-<td>Active CNI plugin</td>
-<td>Set at install time only — migration requires maintenance window</td>
-</tr>
-<tr>
-<td><code>spec.clusterNetwork[].cidr</code></td>
-<td><code>10.128.0.0/14</code></td>
-<td>Pod IP CIDR</td>
-<td>Set at install time — cannot change post-install</td>
-</tr>
-<tr>
-<td><code>spec.clusterNetwork[].hostPrefix</code></td>
-<td><code>23</code></td>
-<td>Subnet size per node</td>
-<td>Smaller = more nodes; larger = more pods per node</td>
-</tr>
-<tr>
-<td><code>spec.serviceNetwork</code></td>
-<td><code>172.30.0.0/16</code></td>
-<td>ClusterIP range</td>
-<td>Set at install time only</td>
-</tr>
-<tr>
-<td><code>spec.defaultNetwork.ovnKubernetesConfig.mtu</code></td>
-<td><code>1400</code> (Geneve)</td>
-<td>Pod network MTU</td>
-<td>Lower if physical MTU &lt; 1450 (e.g. VPN overhead)</td>
-</tr>
-<tr>
-<td><code>spec.defaultNetwork.ovnKubernetesConfig.genevePort</code></td>
-<td><code>6081</code></td>
-<td>UDP tunnel port</td>
-<td>Change if 6081 is blocked</td>
-</tr>
-</tbody>
-</table>
-<hr />
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

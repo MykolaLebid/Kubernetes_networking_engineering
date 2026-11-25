@@ -2970,6 +2970,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4650,6 +4661,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4700,8 +4722,10 @@
 <p><strong>Track:</strong> CF-B — CF Internals and Container Networking
 <strong>Duration:</strong> ~45 min (Deep Dive) / ~10 min (Quick Read)
 <strong>Prerequisites:</strong> CF-01 through CF-07, Linux namespace fundamentals</p>
+<p><strong>Jump to:</strong> <a href="#quick-read-10-min">Quick Read</a> · <a href="#deep-dive">Deep Dive</a> · <a href="#4-troubleshooting-garden-and-network-namespaces">Troubleshooting</a> · <a href="#quick-reference">Quick Reference</a></p>
 <hr />
 <h2 id="quick-read-10-min">Quick Read (10 min)<a class="headerlink" href="#quick-read-10-min" title="Permanent link">&para;</a></h2>
+<p>After this lesson you will be able to: explain how Garden creates and isolates CF app containers using Linux namespaces, trace the Silk CNI plugin's network wiring sequence, and diagnose common container networking failures on a Diego Cell.</p>
 <p><strong>What Garden is:</strong>
 - Garden is the container runtime for Cloud Foundry, analogous to containerd in Kubernetes
 - It runs on every Diego Cell and is managed by the <code>garden-runc</code> process
@@ -4739,6 +4763,7 @@
 </blockquote>
 <hr />
 <h2 id="deep-dive">Deep Dive<a class="headerlink" href="#deep-dive" title="Permanent link">&para;</a></h2>
+<p>The sections below examine each layer in depth: Garden's API and GrootFS filesystem management, the precise namespace creation and CNI wiring sequence, Silk CNI internals including the VXLAN Policy Agent, and a structured troubleshooting workflow with diagnostic commands you can run directly on a Diego Cell.</p>
 <hr />
 <h2 id="practice-setup">Practice Setup<a class="headerlink" href="#practice-setup" title="Permanent link">&para;</a></h2>
 <p>You need two terminals for this lesson.</p>
@@ -5012,7 +5037,7 @@
 </span><span id="__span-13-18"><a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a>curl<span class="w"> </span>-sk<span class="w"> </span>https://&lt;policy-server-ip&gt;:4003/networking/v1/internal/policies
 </span></code></pre></div>
 <p><strong>Failure 3: MTU mismatch — high packet loss or TCP stalls</strong></p>
-<p>Symptom: HTTP requests succeed for small payloads, fail or stall for large responses (file downloads, large JSON).</p>
+<p>Symptom: HTTP requests succeed for small payloads, fail or stall for large responses (file downloads, large JSON). In banking and healthcare deployments this failure is particularly deceptive: health checks pass because they use short probe payloads, yet bulk data transfers — such as HL7 FHIR bundles or large transaction batches — silently fragment and cause throughput collapse that appears as application-level timeouts.</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Verify MTU inside container matches expected value</span>
 </span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>nsenter<span class="w"> </span>--net<span class="o">=</span>/proc/<span class="si">${</span><span class="nv">CONTAINER_PID</span><span class="si">}</span>/ns/net<span class="w"> </span>ip<span class="w"> </span>link<span class="w"> </span>show<span class="w"> </span>eth0
 </span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="c1"># Expected: mtu 1450 (for 1500 underlay)</span>
@@ -5222,6 +5247,15 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li>What is the role of Garden in Cloud Foundry, and which component is its direct analog in Kubernetes?</li>
+<li>Walk through the three-step sequence that occurs when a CF app instance starts: what does <code>runc</code> create first, what does <code>silk-cni ADD</code> configure, and when does the app process begin executing?</li>
+<li>Why does the default route inside a CF container point to <code>169.254.0.1</code> rather than a standard overlay IP, and what advantage does this give Silk?</li>
+<li>A developer reports that small HTTP responses from a backend app arrive correctly, but large file downloads always time out. No errors appear in <code>cf logs</code>. What is the most likely root cause, and which commands would you run on the Diego Cell to confirm it?</li>
+<li>You run <code>iptables -L cni-forward -n -v</code> on a Diego Cell and find no rule matching the destination overlay IP of a backend app, even though <code>cf network-policies</code> shows the policy exists. List the two most likely explanations and the command that distinguishes between them.</li>
+</ol>
 <hr />
 <h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <p><strong>Related K8s lessons in this course:</strong></p>

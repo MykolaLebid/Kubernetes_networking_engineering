@@ -5533,6 +5533,12 @@
 <td>GatewayClass + HTTPRoute + KongPlugin extension points for rate-limiting, authentication, and logging</td>
 <td>Security and routing policies expressed as standard Kubernetes objects with vendor-specific extensions</td>
 </tr>
+<tr>
+<td>European bank (payment platform)</td>
+<td>Migrated annotation-based rate-limiting from Ingress to Gateway API HTTPRoute; the annotation was silently ignored after migration (no error), causing the payment API to accept unlimited requests during a load test</td>
+<td>HTTPRoute does not honor Ingress annotations — rate-limiting must be re-implemented as a controller-specific extension or policy CRD attached to the HTTPRoute</td>
+<td>Team added a RateLimitPolicy (or equivalent vendor CRD) to the HTTPRoute and verified enforcement under synthetic load before promoting to production</td>
+</tr>
 </tbody>
 </table>
 <hr />

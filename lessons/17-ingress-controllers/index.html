@@ -1561,17 +1561,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#configuration-reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration Reference
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -4987,17 +4976,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#configuration-reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration Reference
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -5478,6 +5456,12 @@
 <td>Traefik IngressRoute CRDs with Let's Encrypt auto-TLS via cert-manager</td>
 <td>Zero-touch TLS certificate lifecycle; dynamic routing config from Kubernetes API without NGINX reload delays</td>
 </tr>
+<tr>
+<td>Medtech ISV (FHIR platform)</td>
+<td>NGINX Ingress routing FHIR API traffic including DICOM image uploads from radiology systems</td>
+<td>NGINX Ingress Controller; <code>nginx.ingress.kubernetes.io/proxy-body-size</code> annotation</td>
+<td>Missing <code>proxy-body-size</code> annotation left the default 1 MB limit in place; DICOM uploads over 1 MB returned intermittent 413 errors visible only with large radiology images; fix was adding <code>proxy-body-size: "100m"</code> to the FHIR Ingress resource</td>
+</tr>
 </tbody>
 </table>
 <hr />
@@ -5624,80 +5608,6 @@
 </span><span id="__span-20-13"><a id="__codelineno-20-13" name="__codelineno-20-13" href="#__codelineno-20-13"></a>openssl<span class="w"> </span>s_client<span class="w"> </span>-connect<span class="w"> </span>web.example.com:443<span class="w"> </span>-servername<span class="w"> </span>web.example.com<span class="w"> </span>&lt;<span class="w"> </span>/dev/null<span class="w"> </span><span class="m">2</span>&gt;/dev/null<span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="se">\</span>
 </span><span id="__span-20-14"><a id="__codelineno-20-14" name="__codelineno-20-14" href="#__codelineno-20-14"></a><span class="w">  </span>openssl<span class="w"> </span>x509<span class="w"> </span>-noout<span class="w"> </span>-subject<span class="w"> </span>-dates
 </span></code></pre></div>
-<h3 id="configuration-reference">Configuration Reference<a class="headerlink" href="#configuration-reference" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Parameter</th>
-<th>Default</th>
-<th>Effect</th>
-<th>When to Change</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>ingressClassName</code></td>
-<td>Cluster default IngressClass</td>
-<td>Selects which controller processes this Ingress</td>
-<td>Always set explicitly when multiple controllers are installed</td>
-</tr>
-<tr>
-<td><code>pathType: Prefix</code></td>
-<td>—</td>
-<td>Matches path and all sub-paths</td>
-<td>Use <code>Exact</code> for precise path matching with no sub-path bleed</td>
-</tr>
-<tr>
-<td><code>pathType: Exact</code></td>
-<td>—</td>
-<td>Matches only the exact path string</td>
-<td>Strict API endpoints where sub-paths should 404</td>
-</tr>
-<tr>
-<td><code>tls.secretName</code></td>
-<td>—</td>
-<td>Secret containing <code>tls.crt</code> and <code>tls.key</code></td>
-<td>Required for HTTPS; pair with cert-manager for auto-renewal</td>
-</tr>
-<tr>
-<td><code>nginx.ingress.kubernetes.io/rewrite-target</code></td>
-<td>(no rewrite)</td>
-<td>Rewrites URL before forwarding to backend</td>
-<td>Strip path prefix before sending to backend service</td>
-</tr>
-<tr>
-<td><code>nginx.ingress.kubernetes.io/proxy-read-timeout</code></td>
-<td>60 s</td>
-<td>Max time to wait for backend response</td>
-<td>Increase for slow backends; decrease to fail fast</td>
-</tr>
-<tr>
-<td><code>nginx.ingress.kubernetes.io/limit-rps</code></td>
-<td>(none)</td>
-<td>Per-source-IP requests per second rate limit</td>
-<td>Apply to all public-facing endpoints</td>
-</tr>
-<tr>
-<td><code>nginx.ingress.kubernetes.io/affinity</code></td>
-<td>(none)</td>
-<td>Sticky sessions via cookie</td>
-<td>Use when backend has in-memory session state</td>
-</tr>
-<tr>
-<td><code>nginx.ingress.kubernetes.io/proxy-body-size</code></td>
-<td>1m</td>
-<td>Maximum request body size</td>
-<td>Increase to <code>100m</code> or <code>0</code> (unlimited) for file upload endpoints</td>
-</tr>
-<tr>
-<td>controller <code>kind: DaemonSet</code></td>
-<td>Deployment</td>
-<td>Runs NGINX pod on every node</td>
-<td>Use on bare metal with HostPort so every node accepts traffic</td>
-</tr>
-</tbody>
-</table>
-<hr />
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

@@ -3219,6 +3219,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4906,6 +4917,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#check-your-understanding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check Your Understanding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4956,8 +4978,10 @@
 <p><strong>Track:</strong> CF-C — Advanced Routing<br />
 <strong>Prerequisite:</strong> CF-09 (Gorouter TLS and Route Integrity) or equivalent<br />
 <strong>Companion K8s lessons:</strong> Lesson 17 — Ingress Controllers Deep Dive, Lesson 18 — Gateway API and L4 Routing, Lesson 19 — MetalLB and LoadBalancer Services</p>
+<p><strong>Jump to:</strong> <a href="#quick-read-10-min">Quick Read</a> · <a href="#deep-dive">Deep Dive</a> · <a href="#4-troubleshooting-tcp-routes">Troubleshooting</a> · <a href="#quick-reference">Quick Reference</a></p>
 <hr />
 <h2 id="quick-read-10-min">Quick Read (10 min)<a class="headerlink" href="#quick-read-10-min" title="Permanent link">&para;</a></h2>
+<p>After this lesson you will be able to: explain how CF TCP Router routes non-HTTP traffic at Layer 4, create and manage TCP routes with the cf CLI, and diagnose common TCP routing failures using iptables, conntrack, and the Routing API.</p>
 <p><strong>What TCP Router is:</strong> CF's dedicated Layer 4 router for non-HTTP workloads. While Gorouter handles HTTP/HTTPS at Layer 7 (with headers, sticky sessions, and route integrity), TCP Router forwards raw TCP connections by mapping an external port to a backend application instance. No HTTP parsing, no header injection, no TLS termination by default — just bytes in, bytes out.</p>
 <p><strong>Key mental model:</strong></p>
 <ul>
@@ -5374,6 +5398,7 @@
 </span><span id="__span-14-19"><a id="__codelineno-14-19" name="__codelineno-14-19" href="#__codelineno-14-19"></a><span class="c1"># Monitor conntrack table for dropped connections</span>
 </span><span id="__span-14-20"><a id="__codelineno-14-20" name="__codelineno-14-20" href="#__codelineno-14-20"></a>conntrack<span class="w"> </span>-E<span class="w"> </span>-p<span class="w"> </span>tcp<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">"DESTROY.*dport=61002"</span>
 </span></code></pre></div>
+<p>This failure mode is especially visible in two regulated sectors. In banking, FIX protocol engines (used for real-time order routing between trading systems) hold persistent TCP sessions for hours; a 10-minute AWS NLB idle timeout will silently tear down an active FIX session, causing missed executions and reconciliation failures — fix by setting the NLB idle timeout to 350 seconds and enabling TCP keepalive in the FIX engine configuration. In medtech, MQTT brokers connecting remote patient-monitoring devices over TCP maintain long-lived sessions to deliver telemetry; the same idle timeout drops device connections without a DISCONNECT message, causing the broker to hold stale session state and delay alarm delivery — fix by configuring MQTT keepalive to 60 seconds so devices send PINGREQ packets before the LB timeout fires.</p>
 <h3 id="diagnostic-command-summary">Diagnostic Command Summary<a class="headerlink" href="#diagnostic-command-summary" title="Permanent link">&para;</a></h3>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># Quick health check for a specific TCP port end to end</span>
 </span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="nv">PORT</span><span class="o">=</span><span class="m">1055</span>
@@ -5501,6 +5526,15 @@
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="check-your-understanding">Check Your Understanding<a class="headerlink" href="#check-your-understanding" title="Permanent link">&para;</a></h2>
+<ol>
+<li>What is the fundamental difference between how TCP Router and Gorouter select a backend for an incoming connection — and why does this matter for long-lived database connections?</li>
+<li>A developer runs <code>cf create-route tcp.cf.example.com --random-port</code> and receives an HTTP 507 error. What is the root cause and what operator action resolves it?</li>
+<li>Trace the full path of a TCP SYN packet from an external client to an application container: name each component it traverses and the transformation (if any) applied at each hop.</li>
+<li>Why do MQTT brokers and FIX protocol engines fail silently when the IaaS load balancer idle timeout is shorter than the application's session duration, and what is the recommended fix at both the platform and application layers?</li>
+<li>The Routing API shows a backend registered for port 1055, but <code>nc -vz tcp.cf.example.com 1055</code> receives a TCP RST immediately after connecting. What two checks on the Diego Cell would you run first, and what are you looking for in each?</li>
+</ol>
 <hr />
 <h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <p><strong>Within this CF course:</strong></p>

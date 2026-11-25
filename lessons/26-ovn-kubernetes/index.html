@@ -1909,17 +1909,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#configuration-reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration Reference
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -4919,17 +4908,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#configuration-reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration Reference
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -5393,6 +5371,12 @@
 <td>OVN-Kubernetes + DPDK/SR-IOV offload</td>
 <td>NFVI-grade throughput with OVN logical network control plane</td>
 </tr>
+<tr>
+<td>Banking cluster (PCI-scoped namespace)</td>
+<td>Firewall blocking UDP 6081 (Geneve) silently dropped all cross-node pod traffic — pods appeared healthy, no firewall log entries</td>
+<td>Geneve tunnel (UDP :6081) cross-node encapsulation</td>
+<td>Root-caused via <code>tcpdump udp port 6081</code> showing no tunnel packets arriving on destination node; firewall rule added to permit UDP 6081 between all node IPs</td>
+</tr>
 </tbody>
 </table>
 <hr />
@@ -5442,55 +5426,6 @@
 </span><span id="__span-8-28"><a id="__codelineno-8-28" name="__codelineno-8-28" href="#__codelineno-8-28"></a><span class="w">  </span>ovs-appctl<span class="w"> </span>ofproto/trace<span class="w"> </span>br-int<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-8-29"><a id="__codelineno-8-29" name="__codelineno-8-29" href="#__codelineno-8-29"></a><span class="w">  </span><span class="s2">"in_port=1,ip,ip_src=10.128.0.5,ip_dst=10.128.1.5,tcp,tcp_dst=8080"</span>
 </span></code></pre></div>
-<h3 id="configuration-reference">Configuration Reference<a class="headerlink" href="#configuration-reference" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Parameter</th>
-<th>Default</th>
-<th>Effect</th>
-<th>When to change</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>gatewayConfig.routingViaHost</code></td>
-<td><code>false</code> (shared)</td>
-<td>Routes egress via node NIC vs master</td>
-<td>Set <code>true</code> for local gateway in production</td>
-</tr>
-<tr>
-<td><code>ipsecConfig.mode</code></td>
-<td><code>Disabled</code></td>
-<td>Encrypts Geneve tunnels with IPsec ESP</td>
-<td>Enable for compliance (PCI, HIPAA)</td>
-</tr>
-<tr>
-<td><code>mtu</code></td>
-<td>auto-detected</td>
-<td>Overlay MTU (subtract Geneve overhead ~50B)</td>
-<td>Lower if jumbo frames unavailable</td>
-</tr>
-<tr>
-<td><code>hybridOverlayConfig.enabled</code></td>
-<td><code>false</code></td>
-<td>Allows Windows nodes using VXLAN hybrid</td>
-<td>Enable for mixed Linux/Windows clusters</td>
-</tr>
-<tr>
-<td><code>v4InternalSubnet</code></td>
-<td><code>100.64.0.0/16</code></td>
-<td>Transit subnet for OVN join switch</td>
-<td>Change only if 100.64.x conflicts</td>
-</tr>
-<tr>
-<td><code>egressIPConfig.reachabilityTotalTimeoutSeconds</code></td>
-<td><code>1</code></td>
-<td>Time to detect EgressIP node failure</td>
-<td>Lower for faster HA failover</td>
-</tr>
-</tbody>
-</table>
 <hr />
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <table>
