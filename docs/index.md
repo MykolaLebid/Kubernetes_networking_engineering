@@ -9,11 +9,11 @@
 <div class="grid cards" markdown>
 
 - :fontawesome-brands-kubernetes: **Kubernetes Networking**  
-  34 lessons from Linux foundations through CNI, service meshes, OpenShift, AWS, GitOps, and AI GPU cluster networking.  
+  38 lessons from Linux foundations through CNI, service meshes, OpenShift, AWS, GitOps, AI GPU clusters, and compliance (HIPAA/PCI-DSS/IEC 62443/GDPR).  
   [Start Track A →](lessons/01-linux-networking-fundamentals.md)
 
 - :fontawesome-solid-cloud: **Cloud Foundry Networking**  
-  20 lessons covering Diego, Silk CNI, GoRouter, CF-to-CF mTLS, BTP Private Link, and hybrid connectivity.  
+  23 lessons covering Diego, Silk CNI, GoRouter, CF-to-CF mTLS, BTP Private Link, compliance, and hybrid connectivity.  
   [Start CF Book →](cf/cf-00-overview.md)
 
 - :fontawesome-solid-arrows-left-right: **K8s ↔ CF Migration Guide**  
@@ -28,7 +28,7 @@
 
 ---
 
-## Kubernetes Networking — 9 Tracks
+## Kubernetes Networking — 10 Tracks
 
 <div class="grid cards" markdown>
 
@@ -58,6 +58,26 @@
 
 - :fontawesome-solid-microchip: **[Track I — AI Platform](lessons/34-ai-platform-networking.md)**  
   RDMA · SR-IOV · Multus · RoCE · EFA · GPU Operator
+
+- :fontawesome-solid-shield-halved: **[Track J — Security & Compliance](lessons/35-tetragon-ebpf-runtime-security.md)**  
+  Tetragon · KubeEdge / industrial edge · HIPAA/PCI-DSS/IEC 62443/GDPR · Multus CNI
+
+</div>
+
+---
+
+## Cert Prep
+
+<div class="grid cards" markdown>
+
+- :fontawesome-solid-certificate: **[CKNE + CCA Exam Prep](ckne-prep.md)**  
+  5 CKNE domains + 8 CCA domains mapped to lessons · study paths · exam traps
+
+- :fontawesome-solid-certificate: **[CKA + CKS Exam Prep](cka-cks-prep.md)**  
+  CKA Services & Networking + all 6 CKS domains mapped to lessons
+
+- :fontawesome-solid-map: **[Compliance Learning Paths](compliance-paths.md)**  
+  Sector paths for medtech · banking · manufacturing · big tech — CH / DE / USA
 
 </div>
 
@@ -95,7 +115,8 @@ flowchart LR
     F["Track F\nOpenShift\n25–28"]
     G["Track G\nAWS\n29–32"] --> H
     H["Track H\nGitOps\n33"] --> I
-    I["Track I\nAI Platform\n34"]
+    I["Track I\nAI Platform\n34"] --> J
+    J["Track J\nSecurity &\nCompliance\n35–38"]
 ```
 
 ---
@@ -104,11 +125,11 @@ flowchart LR
 
 | Metric | Value |
 |--------|-------|
-| Lessons | 34 (K8s) + 20 (CF) |
-| Tracks | 9 (K8s) + 5 (CF) |
-| Mermaid diagrams | 90+ |
-| Troubleshooting entries | 230+ |
-| Practice commands | 400+ |
+| Lessons | 38 (K8s) + 23 (CF) |
+| Tracks | 10 (K8s) + 8 (CF) |
+| Mermaid diagrams | 110+ |
+| Troubleshooting entries | 260+ |
+| Practice commands | 450+ |
 | Free resources mapped | 25+ |
 
 ---
@@ -117,8 +138,8 @@ flowchart LR
 
 | Book | EPUB | PDF |
 |------|------|-----|
-| Kubernetes Networking (34 lessons) | [EPUB 4.7 MB](https://github.com/MykolaLebid/Kubernetes_networking_engineering/raw/main/kubernetes-network-engineering.epub) | [PDF 13 MB](https://github.com/MykolaLebid/Kubernetes_networking_engineering/raw/main/kubernetes-network-engineering.pdf) |
-| Cloud Foundry Networking (20 lessons + migration) | [EPUB 3.1 MB](https://github.com/MykolaLebid/Kubernetes_networking_engineering/raw/main/cf-networking.epub) | [PDF 8.7 MB](https://github.com/MykolaLebid/Kubernetes_networking_engineering/raw/main/cf-networking.pdf) |
+| Kubernetes Networking (38 lessons) | [EPUB](https://github.com/MykolaLebid/Kubernetes_networking_engineering/raw/main/kubernetes-network-engineering.epub) | [PDF](https://github.com/MykolaLebid/Kubernetes_networking_engineering/raw/main/kubernetes-network-engineering.pdf) |
+| Cloud Foundry Networking (23 lessons) | [EPUB](https://github.com/MykolaLebid/Kubernetes_networking_engineering/raw/main/cf-networking.epub) | [PDF](https://github.com/MykolaLebid/Kubernetes_networking_engineering/raw/main/cf-networking.pdf) |
 
 EPUB files reflow on reMarkable and e-readers. PDF files are print-ready with page breaks.
 
