@@ -27,7 +27,7 @@
     
     
       
-        <title>Cheat Sheet 09 — Observability: Hubble / Prometheus / CF Loggregator - Platform Network Engineering</title>
+        <title>Cheat Sheet 09 — Observability, SLOs, and RCA - Platform Network Engineering</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#cheat-sheet-09-observability-hubble-prometheus-cf-loggregator" class="md-skip">
+        <a href="#cheat-sheet-09-observability-slos-and-rca" class="md-skip">
           Skip to content
         </a>
       
@@ -114,7 +114,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Cheat Sheet 09 — Observability: Hubble / Prometheus / CF Loggregator
+              Cheat Sheet 09 — Observability, SLOs, and RCA
             
           </span>
         </div>
@@ -2223,6 +2223,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../lessons/39-network-incident-management-slo-rca/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    39 · Network Incident Management, SLOs, and RCA
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -4118,7 +4146,7 @@
   <span class="md-ellipsis">
     
   
-    Cheat Sheet 09 — Observability: Hubble / Prometheus / CF Loggregator
+    Cheat Sheet 09 — Observability, SLOs, and RCA
   
 
     
@@ -4136,7 +4164,7 @@
   <span class="md-ellipsis">
     
   
-    Cheat Sheet 09 — Observability: Hubble / Prometheus / CF Loggregator
+    Cheat Sheet 09 — Observability, SLOs, and RCA
   
 
     
@@ -4162,10 +4190,32 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#stack-comparison" class="md-nav__link">
+  <a href="#stack-comparison-20252026" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Stack Comparison
+        Stack Comparison (2025/2026)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#network-slo-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network SLO Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alerting-burn-rate-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alerting — Burn Rate Rules
       
     </span>
   </a>
@@ -4238,6 +4288,50 @@
     <span class="md-ellipsis">
       
         Diagnostic Workflows
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#five-layer-rca-decision-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Five-Layer RCA Decision Tree
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alerting-thresholds-quick-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alerting Thresholds — Quick Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#otel-network-observability-20252026" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OTel Network Observability (2025/2026)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#postmortem-sections-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Postmortem Sections Checklist
       
     </span>
   </a>
@@ -4455,10 +4549,32 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#stack-comparison" class="md-nav__link">
+  <a href="#stack-comparison-20252026" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Stack Comparison
+        Stack Comparison (2025/2026)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#network-slo-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network SLO Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alerting-burn-rate-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alerting — Burn Rate Rules
       
     </span>
   </a>
@@ -4537,6 +4653,50 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#five-layer-rca-decision-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Five-Layer RCA Decision Tree
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alerting-thresholds-quick-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alerting Thresholds — Quick Reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#otel-network-observability-20252026" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OTel Network Observability (2025/2026)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#postmortem-sections-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Postmortem Sections Checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4562,14 +4722,15 @@
   
 
 
-<h1 id="cheat-sheet-09-observability-hubble-prometheus-cf-loggregator">Cheat Sheet 09 — Observability: Hubble / Prometheus / CF Loggregator<a class="headerlink" href="#cheat-sheet-09-observability-hubble-prometheus-cf-loggregator" title="Permanent link">&para;</a></h1>
-<h2 id="stack-comparison">Stack Comparison<a class="headerlink" href="#stack-comparison" title="Permanent link">&para;</a></h2>
+<h1 id="cheat-sheet-09-observability-slos-and-rca">Cheat Sheet 09 — Observability, SLOs, and RCA<a class="headerlink" href="#cheat-sheet-09-observability-slos-and-rca" title="Permanent link">&para;</a></h1>
+<h2 id="stack-comparison-20252026">Stack Comparison (2025/2026)<a class="headerlink" href="#stack-comparison-20252026" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
 <th>Layer</th>
 <th>Kubernetes Tool</th>
 <th>CF / BTP Equivalent</th>
+<th>Notes</th>
 </tr>
 </thead>
 <tbody>
@@ -4577,29 +4738,108 @@
 <td>Flow visibility</td>
 <td>Hubble (Cilium)</td>
 <td>Loggregator / RLP Gateway</td>
+<td>Cilium 1.15+ exports Hubble flows as OTLP traces</td>
+</tr>
+<tr>
+<td>eBPF auto-instrumentation</td>
+<td>Beyla / OTel eBPF Instrumentation (OBI)</td>
+<td>—</td>
+<td>Grafana donated Beyla to OTel project 2025</td>
 </tr>
 <tr>
 <td>Metrics scraping</td>
 <td>Prometheus</td>
 <td>Log Cache / Metrics Forwarder</td>
+<td>OTel Collector can bridge both</td>
+</tr>
+<tr>
+<td>Distributed traces</td>
+<td>Grafana Tempo / Jaeger</td>
+<td>Zipkin (via service mesh)</td>
+<td>Cilium spans appear as network hops in Tempo</td>
+</tr>
+<tr>
+<td>Logs</td>
+<td>Grafana Loki</td>
+<td>Loggregator + syslog drains</td>
+<td>Tetragon events → structured JSON → Loki</td>
 </tr>
 <tr>
 <td>Visualization</td>
 <td>Grafana</td>
 <td>Stratos / Log Cache Nozzle</td>
+<td>Single Grafana can show K8s + CF signals</td>
 </tr>
 <tr>
 <td>Alerting</td>
 <td>Alertmanager</td>
 <td>Healthwatch</td>
-</tr>
-<tr>
-<td>Tracing</td>
-<td>Jaeger / Tempo</td>
-<td>Zipkin (via service mesh)</td>
+<td>Multiwindow multi-burnrate rules (see below)</td>
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="network-slo-reference">Network SLO Reference<a class="headerlink" href="#network-slo-reference" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>SLO</th>
+<th>SLI Metric</th>
+<th>Target</th>
+<th>Error Budget (30d)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Flow availability</td>
+<td><code>hubble_flows_processed_total{verdict="FORWARDED"} / total</code></td>
+<td>≥ 99.95%</td>
+<td>21.6 min drop budget</td>
+</tr>
+<tr>
+<td>DNS success rate</td>
+<td><code>1 - coredns_dns_responses_total{rcode=~"SERVFAIL\|NXDOMAIN"} / total</code></td>
+<td>≥ 99.9%</td>
+<td>43.2 min</td>
+</tr>
+<tr>
+<td>conntrack headroom</td>
+<td><code>node_nf_conntrack_entries / node_nf_conntrack_entries_limit</code></td>
+<td>&lt; 80%</td>
+<td>threshold alert</td>
+</tr>
+<tr>
+<td>Policy convergence</td>
+<td><code>histogram_quantile(0.99, cilium_policy_regeneration_time_stats_seconds_bucket)</code></td>
+<td>&lt; 5s p99</td>
+<td>threshold alert</td>
+</tr>
+<tr>
+<td>DNS latency</td>
+<td>CoreDNS histogram p99</td>
+<td>&lt; 50ms</td>
+<td>threshold alert</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Error budget = <code>(1 - SLO_target) × window_seconds</code></strong><br />
+Example: 0.0005 × 2592000s = 1296s = 21.6 min</p>
+<hr />
+<h2 id="alerting-burn-rate-rules">Alerting — Burn Rate Rules<a class="headerlink" href="#alerting-burn-rate-rules" title="Permanent link">&para;</a></h2>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Fast burn (1h window, 14.4× burn rate → consuming 2% of monthly budget in 1 hour)</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">NetworkFlowDropBudgetBurn_Fast</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">(1 - slo:hubble_forward_ratio:rate5m) &gt; (14.4 * 0.0005)</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2m</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nt">labels</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> severity</span><span class="p">:</span><span class="w"> </span><span class="nv">page</span><span class="w"> </span><span class="p p-Indicator">}</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># Slow burn (6h window, 6× burn rate → consuming 5% in 6 hours)</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">NetworkFlowDropBudgetBurn_Slow</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">(1 - slo:hubble_forward_ratio:rate1h) &gt; (6 * 0.0005)</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">15m</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">  </span><span class="nt">labels</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> severity</span><span class="p">:</span><span class="w"> </span><span class="nv">ticket</span><span class="w"> </span><span class="p p-Indicator">}</span>
+</span></code></pre></div>
+<p><strong>Multiwindow logic:</strong> fast burn wakes you up; slow burn catches gradual erosion. Both are needed.</p>
+<hr />
 <hr />
 <h2 id="key-prometheus-cilium-metrics">Key Prometheus / Cilium Metrics<a class="headerlink" href="#key-prometheus-cilium-metrics" title="Permanent link">&para;</a></h2>
 <table>
@@ -4777,7 +5017,139 @@
 - <code>cf network-policies</code> — verify C2C policy exists between source and target apps
 - <code>cf curl /networking/v1/external/policies</code> — list all active C2C policies</p>
 <hr />
-<p>→ Full lessons: <a href="../../lessons/24-network-observability-troubleshooting/">K8s Lesson 24 — Network Observability &amp; Troubleshooting</a> · <a href="../../cf/cf-16-observability-troubleshooting/">CF Lesson 16 — Observability &amp; Troubleshooting</a></p>
+<h2 id="five-layer-rca-decision-tree">Five-Layer RCA Decision Tree<a class="headerlink" href="#five-layer-rca-decision-tree" title="Permanent link">&para;</a></h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Symptom: network fault
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>│
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>├─ L5 — Policy layer
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>│    hubble observe --verdict DROPPED
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>│    kubectl describe ciliumnetworkpolicy
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>│    → drops? → fix NetworkPolicy / CiliumNetworkPolicy
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>│
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>├─ L4 — K8s control plane
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>│    kubectl get endpoints &lt;svc&gt;
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>│    kubectl get endpointslice
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>│    → empty? → fix pod labels / service selector
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>│
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>├─ L3 — CNI / overlay
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>│    cilium status; bpftool prog list
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>│    → not OK? → restart cilium DaemonSet
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>│
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>├─ L2 — Node networking
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>│    sysctl net.ipv4.ip_forward
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>│    conntrack -S | grep max_entries
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>│    ip link show | grep mtu
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>│    → 0 or full or mismatch? → fix sysctl / MTU
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>│
+</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>└─ L1 — Infrastructure
+</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>     ip link show; ethtool -S eth0
+</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>     → cloud console: SG / VPC route / NIC errors
+</span></code></pre></div>
+<hr />
+<h2 id="alerting-thresholds-quick-reference">Alerting Thresholds — Quick Reference<a class="headerlink" href="#alerting-thresholds-quick-reference" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Alert</th>
+<th>Threshold</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hubble DROPPED rate</td>
+<td>&gt; 0.05% for 2m</td>
+<td>Page on-call</td>
+</tr>
+<tr>
+<td>DNS NXDOMAIN + SERVFAIL rate</td>
+<td>&gt; 0.1% for 5m</td>
+<td>Page on-call</td>
+</tr>
+<tr>
+<td>conntrack fill</td>
+<td>&gt; 80% for 5m</td>
+<td>Warning ticket</td>
+</tr>
+<tr>
+<td>conntrack fill</td>
+<td>&gt; 95% for 1m</td>
+<td>Page on-call</td>
+</tr>
+<tr>
+<td>Policy convergence p99</td>
+<td>&gt; 5s for 3m</td>
+<td>Warning ticket</td>
+</tr>
+<tr>
+<td>Cilium agent down</td>
+<td>0 for 1m</td>
+<td>Page on-call</td>
+</tr>
+<tr>
+<td>WireGuard interfaces</td>
+<td>&lt; 1 for 1m</td>
+<td>Page on-call (HIPAA/PCI)</td>
+</tr>
+<tr>
+<td>Tetragon events</td>
+<td>0 for 5m</td>
+<td>Warning (IEC 62443)</td>
+</tr>
+<tr>
+<td>Node network errors</td>
+<td>&gt; 0 for 5m</td>
+<td>Warning ticket</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="otel-network-observability-20252026">OTel Network Observability (2025/2026)<a class="headerlink" href="#otel-network-observability-20252026" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Cilium Hubble OTLP export</strong></td>
+<td>Hubble flows → OTLP traces (network hops as spans in Tempo)</td>
+</tr>
+<tr>
+<td><strong>OTel eBPF Instrumentation (OBI)</strong></td>
+<td>Beyla donated to OTel project 2025; eBPF auto-instrumentation without code changes</td>
+</tr>
+<tr>
+<td><strong>OTel Collector</strong></td>
+<td>Receives OTLP from Cilium + app SDKs; fans out to Prometheus/Tempo/Loki</td>
+</tr>
+<tr>
+<td><strong>Tetragon → Loki</strong></td>
+<td>Process/network security events as structured JSON logs with trace context</td>
+</tr>
+<tr>
+<td><strong>Grafana Tempo</strong></td>
+<td>Trace storage; correlate Cilium network-hop spans with app spans</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key OTel semantic conventions for network events:</strong><br />
+<code>network.type</code> (ipv4/ipv6) · <code>network.transport</code> (tcp/udp) · <code>net.peer.ip</code> · <code>server.address</code> · <code>server.port</code></p>
+<hr />
+<h2 id="postmortem-sections-checklist">Postmortem Sections Checklist<a class="headerlink" href="#postmortem-sections-checklist" title="Permanent link">&para;</a></h2>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Title / Date / Severity / Duration</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Impact (services, users, error budget consumed)</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Timeline with UTC timestamps</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Five-layer RCA table (which layers were checked)</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 5-Why root cause chain</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> What went well / what went wrong</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Action items with owner + due date</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Compliance evidence (flow logs, audit trail, ticket)</li>
+</ul>
+<hr />
+<p>→ Full lessons: <a href="../../lessons/24-network-observability-troubleshooting/">K8s Lesson 24 — Network Observability &amp; Troubleshooting</a> · <a href="../../lessons/39-network-incident-management-slo-rca/">K8s Lesson 39 — Network Incident Management, SLOs &amp; RCA</a> · <a href="../../cf/cf-16-observability-troubleshooting/">CF Lesson 16 — Observability &amp; Troubleshooting</a></p>
 
 
 
