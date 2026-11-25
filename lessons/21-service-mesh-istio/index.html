@@ -5467,18 +5467,18 @@
 <h3 id="sidecar-mode-classic-istio">Sidecar Mode (classic Istio)<a class="headerlink" href="#sidecar-mode-classic-istio" title="Permanent link">&para;</a></h3>
 <pre class="mermaid"><code>flowchart LR
     subgraph ClusterControl["Control Plane (istio-system)"]
-        istiod["istiod v1.20 (Pilot + CA + Galley) :15010 xDS gRPC :15012 mTLS webhook"]
+        istiod["istiod v1.32 (Pilot + CA + Galley) :15010 xDS gRPC :15012 mTLS webhook"]
     end
 
     subgraph PodA["Pod A ns:default sa:frontend"]
         appA["App :8080"]
-        envoyA["Envoy sidecar v1.28 :15001 outbound :15006 inbound :15020 health"]
+        envoyA["Envoy sidecar :15001 outbound :15006 inbound :15020 health"]
         appA &lt;--&gt; envoyA
     end
 
     subgraph PodB["Pod B ns:default sa:backend"]
         appB["App :8080"]
-        envoyB["Envoy sidecar v1.28 :15001 outbound :15006 inbound :15020 health"]
+        envoyB["Envoy sidecar :15001 outbound :15006 inbound :15020 health"]
         envoyB &lt;--&gt; appB
     end
 

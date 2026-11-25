@@ -5233,7 +5233,7 @@
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># OR use an existing K8s cluster as cloud</span>
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="c1"># Install keadm (KubeEdge admin CLI)</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="nv">KEADM_VERSION</span><span class="o">=</span>v1.17.0
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="nv">KEADM_VERSION</span><span class="o">=</span>v1.23.1
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>curl<span class="w"> </span>-LO<span class="w"> </span>https://github.com/kubeedge/kubeedge/releases/download/<span class="si">${</span><span class="nv">KEADM_VERSION</span><span class="si">}</span>/keadm-<span class="si">${</span><span class="nv">KEADM_VERSION</span><span class="si">}</span>-linux-amd64.tar.gz
 </span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>tar<span class="w"> </span>xzf<span class="w"> </span>keadm-<span class="si">${</span><span class="nv">KEADM_VERSION</span><span class="si">}</span>-linux-amd64.tar.gz
 </span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>sudo<span class="w"> </span>mv<span class="w"> </span>keadm-<span class="si">${</span><span class="nv">KEADM_VERSION</span><span class="si">}</span>-linux-amd64/keadm<span class="w"> </span>/usr/local/bin/
@@ -5247,7 +5247,7 @@
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># This installs the KubeEdge CRDs and CloudCore deployment</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>keadm<span class="w"> </span>init<span class="w"> </span>--advertise-address<span class="o">=</span><span class="k">$(</span>kubectl<span class="w"> </span>get<span class="w"> </span>nodes<span class="w"> </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">'{.items[0].status.addresses[0].address}'</span><span class="k">)</span><span class="w"> </span><span class="se">\</span>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>--set<span class="w"> </span>cloudCore.service.type<span class="o">=</span>NodePort<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span>--kubeedge-version<span class="o">=</span><span class="m">1</span>.17.0
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span>--kubeedge-version<span class="o">=</span><span class="m">1</span>.23.1
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
 </span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="c1"># Verify CloudCore is running</span>
 </span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>kubectl<span class="w"> </span>get<span class="w"> </span>pods<span class="w"> </span>-n<span class="w"> </span>kubeedge
@@ -5273,7 +5273,7 @@
 </span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>keadm<span class="w"> </span>join<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span>--cloudcore-ipport<span class="o">=</span><span class="si">${</span><span class="nv">CLOUD_IP</span><span class="si">}</span>:10000<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">  </span>--token<span class="o">=</span><span class="si">${</span><span class="nv">TOKEN</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">  </span>--kubeedge-version<span class="o">=</span><span class="m">1</span>.17.0<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">  </span>--kubeedge-version<span class="o">=</span><span class="m">1</span>.23.1<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">  </span>--cgroupdriver<span class="o">=</span>systemd
 </span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
 </span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="c1"># Verify EdgeCore is running on the edge node</span>
@@ -5282,8 +5282,8 @@
 </span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="c1"># Terminal 2 (Mac): Verify edge node appears in kubectl</span>
 </span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>kubectl<span class="w"> </span>get<span class="w"> </span>nodes
 </span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="c1"># NAME         STATUS   ROLES        AGE   VERSION</span>
-</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="c1"># cloud-node   Ready    control-plane  5m   v1.29.0</span>
-</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="c1"># edge-node    Ready    agent,edge     1m   v1.29.0+kubeedge</span>
+</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="c1"># cloud-node   Ready    control-plane  5m   v1.32.0</span>
+</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="c1"># edge-node    Ready    agent,edge     1m   v1.32.0+kubeedge</span>
 </span></code></pre></div>
 <hr />
 <h3 id="lab-3-deploy-a-workload-to-the-edge-node">Lab 3 — Deploy a workload to the edge node<a class="headerlink" href="#lab-3-deploy-a-workload-to-the-edge-node" title="Permanent link">&para;</a></h3>
@@ -5495,7 +5495,7 @@
 <hr />
 <h2 id="quick-reference">Quick Reference<a class="headerlink" href="#quick-reference" title="Permanent link">&para;</a></h2>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Install keadm</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>curl<span class="w"> </span>-LO<span class="w"> </span>https://github.com/kubeedge/kubeedge/releases/download/v1.17.0/keadm-v1.17.0-linux-amd64.tar.gz
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>curl<span class="w"> </span>-LO<span class="w"> </span>https://github.com/kubeedge/kubeedge/releases/download/v1.23.1/keadm-v1.23.1-linux-amd64.tar.gz
 </span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
 </span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># Initialize cloud side</span>
 </span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>keadm<span class="w"> </span>init<span class="w"> </span>--advertise-address<span class="o">=</span>&lt;IP&gt;

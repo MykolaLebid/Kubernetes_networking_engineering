@@ -5498,7 +5498,7 @@
 <h2 id="8-hubble-flow-level-observability">8. Hubble — Flow-Level Observability<a class="headerlink" href="#8-hubble-flow-level-observability" title="Permanent link">&para;</a></h2>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Install Hubble CLI</span>
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>curl<span class="w"> </span>-L<span class="w"> </span>--fail<span class="w"> </span>--remote-name-all<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span>https://github.com/cilium/hubble/releases/download/v0.13.0/hubble-linux-amd64.tar.gz
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span>https://github.com/cilium/hubble/releases/download/v1.20.4/hubble-linux-amd64.tar.gz
 </span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>tar<span class="w"> </span>xzvf<span class="w"> </span>hubble-linux-amd64.tar.gz
 </span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>mv<span class="w"> </span>hubble<span class="w"> </span>/usr/local/bin/
 </span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
@@ -6023,7 +6023,7 @@
 </span></code></pre></div>
 <hr />
 <h3 id="102-obi-v10-ebpf-zero-code-instrumentation">10.2 OBI v1.0 — eBPF Zero-Code Instrumentation<a class="headerlink" href="#102-obi-v10-ebpf-zero-code-instrumentation" title="Permanent link">&para;</a></h3>
-<p><strong>OBI</strong> (OpenTelemetry eBPF Instrumentation) was originally Grafana's Beyla project. Grafana donated it to the CNCF/OTel project in 2025; it was renamed to OBI and reached v1.0 GA in 2026.</p>
+<p><strong>OBI</strong> (OpenTelemetry eBPF Instrumentation) is the OTel project's native eBPF auto-instrumentation tool (<code>open-telemetry/opentelemetry-ebpf-instrumentation</code>). It reached v1.0 GA in October 2026.</p>
 <p><strong>What it does:</strong> hooks into the Linux kernel via eBPF (kernel 5.8+) to intercept HTTP, gRPC, SQL, and other protocol calls at the system-call boundary. No sidecar. No code change. No pod restart. Runs as a cluster-wide DaemonSet.</p>
 <p><strong>Supported protocols:</strong> HTTP/HTTPS, HTTP/2, gRPC, SQL (MySQL/PostgreSQL), Redis, MongoDB, Kafka, GraphQL, Elasticsearch/OpenSearch, AWS S3</p>
 <p><strong>Languages with distributed trace context propagation:</strong> Go, Node.js, Python, NGINX, PHP</p>

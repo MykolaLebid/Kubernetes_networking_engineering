@@ -5183,6 +5183,7 @@
 <strong>Prerequisites:</strong> <a href="../22-multi-cluster-networking/">Lesson 22 — Multi-Cluster Networking</a>, <a href="../16-network-policies/">Lesson 16 — Network Policies</a><br />
 <strong>Duration:</strong> ~2 hours</p>
 <p><strong>Goal:</strong> Use ArgoCD to manage NetworkPolicies, CoreDNS configs, and Ingress rules as code — with sync waves for ordered delivery, ApplicationSets for multi-cluster rollout, and drift auto-remediation.</p>
+<p><strong>Version note:</strong> Current stable is <strong>ArgoCD v3.6.3</strong> (November 2026). v3.0 introduced breaking changes: annotation-based resource tracking by default (was label-based), RBAC no longer extends to sub-resources automatically, deprecated metrics removed (<code>argocd_app_sync_status</code>, <code>argocd_app_health_status</code>), repository config must use Secrets not ConfigMap. The CRD apiVersion <code>argoproj.io/v1alpha1</code> is unchanged.</p>
 </blockquote>
 <p><strong>Jump to:</strong> <a href="#theory">Theory</a> · <a href="#practice">Practice</a> · <a href="#troubleshooting">Troubleshooting</a> · <a href="#production-checklist">Production Checklist</a> · <a href="#quick-reference">Quick Reference</a> · <a href="#check-your-understanding">Check Your Understanding</a></p>
 <hr />

@@ -5049,6 +5049,7 @@
 <strong>Prerequisites:</strong> <a href="../08-cloud-provider-networking/">Lesson 08 — Cloud Provider Networking</a>, <a href="../09-cni-specification/">Lesson 09 — CNI</a>
 <strong>Duration:</strong> ~3 hours</p>
 <p><strong>Goal:</strong> Explain how the AWS VPC CNI assigns real VPC IPs to pods via ENI secondary IPs, calculate the pod density limit for a given instance type, enable prefix delegation to increase that limit, and assign per-pod Security Groups using SecurityGroupPolicy.</p>
+<p><strong>Version note:</strong> Current stable as of November 2026 — <strong>AWS VPC CNI v1.23.3</strong>, <strong>EKS supports K8s 1.32–1.37</strong>. eBPF network policy controller was introduced in VPC CNI v1.14 (minimum version for that feature); the reference to <code>v1.14+</code> throughout this lesson means that feature boundary, not the current version.</p>
 </blockquote>
 <p><strong>Jump to:</strong> <a href="#theory">Theory</a> · <a href="#practice">Practice</a> · <a href="#troubleshooting">Troubleshooting</a> · <a href="#production-checklist">Production Checklist</a> · <a href="#quick-reference">Quick Reference</a> · <a href="#check-your-understanding">Check Your Understanding</a></p>
 <hr />
